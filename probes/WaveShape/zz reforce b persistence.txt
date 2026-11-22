@@ -1,0 +1,13 @@
+// reforce probe: B0 counts frames (self-reference). Dot walks right from x=-1 at .002/frame; wraps every 1000 frames.
+// Starting x reveals B0's initial value; speed confirms per-frame evaluation.
+// Second dot: C0 accumulates across s steps (Fern-style carry-over). Stps=5: if C carries, dots at y=.1,.2,.3,.4,.5; if reset each step, all at y=.1.
+Stps=5
+ConB=0
+LWdt=8
+B0="B0 + 1"
+C0="C0 + .1"
+X0="wrap(B0 * .001) * 2 - 1"
+Y0="-.5"
+X1="s - .5"
+Y1="C0"
+Vers=270

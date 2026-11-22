@@ -1,0 +1,12 @@
+Vers=100
+Meta="reforce organic: a phyllotaxis whose angle drifts around the golden angle once per phrase, so its spiral arms open, wind up and fly apart into galaxies and back."
+Kind="phyllotaxis"
+Num="1200"
+Rate="8"
+Spc=".026"
+DotW="4"
+B0="t - START_TIME"
+// the phrase position: the phrase clock when the beat clock is locked, else one phrase per 32 s
+B1="SYNC_ON * SYNC_PHRASE + (1 - SYNC_ON) * B0 / 32"
+Ang="137.508 + 1.8 * sin(2 * PI * B1)"
+Rot="-.06 * B0"

@@ -1,0 +1,4 @@
+Vers=100
+Meta="reforce dancer: someone new every time: a hip-hop dancer (party grooves and LA choreography), dressed to match (body, colours, outfit, prints, fabrics, sunglasses, face)."
+Style="hiphop"
+Random="1"

@@ -1,0 +1,97 @@
+{
+ "file": "tone_pairs.wav",
+ "description": "Simultaneous sines, -18 dBFS peak each: 300+2400 Hz 10 s; gap 2 s; 200+400+3200 Hz 10 s; gap 2 s; 1 kHz 6 s -> 1k+4k 6 s -> 4 kHz 6 s (no gaps); gap 2 s; 250+1000 Hz 6 s.",
+ "sample_rate": 44100,
+ "channels": 1,
+ "sample_format": "s16",
+ "duration": 54.0,
+ "samples": 2381400,
+ "sync": {
+  "t": 0.5,
+  "duration": 0.05,
+  "freq_hz": 2000.0,
+  "peak_dbfs": -6.0
+ },
+ "content_start": 2.0,
+ "segments": [
+  {
+   "kind": "tones",
+   "freqs_hz": [
+    300.0,
+    2400.0
+   ],
+   "peak_dbfs_each": -18,
+   "t0": 2.0,
+   "t1": 12.0
+  },
+  {
+   "t0": 12.0,
+   "t1": 14.0,
+   "kind": "silence",
+   "label": "gap"
+  },
+  {
+   "kind": "tones",
+   "freqs_hz": [
+    200.0,
+    400.0,
+    3200.0
+   ],
+   "peak_dbfs_each": -18,
+   "t0": 14.0,
+   "t1": 24.0
+  },
+  {
+   "t0": 24.0,
+   "t1": 26.0,
+   "kind": "silence",
+   "label": "gap"
+  },
+  {
+   "kind": "tones",
+   "freqs_hz": [
+    1000.0
+   ],
+   "peak_dbfs_each": -18,
+   "t0": 26.0,
+   "t1": 32.0
+  },
+  {
+   "kind": "tones",
+   "freqs_hz": [
+    1000.0,
+    4000.0
+   ],
+   "peak_dbfs_each": -18,
+   "t0": 32.0,
+   "t1": 38.0
+  },
+  {
+   "kind": "tones",
+   "freqs_hz": [
+    4000.0
+   ],
+   "peak_dbfs_each": -18,
+   "t0": 38.0,
+   "t1": 44.0
+  },
+  {
+   "t0": 44.0,
+   "t1": 46.0,
+   "kind": "silence",
+   "label": "gap"
+  },
+  {
+   "kind": "tones",
+   "freqs_hz": [
+    250.0,
+    1000.0
+   ],
+   "peak_dbfs_each": -18,
+   "t0": 46.0,
+   "t1": 52.0
+  }
+ ],
+ "levels": "tones/sweep/kick: dBFS peak (0 dBFS = full-scale sine); noise: dBFS RMS",
+ "generator": "tools/audio_signals/gen_signals.py"
+}

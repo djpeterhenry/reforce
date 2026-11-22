@@ -1,0 +1,7 @@
+// reforce probe: a single dot at (-.5,0).
+Stps=1
+ConB=0
+LWdt=8
+X0="-.5"
+Y0="0"
+Vers=270

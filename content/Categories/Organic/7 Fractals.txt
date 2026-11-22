@@ -1,0 +1,6 @@
+CategoryTitle = "Fractals"
+Include.List = "
+Julia Drift
+Julia Pulse
+Julia Bands
+"

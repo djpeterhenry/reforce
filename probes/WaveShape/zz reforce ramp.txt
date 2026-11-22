@@ -1,0 +1,9 @@
+// reforce probe: 32 short vertical bars across the screen with Pen = s (0..1) -> an intensity ramp.
+// Used to read ColorMaps (clamp test, morph midpoint) and the Pen->intensity mapping.
+Stps=64
+ConB=0
+LWdt=12
+X0="floor(s * 31.99) / 16 - .97"
+Y0="(s * 64 - floor(s * 64)) * .4 - .2"
+Pen="floor(s * 31.99) / 31"
+Vers=270

@@ -1,0 +1,3 @@
+ThemeName = "Dance Party"
+About = "reforce: everything as in (Standard), plus a dancer stepping onto the disco floor every 15 seconds or so (each stays about 90 s, up to five at once)."
+Dancer.Slideshow.Interval.Duration = 15

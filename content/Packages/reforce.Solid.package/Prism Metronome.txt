@@ -1,0 +1,18 @@
+Vers=100
+Meta="reforce solid: a prism swinging like a metronome from a pivot above the frame, turning round at each beat (one swing per beat) while the beat clock is locked (SYNC_*), else at 120 BPM; it spins slowly on its own axis and its edges flash at each turn."
+Mesh="prism"
+Text="0"
+B0="t - START_TIME"
+B1="SYNC_ON * SYNC_BEAT + (1 - SYNC_ON) * 2 * B0"
+// swing angle: +-.6 rad at the beats, through the middle half way between them
+B2=".6 * cos(PI * B1)"
+// how close to a turning point (1 at the beat)
+B3="abs(cos(PI * B1))^6"
+X="1.75 * sin(B2) / 1.7778"
+Y="1.25 - 1.75 * cos(B2)"
+Z="0"
+Scal=".3"
+RotX="0"
+RotY=".4 * B0"
+RotZ="B2"
+Edge=".5 + .5 * B3"

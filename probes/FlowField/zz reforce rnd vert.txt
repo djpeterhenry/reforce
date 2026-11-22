@@ -1,0 +1,8 @@
+// reforce probe: vertical jitter. Left half (x<0) uses a C var (expected one rnd per row -> rows shift as units,
+// horizontal lines stay sharp). Right half uses a D var (expected per-pixel -> lines diffuse into vertical fuzz).
+Aspc=0
+C0="rnd(.02) - .01"
+D0="rnd(.02) - .01"
+srcX="x"
+srcY="y + (x < 0) * C0 + (x >= 0) * D0"
+Vers=100

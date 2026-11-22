@@ -1,0 +1,7 @@
+// reforce probe (5B.1 FlowField morph timing, 5B.2 particle strip): everything scrolls LEFT by exactly 1 px per
+// frame at 1980 px width, except a void gap .3 < y <= .4 (cleared every frame) that separates the clock bands
+// (y > .4) from the morph region (y <= .3). Morph partner: 'zz reforce morph b'.
+Aspc=0
+srcX="(y > .3) * (y <= .4) * 9 + ((y <= .3) + (y > .4)) * (x + 2/1980)"
+srcY="(y > .3) * (y <= .4) * 9 + ((y <= .3) + (y > .4)) * y"
+Vers=100

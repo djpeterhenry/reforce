@@ -1,0 +1,120 @@
+{
+ "file": "tone_freqs.wav",
+ "description": "Steady sines at -12 dBFS peak: 125/250/500/1k/2k/4k Hz, 6 s each with 2 s silent gaps; 2 s gap; 1 kHz for 20 s (drift); 2 s gap; falling log sweep 20 kHz -> 20 Hz over 20 s at -6 dBFS peak.",
+ "sample_rate": 44100,
+ "channels": 1,
+ "sample_format": "s16",
+ "duration": 94.0,
+ "samples": 4145400,
+ "sync": {
+  "t": 0.5,
+  "duration": 0.05,
+  "freq_hz": 2000.0,
+  "peak_dbfs": -6.0
+ },
+ "content_start": 2.0,
+ "segments": [
+  {
+   "kind": "tone",
+   "freq_hz": 125.0,
+   "peak_dbfs": -12,
+   "t0": 2.0,
+   "t1": 8.0
+  },
+  {
+   "t0": 8.0,
+   "t1": 10.0,
+   "kind": "silence",
+   "label": "gap"
+  },
+  {
+   "kind": "tone",
+   "freq_hz": 250.0,
+   "peak_dbfs": -12,
+   "t0": 10.0,
+   "t1": 16.0
+  },
+  {
+   "t0": 16.0,
+   "t1": 18.0,
+   "kind": "silence",
+   "label": "gap"
+  },
+  {
+   "kind": "tone",
+   "freq_hz": 500.0,
+   "peak_dbfs": -12,
+   "t0": 18.0,
+   "t1": 24.0
+  },
+  {
+   "t0": 24.0,
+   "t1": 26.0,
+   "kind": "silence",
+   "label": "gap"
+  },
+  {
+   "kind": "tone",
+   "freq_hz": 1000.0,
+   "peak_dbfs": -12,
+   "t0": 26.0,
+   "t1": 32.0
+  },
+  {
+   "t0": 32.0,
+   "t1": 34.0,
+   "kind": "silence",
+   "label": "gap"
+  },
+  {
+   "kind": "tone",
+   "freq_hz": 2000.0,
+   "peak_dbfs": -12,
+   "t0": 34.0,
+   "t1": 40.0
+  },
+  {
+   "t0": 40.0,
+   "t1": 42.0,
+   "kind": "silence",
+   "label": "gap"
+  },
+  {
+   "kind": "tone",
+   "freq_hz": 4000.0,
+   "peak_dbfs": -12,
+   "t0": 42.0,
+   "t1": 48.0
+  },
+  {
+   "t0": 48.0,
+   "t1": 50.0,
+   "kind": "silence",
+   "label": "gap"
+  },
+  {
+   "kind": "tone_long",
+   "freq_hz": 1000.0,
+   "peak_dbfs": -12,
+   "t0": 50.0,
+   "t1": 70.0
+  },
+  {
+   "t0": 70.0,
+   "t1": 72.0,
+   "kind": "silence",
+   "label": "gap"
+  },
+  {
+   "kind": "log_sweep_down",
+   "f0_hz": 20000.0,
+   "f1_hz": 20.0,
+   "peak_dbfs": -6,
+   "freq_of_t": "f0 * (f1/f0)^((t - t0)/(t1 - t0))",
+   "t0": 72.0,
+   "t1": 92.0
+  }
+ ],
+ "levels": "tones/sweep/kick: dBFS peak (0 dBFS = full-scale sine); noise: dBFS RMS",
+ "generator": "tools/audio_signals/gen_signals.py"
+}

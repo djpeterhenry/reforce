@@ -1,0 +1,13 @@
+Vers=100
+Meta="reforce organic: a spiral Julia set drawn as bands of its escape count that flow inward once per beat; the constant drifts over 32 bars."
+Kind="julia"
+Iter="100"
+B0="t - START_TIME"
+B1="SYNC_ON * SYNC_BEAT + (1 - SYNC_ON) * 2 * B0"
+CRe="-.4 + .06 * cos(2 * PI * B1 / 128)"
+CIm=".6 + .05 * sin(2 * PI * B1 / 96)"
+Band="7"
+Phas="-2 * PI * B1"
+Scal="1.15"
+Gain="1.4"
+Pen=".9"

@@ -1,0 +1,3 @@
+// reforce probe: constant ALFA = .5 everywhere -> compare zoom progress against a no-union transition.
+ALFA=".5"
+Vers=250

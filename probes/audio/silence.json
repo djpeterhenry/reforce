@@ -1,0 +1,26 @@
+{
+ "file": "silence.wav",
+ "description": "Lead-in + 10 s digital silence: baseline / noise floor of every signal.",
+ "sample_rate": 44100,
+ "channels": 1,
+ "sample_format": "s16",
+ "duration": 14.0,
+ "samples": 617400,
+ "sync": {
+  "t": 0.5,
+  "duration": 0.05,
+  "freq_hz": 2000.0,
+  "peak_dbfs": -6.0
+ },
+ "content_start": 2.0,
+ "segments": [
+  {
+   "t0": 2.0,
+   "t1": 12.0,
+   "kind": "silence",
+   "label": "silence"
+  }
+ ],
+ "levels": "tones/sweep/kick: dBFS peak (0 dBFS = full-scale sine); noise: dBFS RMS",
+ "generator": "tools/audio_signals/gen_signals.py"
+}

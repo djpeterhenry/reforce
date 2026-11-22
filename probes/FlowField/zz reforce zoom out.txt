@@ -1,0 +1,5 @@
+// reforce probe: samples outside the frame near the edges -> reveals out-of-frame policy (black / clamp / wrap).
+Aspc=0
+srcX="x * 1.5"
+srcY="y * 1.5"
+Vers=100

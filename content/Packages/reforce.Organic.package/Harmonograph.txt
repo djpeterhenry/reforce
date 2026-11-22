@@ -1,0 +1,12 @@
+Vers=100
+Meta="reforce organic: a harmonograph pen tracing a 3:2 Lissajous figure that closes once per bar; its phase drifts, so the figure turns through knots and loops."
+Kind="harmonograph"
+Stps="700"
+Len="1"
+Wdth="3"
+B0="t - START_TIME"
+FX="3"
+FY="2"
+PhX=".15 * B0"
+AX="1.25"
+AY=".82"

@@ -1,0 +1,18 @@
+// reforce probe (F6 line width vs frame size; use with FlowField 'zz reforce void', MapFunction "i"). Pen 1.
+// Paths 0-2: horizontal lines x -.95..+.2 at y = -.6 / -.1 / .5 with LWdt 2 / 5 / 10.
+// Paths 3-4: vertical lines y -.95..+.95 at x = .5 / .8 with LWdt 5 / 10.
+// Width = area across the line (column / row integral / 255), median along the line away from crossings.
+Stps=2
+ConB=1
+LWdt="2 + 3 * (PATH_ID > .5) + 5 * (PATH_ID > 1.5) - 5 * (PATH_ID > 2.5) + 5 * (PATH_ID > 3.5)"
+X0="-.95 + 1.15 * s"
+Y0="-0.6"
+X1="-.95 + 1.15 * s"
+Y1="-0.1"
+X2="-.95 + 1.15 * s"
+Y2="0.5"
+X3="0.5"
+Y3="-.95 + 1.9 * s"
+X4="0.8"
+Y4="-.95 + 1.9 * s"
+Vers=270

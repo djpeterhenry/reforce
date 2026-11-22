@@ -1,0 +1,9 @@
+Vers=100
+Meta="reforce organic: Conway's Game of Life, one generation per beat; newborn cells flash; a fresh soup every 16 bars (on the phrase lines with the phrase clock), or when it dies down."
+Kind="life"
+Cols="72"
+Rows="40"
+Rate="1"
+Dens=".32"
+Rsd="16"
+Cell=".78"

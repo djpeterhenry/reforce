@@ -1,0 +1,4 @@
+ThemeName = "Organics: Trees"
+About = "reforce: everything as in (Standard), plus a growing tree or plant (Oak, Willow, Roots, Lightning, Neurons, Kelp Forest, Radial Bloom, Fern, Bush) every 30 seconds or so."
+Organic.CategoryExpr = "+Trees"
+Organic.Slideshow.Interval.Duration = 30

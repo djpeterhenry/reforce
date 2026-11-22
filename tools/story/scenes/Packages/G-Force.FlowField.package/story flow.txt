@@ -1,0 +1,5 @@
+// story page (our own scene, not G-Force's): clears the frame every step, so only the current lines show
+Aspc=0
+srcX="9"
+srcY="9"
+Vers=100

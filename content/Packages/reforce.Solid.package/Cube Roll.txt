@@ -1,0 +1,19 @@
+Vers=100
+Meta="reforce solid: a cube that rolls along the floor, tipping over one edge per beat and landing on the beat while the beat clock is locked (SYNC_*), else at 120 BPM. It falls like a real cube (slow start, fast finish) and its edges flash as it lands. Distances assume a 16:9 frame."
+Mesh="cube"
+Text="0"
+B0="t - START_TIME"
+// beat phase: the beat clock when locked, else 2 beats per second
+B1="SYNC_ON * SYNC_BEAT + (1 - SYNC_ON) * 2 * B0"
+B2="wrap(B1)"
+// roll angle 0..pi/2 within the beat, accelerating like a fall
+B3="1.5708 * B2^3"
+// h = half the edge (Scal .32 / sqrt 3); the cube rests at B4 (half-heights) and pivots on its right bottom edge
+B4="-2.3 + 4.6 * wrap(floor(B1) * .3695 / 4.6)"
+X="(B4 + .1848 - .1848 * cos(B3) + .1848 * sin(B3)) / 1.7778"
+Y="-.62 + .1848 * (sin(B3) + cos(B3))"
+Z=".15"
+Scal=".32"
+RotZ="-B3"
+Fill=".15 + .35 * exp(-10 * B2)"
+Edge=".5 + .5 * exp(-8 * B2)"

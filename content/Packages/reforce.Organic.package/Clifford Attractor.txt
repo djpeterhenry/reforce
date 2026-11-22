@@ -1,0 +1,13 @@
+Vers=100
+Meta="reforce organic: a Clifford strange attractor, thousands of points a frame; its four parameters glide over 32 bars, so the cloud folds through wings, shells and knots in time with the music."
+Kind="attractor"
+Num="9000"
+DotW="1.4"
+Sprd=".42"
+B0="t - START_TIME"
+B1="SYNC_ON * SYNC_BAR + (1 - SYNC_ON) * .5 * B0"
+PA="-1.4 + .25 * sin(2 * PI * B1 / 32)"
+PB="1.6 + .2 * cos(2 * PI * B1 / 24)"
+PC="1.0 + .3 * sin(2 * PI * B1 / 40)"
+PD=".7 + .25 * cos(2 * PI * B1 / 28)"
+Pen=".85"

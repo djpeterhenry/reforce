@@ -1,0 +1,5 @@
+// reforce probe: black at i=0, pure green elsewhere. Red->green morph midpoint: RGB lerp=(.5,.5,0) dark yellow; HSV lerp=bright yellow.
+H=".3333"
+S="1"
+V="i > .01"
+Vers=100

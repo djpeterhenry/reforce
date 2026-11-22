@@ -1,0 +1,13 @@
+// reforce probe: path0 horizontal (Pen .8), path1 vertical at x=-.3 (Pen .3), path2 vertical at x=+.3 (Pen 0).
+// At the crossings: overwrite -> .3 / black gap; max-blend -> .8 / unchanged. Use with the void field.
+Stps=50
+ConB=1
+LWdt=6
+X0="2*s - 1"
+Y0="0"
+X1="-.3"
+Y1="2*s - 1"
+X2=".3"
+Y2="2*s - 1"
+Pen="max(0, .8 - PATH_ID * .5) * (PATH_ID < 2)"
+Vers=270

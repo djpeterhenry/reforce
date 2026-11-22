@@ -1,0 +1,9 @@
+Vers=100
+Meta="reforce organic: rule 90, a Sierpinski triangle drawn one row per beat from a single cell, scrolling up; it starts over when it fills the row."
+Kind="automaton"
+Rule="90"
+Cols="129"
+Rows="64"
+Rate="1"
+Seed="0"
+Cell=".85"

@@ -1,0 +1,13 @@
+Vers=100
+Meta="reforce organic: a pendulum wave from the side. Twenty-four pendulums hang from a bar at the top of the frame and swing on their strings; they line up again every 8 bars."
+Kind="pendulums"
+Num="24"
+Cyc="8"
+Osc="8"
+View="1"
+Sprd="3.2"
+Len="1.2"
+BobW="12"
+Wdth="2"
+Amp=".45"
+Strg=".65"

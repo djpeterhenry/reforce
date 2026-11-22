@@ -1,0 +1,4 @@
+ThemeName = "Organics: Water"
+About = "reforce: everything as in (Standard), plus ripples on water, a drop on the beat every 30 seconds or so."
+Organic.CategoryExpr = "+Water"
+Organic.Slideshow.Interval.Duration = 30

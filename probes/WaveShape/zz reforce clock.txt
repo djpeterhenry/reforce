@@ -1,0 +1,7 @@
+// reforce probe: a dot whose x = wrap(t * .1) * 2 - 1 -> moves 0.2 per second if t is in seconds.
+Stps=1
+ConB=0
+LWdt=10
+X0="wrap(t * .1) * 2 - 1"
+Y0="0"
+Vers=270

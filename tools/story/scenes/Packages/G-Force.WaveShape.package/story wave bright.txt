@@ -1,0 +1,10 @@
+// story page (our own scene, not G-Force's): two slowly turning Lissajous figures, full brightness
+Stps=360
+ConB=1
+LWdt=3
+Pen="1"
+X0=".8 * sin(6.283 * 3 * s + .7 * t)"
+Y0=".8 * sin(6.283 * 4 * s)"
+X1=".55 * sin(6.283 * 5 * s - .5 * t)"
+Y1=".55 * cos(6.283 * 2 * s + .3 * t)"
+Vers=270

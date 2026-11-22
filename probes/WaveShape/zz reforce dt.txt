@@ -1,0 +1,8 @@
+// reforce probe (run 33): what is dt in a plain WaveShape? Five dots, top to bottom (y .8 .4 0 -.4 -.8), x = -.9 + dt
+// at scales 0..2, 0..0.1, 0..200, 0..20000 (x = dt*k - .9), and the last dot at x = .25 if dt == 0, else -.25.
+Stps=5
+ConB=0
+LWdt=8
+X0="(s < .1)*(dt*.9 - .9) + (s > .1)*(s < .4)*(dt*18 - .9) + (s > .4)*(s < .6)*(dt*.009 - .9) + (s > .6)*(s < .9)*(dt*.00009 - .9) + (s > .9)*((dt == 0)*.5 - .25)"
+Y0=".8 - s*1.6"
+Vers=270

@@ -1,0 +1,3 @@
+ThemeName = "Solids"
+About = "reforce: everything as in (Standard), plus a 3D solid every 30 seconds or so."
+Solid.Slideshow.Interval.Duration = 30

@@ -1,0 +1,21 @@
+Vers=100
+Meta="reforce debug solid: shows the beat clock. Locked: a white cube steps through four places left to right, one per beat (with Link the leftmost is the bar line), and flashes big and bright for the first quarter of each beat. Not locked: small and dim in the centre. Parenthesized: never in a slideshow; start it from the Solids card, Clear removes it."
+Mesh="cube"
+Text="2"
+PDur="3600"
+B0="t - START_TIME"
+// position in the beat (0 at the beat) and the flash: full at the beat, gone after a quarter beat
+B1="wrap(SYNC_BEAT)"
+B2="SYNC_ON * max(0, 1 - 4 * B1)"
+// beat in the bar, 0..3
+B3="floor(4 * wrap(SYNC_BEAT / 4) + .0001)"
+X="SYNC_ON * (-.6 + .4 * B3)"
+Y="0"
+Z="0"
+Scal=".12 + SYNC_ON * (.04 + .14 * B2)"
+RotX=".45"
+RotY=".6 + .25 * B0"
+Fill=".25 + .75 * B2"
+Shad=".35 * (1 - B2)"
+Edge="1"
+Pen=".3 + .7 * SYNC_ON"

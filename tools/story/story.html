@@ -1,0 +1,1361 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Making of reforce</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="How a DJ and an AI rebuilt a music visualizer from scratch in eleven days, then taught it to dance.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Syne:wght@800&family=Epilogue:wght@600;700;800&family=Instrument+Sans:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one long night at the club. A dark stage, a single column of story at reading width, with live
+   instruments (canvases) that break out wider. Accent = the ember-to-violet ramp of a G-Force-style ColorMap. */
+:root {
+  color-scheme: dark;
+  --ground: #0f0b18;       /* the stage */
+  --raised: #191326;       /* panels, demo frames */
+  --line: #2e2541;         /* hairlines */
+  --ink: #ece6f5;          /* text */
+  --muted: #a49bb5;        /* secondary text */
+  --ember: #ff8a3d;        /* accent: warm end of the ramp */
+  --violet: #b57bff;       /* accent: cool end of the ramp */
+  --ok: #6fdba8;           /* pass / good */
+  --ramp: linear-gradient(90deg, var(--ember), #ff4f8b 50%, var(--violet));
+  --wordmark: "Syne", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --display: "Epilogue", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --body: "Instrument Sans", "Helvetica Neue", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --read: 40rem;
+  --wide: 64rem;
+}
+* { box-sizing: border-box; }
+html { background: var(--ground); }
+body {
+  margin: 0; background: var(--ground); color: var(--ink);
+  font: 17px/1.62 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: env(safe-area-inset-top, 0px) calc(env(safe-area-inset-bottom, 0px) + 4rem);
+  -webkit-font-smoothing: antialiased;
+}
+img, canvas { max-width: 100%; display: block; }
+a { color: var(--ember); }
+:focus-visible { outline: 2px solid var(--violet); outline-offset: 3px; border-radius: 4px; }
+
+.col { max-width: var(--read); margin-inline: auto; }
+.wide { max-width: var(--wide); margin-inline: auto; }
+
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; line-height: 1.08; margin: 0; }
+h2 { font-size: clamp(1.9rem, 4.6vw, 2.75rem); font-weight: 800; letter-spacing: -0.03em; line-height: 1.08; }
+h3 { font-size: 1.2rem; font-weight: 700; }
+p { margin: 0; }
+.eyebrow {
+  font: 600 0.72rem/1 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted);
+  display: flex; gap: 0.75rem; align-items: center;
+}
+.eyebrow .day { color: var(--ember); white-space: nowrap; }
+
+section { padding-top: 5.5rem; display: grid; gap: 1.5rem; }
+.prose { display: grid; gap: 1.05rem; }
+.prose p { color: var(--ink); }
+.prose .lede { font-size: 1.16rem; color: var(--ink); }
+.aside { color: var(--muted); font-size: 0.95rem; }
+code, .num { font-family: var(--mono); font-size: 0.88em; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---------- Hero ---------- */
+.hero { padding-top: 3.5rem; display: grid; gap: 1.6rem; }
+.wordmark {
+  font: 800 clamp(3rem, 13vw, 8.5rem)/0.95 var(--wordmark); letter-spacing: -0.02em;
+  background: var(--ramp); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.hero .tag { font-size: clamp(1.15rem, 2.6vw, 1.45rem); max-width: 34rem; line-height: 1.45; }
+.hero .tag em { font-style: normal; color: var(--ember); }
+
+.stage {
+  position: relative; border-radius: 14px; overflow: hidden; background: #000;
+  border: 1px solid var(--line); aspect-ratio: 16 / 9; width: 100%;
+}
+.stage canvas { width: 100%; height: 100%; }
+.stage .badge, .wall .badge {
+  position: absolute; left: 12px; top: 10px; font: 600 0.68rem/1 var(--mono); letter-spacing: 0.12em;
+  text-transform: uppercase; color: rgba(255,255,255,0.72); background: rgba(0,0,0,0.45); padding: 6px 8px; border-radius: 6px;
+}
+.controls { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; }
+.controls .label { font: 600 0.7rem/1 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-left: 0.4rem; }
+button, select {
+  font: 600 0.9rem/1 var(--body); color: var(--ink); background: var(--raised); border: 1px solid var(--line);
+  border-radius: 999px; padding: 0.62rem 1rem; cursor: pointer;
+}
+button:hover, select:hover { border-color: var(--violet); }
+button.primary { background: var(--ember); color: #1a0d05; border-color: transparent; }
+button.primary:hover { filter: brightness(1.08); }
+button[aria-pressed="true"] { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; gap: 2px; background: var(--raised); }
+.seg button { border: 0; padding: 0.5rem 0.8rem; background: transparent; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--ground); }
+
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.stat { background: var(--ground); padding: 1rem 1.1rem; display: grid; gap: 0.3rem; align-content: start; }
+.stat b { font: 700 1.9rem/1 var(--display); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.stat span { color: var(--muted); font-size: 0.86rem; line-height: 1.35; }
+
+/* ---------- Rules ---------- */
+.rules { display: grid; gap: 1rem 1.2rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 600px) { .rules { grid-template-columns: 1fr; } }
+.rule { border-top: 2px solid var(--ember); padding-top: 0.9rem; display: grid; gap: 0.45rem; }
+.rule:nth-child(2) { border-color: #ff4f8b; }
+.rule:nth-child(3) { border-color: var(--violet); }
+.rule p { color: var(--muted); font-size: 0.95rem; }
+
+/* ---------- Finding cards ---------- */
+
+/* ---------- Precision comparison ---------- */
+.pair { display: grid; gap: 0.8rem; grid-template-columns: 1fr 1fr; }
+.pair figure { margin: 0; display: grid; gap: 0.5rem; }
+.pair .stage { aspect-ratio: 4 / 3; }
+.pair figcaption { font-size: 0.9rem; color: var(--muted); }
+.pair figcaption b { color: var(--ink); }
+.cmp { display: grid; gap: 0.9rem; padding-top: 1.6rem; border-top: 1px solid var(--line); }
+.cmp-head { display: grid; gap: 0.5rem; max-width: var(--read); }
+.cmp-head p { color: var(--muted); font-size: 0.96rem; }
+.stage.px canvas { image-rendering: pixelated; }
+.stage.strips { aspect-ratio: 2 / 1; }
+@media (max-width: 560px) { .pair { grid-template-columns: 1fr; } }
+
+/* ---------- Scoreboard ---------- */
+.board { display: grid; gap: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.35rem 1rem; padding: 0.95rem 1.1rem; border-top: 1px solid var(--line); background: var(--ground); }
+.row:first-child { border-top: 0; }
+.row .what { font-weight: 600; }
+.row .what small { display: block; color: var(--muted); font-weight: 400; font-size: 0.86rem; }
+.row .score { font: 600 1rem/1.3 var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+.meter { grid-column: 1 / -1; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--ok); border-radius: 3px; }
+
+.fast { margin-top: 1.5rem; padding: 1.6rem 1.4rem; border-radius: 16px; display: grid; gap: 1.1rem;
+  background: radial-gradient(130% 120% at 0% 0%, #2a1530 0%, var(--raised) 60%); border: 1px solid var(--line); }
+.fast-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.fast-stats div { display: grid; gap: 0.35rem; align-content: start; }
+.fast-stats b { font: 800 clamp(1.9rem, 6vw, 2.6rem)/1 var(--display); letter-spacing: -0.03em;
+  background: var(--ramp); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.fast-stats span { color: var(--muted); font-size: 0.88rem; line-height: 1.4; }
+@media (max-width: 560px) { .fast-stats { grid-template-columns: 1fr; } }
+.cpu { display: grid; gap: 0.7rem; }
+.cpu .bar { display: grid; grid-template-columns: 4.6rem minmax(0, 1fr) 6.2rem; gap: 0.8rem; align-items: center; }
+.cpu .bar span:first-child { font-weight: 600; }
+.cpu .track { height: 22px; background: var(--raised); border-radius: 4px; position: relative; }
+.cpu .fill { position: absolute; inset: 0 auto 0 0; border-radius: 4px; }
+.cpu .val { font: 600 0.92rem var(--mono); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* ---------- Beat ---------- */
+.pipeline { display: grid; grid-template-columns: repeat(auto-fit, minmax(8.25rem, 1fr)); gap: 0.6rem; counter-reset: step; }
+.pipeline div { background: var(--raised); border: 1px solid var(--line); border-radius: 10px; padding: 0.85rem 0.95rem; display: grid; gap: 0.3rem; align-content: start; counter-increment: step; }
+.pipeline div::before { content: counter(step); font: 600 0.72rem/1 var(--mono); color: var(--ember); }
+.pipeline b { font-family: var(--display); font-size: 1.02rem; }
+.pipeline span { color: var(--muted); font-size: 0.88rem; line-height: 1.45; }
+
+.beforeafter { display: grid; gap: 1rem; }
+.ba { display: grid; gap: 0.45rem; }
+.ba .head { display: flex; justify-content: space-between; gap: 1rem; font-weight: 600; flex-wrap: wrap; }
+.ba .head .num { color: var(--muted); font-weight: 400; }
+.ba .tracks { display: grid; gap: 4px; }
+.ba .t { height: 16px; border-radius: 3px; background: var(--raised); position: relative; overflow: hidden; }
+.ba .t i { position: absolute; inset: 0 auto 0 0; border-radius: 3px; }
+.ba .t.before i { background: #5c5070; }
+.ba .t.after i { background: var(--ramp); }
+.legend { display: flex; gap: 1.2rem; flex-wrap: wrap; color: var(--muted); font-size: 0.86rem; }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -1px; margin-right: 0.4rem; }
+
+/* ---------- Gallery / organics ---------- */
+.shot { margin: 0; display: grid; gap: 0.55rem; }
+.shot img { border-radius: 12px; border: 1px solid var(--line); width: 100%; height: auto; }
+.shot figcaption { color: var(--muted); font-size: 0.9rem; }
+.features { display: grid; gap: 1.1rem 1.6rem; grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 48rem; }
+@media (max-width: 600px) { .features { grid-template-columns: 1fr; } }
+.features div { display: grid; gap: 0.35rem; align-content: start; }
+.features p { color: var(--muted); font-size: 0.95rem; }
+.clip { margin: 0.4rem 0; display: grid; gap: 0.5rem; }
+.clip video { width: 100%; height: auto; display: block; border-radius: 10px; border: 1px solid var(--line); background: #000; }
+.clip-labels { display: grid; grid-template-columns: 1fr 1fr; font: 600 0.7rem/1 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+.clip-labels span:last-child { color: var(--ember); }
+.clip figcaption { color: var(--muted); font-size: 0.9rem; }
+.lightsdemo { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 0.8rem; align-items: center; }
+.lightsdemo figure { margin: 0; }
+.wall { position: relative; border-radius: 14px; border: 1px solid var(--line); padding: 1.4rem 1rem 1rem;
+  background: radial-gradient(120% 100% at 50% 40%, #1c1622 0%, #0c0910 80%); }
+.wall svg { width: 100%; height: auto; display: block; overflow: visible; }
+@media (max-width: 700px) { .lightsdemo { grid-template-columns: 1fr; } }
+.solidpair { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.solidpair video { width: 100%; height: auto; display: block; border-radius: 12px; border: 1px solid var(--line); background: #000; }
+@media (max-width: 560px) { .solidpair { grid-template-columns: 1fr; } }
+.dv { display: grid; gap: 0.9rem; padding-top: 1.2rem; }
+.dv-title { font-size: clamp(1.4rem, 3vw, 1.75rem); font-weight: 800; letter-spacing: -0.02em; }
+.idea { font: 600 0.68rem/1 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ember); }
+
+/* ---------- Dancers ---------- */
+.floor {
+  border-radius: 16px; border: 1px solid var(--line); padding: 1rem;
+  background: radial-gradient(120% 90% at 50% 100%, #3a1d4f 0%, #1a1029 55%, var(--ground) 100%);
+  display: grid; gap: 1rem;
+}
+.crew { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.6rem; }
+.dancer { display: grid; gap: 0.5rem; }
+.dancer canvas { width: 100%; aspect-ratio: 3 / 4; }
+.dancer .who { display: flex; gap: 0.4rem; flex-wrap: wrap; justify-content: center; }
+.dancer select, .dancer button { padding: 0.45rem 0.7rem; font-size: 0.82rem; }
+.floor .note { color: var(--muted); font-size: 0.86rem; text-align: center; }
+.floor .fail { color: var(--muted); text-align: center; padding: 3rem 1rem; }
+input[type="range"] { accent-color: var(--ember); width: min(14rem, 100%); }
+@media (max-width: 520px) { .dancer select { width: 100%; } }
+
+.list { display: grid; gap: 0.7rem; padding: 0; margin: 0; list-style: none; }
+.list li { display: grid; grid-template-columns: 1.4rem minmax(0, 1fr); gap: 0.6rem; }
+.list li::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--ember); margin-top: 0.62rem; justify-self: center; }
+.list li:nth-child(3n+2)::before { background: #ff4f8b; }
+.list li:nth-child(3n)::before { background: var(--violet); }
+
+/* ---------- Timeline ---------- */
+.timeline { display: grid; gap: 0; }
+.tday { display: grid; grid-template-columns: 4.6rem minmax(0, 1fr); gap: 1rem; padding: 0.95rem 0; border-top: 1px solid var(--line); }
+.tday .date { font: 600 0.8rem/1.3 var(--mono); color: var(--muted); }
+.tday .date b { display: block; font: 700 1.5rem/1 var(--display); color: var(--ink); }
+.tday .commits { display: flex; align-items: center; gap: 0.6rem; font: 400 0.78rem var(--mono); color: var(--muted); }
+.tday .commits i { display: block; height: 6px; border-radius: 3px; background: var(--ramp); }
+.tday p { color: var(--ink); font-size: 0.97rem; }
+.tday > div { display: grid; gap: 0.4rem; }
+
+.duo { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 1rem; }
+.duo div { background: var(--raised); border: 1px solid var(--line); border-radius: 12px; padding: 1.1rem; display: grid; gap: 0.5rem; align-content: start; }
+.duo ul { margin: 0; padding-left: 1.1rem; color: var(--muted); font-size: 0.94rem; display: grid; gap: 0.3rem; }
+
+/* ---------- rekordbox ---------- */
+.chain { display: grid; grid-template-columns: minmax(0, 1fr) 1.6rem minmax(0, 1fr) 1.6rem minmax(0, 1fr); align-items: stretch; gap: 0.4rem; }
+.chain .node { background: var(--raised); border: 1px solid var(--line); border-radius: 12px; padding: 0.9rem 1rem; display: grid; gap: 0.3rem; align-content: start; }
+.chain .node b { font-family: var(--display); font-size: 1.02rem; }
+.chain .node span { color: var(--muted); font-size: 0.86rem; line-height: 1.45; }
+.chain .node.mid { border-color: var(--ember); }
+.chain .arrow { align-self: center; justify-self: center; color: var(--ember); font: 600 1.2rem/1 var(--mono); }
+@media (max-width: 640px) {
+  .chain { grid-template-columns: 1fr; }
+  .chain .arrow { transform: rotate(90deg); }
+}
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 1.1rem; counter-reset: s; }
+.steps li { display: grid; grid-template-columns: 2.2rem minmax(0, 1fr); gap: 0.8rem; counter-increment: s; }
+.steps li::before {
+  content: counter(s); width: 2.2rem; height: 2.2rem; border-radius: 50%; display: grid; place-items: center;
+  font: 700 0.95rem/1 var(--display); color: var(--ground); background: var(--ramp);
+}
+.steps b { display: block; font-family: var(--display); font-size: 1.05rem; margin-bottom: 0.2rem; color: var(--ink); }
+.steps span { color: var(--muted); font-size: 0.95rem; }
+
+footer { padding-top: 5rem; color: var(--muted); font-size: 0.85rem; display: grid; gap: 0.6rem; }
+footer .wordmark { font-size: 2.2rem; }
+
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+
+<!-- ======================= HERO ======================= -->
+<header class="hero wide">
+  <div class="eyebrow"><span class="day">Nov 11 – 21, 2026</span><span>A visualizer, rebuilt</span></div>
+  <div class="wordmark" aria-label="reforce">reforce</div>
+
+  <div class="stage" id="heroStage">
+    <canvas id="heroCanvas" aria-label="A small live visualizer drawn in your browser"></canvas>
+    <span class="badge">Live in your browser</span>
+  </div>
+  <div class="controls" role="group" aria-label="Visualizer controls">
+    <button class="primary" id="playBtn" type="button">▶ Play a beat</button>
+    <span class="label">Flow</span>
+    <span class="seg" id="flowSeg">
+      <button type="button" data-v="0" aria-pressed="true">Tunnel</button>
+      <button type="button" data-v="1" aria-pressed="false">Swirl</button>
+      <button type="button" data-v="2" aria-pressed="false">Drift</button>
+    </span>
+    <span class="label">Colours</span>
+    <span class="seg" id="palSeg">
+      <button type="button" data-v="ember" aria-pressed="true">Ember</button>
+      <button type="button" data-v="uv" aria-pressed="false">Ultraviolet</button>
+      <button type="button" data-v="ice" aria-pressed="false">Ice</button>
+    </span>
+  </div>
+  <p class="aside">This toy is the same idea as reforce in about 300 lines: a <b>FlowField</b> moves last frame's
+    picture a little (zoom, swirl, drift), a <b>WaveShape</b> draws the sound on top, and a <b>ColorMap</b> turns
+    brightness into colour. Real G-Force scenes are small text files full of formulas for exactly those three things.</p>
+
+  <div class="stats">
+    <div class="stat"><b class="num">11</b><span>days, first commit to Room Lights</span></div>
+    <div class="stat"><b class="num">237</b><span>commits</span></div>
+    <div class="stat"><b class="num">733</b><span>G-Force scenes it reads</span></div>
+    <div class="stat"><b class="num">84k</b><span>lines of C++, Metal, Python and JS</span></div>
+    <div class="stat"><b class="num">⅕</b><span>of G-Force's CPU, at a higher frame rate</span></div>
+  </div>
+</header>
+
+<!-- ======================= WHY ======================= -->
+<section class="col" id="why">
+  <div class="eyebrow"><span class="day">Day 1</span><span>The idea</span></div>
+  <h2>Keep the look. Own the engine.</h2>
+  <div class="prose">
+    <p class="lede">G-Force is great, but it's a closed program. You can't make it follow a DJ's tempo, add
+      a new kind of picture, or send its output to OBS without workarounds.</p>
+    <p>So the plan was a brand-new app for the Mac, written from scratch in C++ on Apple's Metal graphics, that
+      opens G-Force's own scene files and draws them the same way. Then, once it matched, keep going.</p>
+    <p>Three rules shaped everything after that:</p>
+  </div>
+  <div class="rules">
+    <div class="rule"><h3>Never look inside</h3><p>G-Force's licence forbids taking the program apart, so nobody did.
+      Everything about how it behaves was learned by watching it from the outside.</p></div>
+    <div class="rule"><h3>Leave G-Force alone</h3><p>Peter still uses it. Every experiment backed up its settings first,
+      restored them after, and checked byte by byte that nothing had changed.</p></div>
+    <div class="rule"><h3>Match it, but not its flaws</h3><p>Where copying G-Force would mean copying a flaw (jagged
+      lines, banding), reforce offers both and Peter picks.</p></div>
+  </div>
+</section>
+
+<!-- ======================= PROBES ======================= -->
+<section class="wide" id="probes">
+  <div class="col prose" style="margin:0 auto; width:100%">
+    <div class="eyebrow"><span class="day">Days 1 – 3</span><span>Black-box probing</span></div>
+    <h2>Learning a program by watching it</h2>
+    <p class="lede">The trick was writing tiny fake scenes, each one a single question, and feeding them to G-Force.</p>
+    <p>"Draw one dot, then clear the screen." "Fade this line and stop." A script launched G-Force, played the
+      probe scenes, took screenshots, quit, and put everything back. Then the pixels were measured. Over 44 runs this
+      turned up 46 numbered findings, and each became a rule reforce follows.</p>
+  </div>
+</section>
+
+<!-- ======================= DONE RIGHT DEMO ======================= -->
+<section class="wide" id="right">
+  <div class="col prose" style="margin:0 auto; width:100%">
+    <div class="eyebrow"><span class="day">Days 1 – 2</span><span>The Look card</span></div>
+    <h2>Match it, or do it right?</h2>
+    <p>Some of what the probes found are flaws: lost precision, jagged edges, muddy colours. reforce can copy each
+      one exactly, which the comparison tests need, or do it properly. The control panel's <b>Look</b> card switches
+      each one live, between "G-Force exact" and "Done right", so Peter could compare them on a real set. Peter picked
+      "Done right" for all of them. Here are four, side by side.</p>
+  </div>
+
+  <div class="cmp">
+    <div class="cmp-head"><h3>How finely brightness is stored</h3>
+      <p>These visuals fade the last frame a little and draw on top, over and over. G-Force keeps each pixel's
+        brightness as a whole number from 0 to 255. Here both canvases fade 1.5% a frame: on the left, a dim pixel
+        loses less than one step, rounds back to where it was and never goes dark, so a fog builds up. G-Force's
+        fixed-step fade (finding #6) hides the worst of it, but its slow, soft trails still band and stick.</p></div>
+    <div class="pair">
+      <figure>
+        <div class="stage"><canvas id="loCanvas" aria-label="Visualizer storing brightness as 8-bit whole numbers"></canvas><span class="badge">G-Force exact · 0–255</span></div>
+        <figcaption>The haze builds up and never leaves.</figcaption>
+      </figure>
+      <figure>
+        <div class="stage"><canvas id="hiCanvas" aria-label="Visualizer storing brightness with fine precision"></canvas><span class="badge">Done right · fine steps</span></div>
+        <figcaption>Trails fade all the way to black.</figcaption>
+      </figure>
+    </div>
+    <div class="controls"><button type="button" id="resetPair">Clear both and start again</button></div>
+  </div>
+
+  <div class="cmp">
+    <div class="cmp-head"><h3>Thin lines</h3>
+      <p>G-Force snaps every point of a thin line to a whole pixel (finding #32) and draws it one pixel tall, so slanted
+        lines become staircases and slow movement crawls in little jumps. Done right, a line can sit between pixels,
+        with soft edges and the same overall brightness. Both are magnified here so you can see the pixels.</p></div>
+    <div class="pair">
+      <figure><div class="stage px"><canvas id="thinL" width="128" height="96" aria-label="Thin line snapped to whole pixels"></canvas><span class="badge">G-Force exact</span></div>
+        <figcaption>Steps and crawling.</figcaption></figure>
+      <figure><div class="stage px"><canvas id="thinR" width="128" height="96" aria-label="Thin line drawn between pixels"></canvas><span class="badge">Done right</span></div>
+        <figcaption>Glides smoothly.</figcaption></figure>
+    </div>
+  </div>
+
+  <div class="cmp">
+    <div class="cmp-head"><h3>See-through pictures</h3>
+      <p>Sprites are pictures that float over the scene, and many have see-through edges. G-Force ignores the
+        see-through part (finding #42) and shows whatever colour happens to be stored there, often a box of leftover
+        junk from whoever made the picture. Done right, see-through means not drawn.</p></div>
+    <div class="pair">
+      <figure><div class="stage"><canvas id="alphaL" width="480" height="360" aria-label="A sprite with its hidden junk showing"></canvas><span class="badge">G-Force exact</span></div>
+        <figcaption>The hidden rectangle shows up.</figcaption></figure>
+      <figure><div class="stage"><canvas id="alphaR" width="480" height="360" aria-label="The same sprite with see-through parts left out"></canvas><span class="badge">Done right</span></div>
+        <figcaption>Just the picture.</figcaption></figure>
+    </div>
+  </div>
+
+  <div class="cmp">
+    <div class="cmp-head"><h3>Changing colour schemes</h3>
+      <p>When the slideshow moves to the next ColorMap, every colour slides to its new value over a couple of seconds.
+        G-Force mixes the red, green and blue numbers directly, which sags through darker, muddier colours halfway.
+        Done right mixes in OKLab, a colour space built around how eyes see, so brightness holds through the change.
+        Each strip below is one colour's journey, start on the left, end on the right.</p></div>
+    <div class="pair">
+      <figure><div class="stage strips"><canvas id="morphL" width="480" height="240" aria-label="Colour transitions mixed in RGB"></canvas><span class="badge">G-Force exact · RGB</span></div>
+        <figcaption>Muddy in the middle.</figcaption></figure>
+      <figure><div class="stage strips"><canvas id="morphR" width="480" height="240" aria-label="Colour transitions mixed in OKLab"></canvas><span class="badge">Done right · OKLab</span></div>
+        <figcaption>Even all the way across.</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= SCORE ======================= -->
+<section class="col" id="score">
+  <div class="eyebrow"><span class="day">Days 1 – 3</span><span>Proving it</span></div>
+  <h2>How close is "the same"?</h2>
+  <div class="prose">
+    <p>"Looks right" isn't a test. So reforce got automatic ones: replay each probe in reforce frame by frame and
+      measure the same pixels, and run every scene in both apps on a fixed test pattern and compare. A handful of
+      leftover gaps are written down with their reasons.</p>
+  </div>
+  <div class="board">
+    <div class="row"><span class="what">Probe measurements<small>The same timelines replayed in both apps</small></span><span class="score">241 / 246</span><span class="meter"><i style="width:97.97%"></i></span></div>
+    <div class="row"><span class="what">ColorMaps<small>Every colour scheme on a fixed ramp</small></span><span class="score">250 / 250</span><span class="meter"><i style="width:100%"></i></span></div>
+    <div class="row"><span class="what">FlowFields<small>Every motion field on a fixed test grid</small></span><span class="score">349 / 352</span><span class="meter"><i style="width:99.15%"></i></span></div>
+    <div class="row"><span class="what">Sound response<small>Test tones played to both; checks outside known gaps</small></span><span class="score">276 / 276</span><span class="meter"><i style="width:100%"></i></span></div>
+  </div>
+  <div class="fast">
+    <h2>And it's faster</h2>
+    <p class="lede">Doing the same job, with the same scenes, reforce draws more frames per second than G-Force and
+      uses about a fifth of the processor to do it.</p>
+    <div class="fast-stats">
+      <div><b class="num">~5×</b><span>less CPU: about 0.2 cores for a typical slideshow, against G-Force's 1.2</span></div>
+      <div><b class="num">60 fps</b><span>steady, against G-Force's ~56 on the same Mac</span></div>
+      <div><b class="num">2–9 ms</b><span>of CPU per frame, against G-Force's 22 ms</span></div>
+    </div>
+    <div class="cpu" role="img" aria-label="CPU use: G-Force about 1.2 cores, reforce about 0.2 cores">
+      <div class="bar"><span>G-Force</span><span class="track"><span class="fill" style="width:100%; background:#5c5070"></span></span><span class="val">1.2 cores</span></div>
+      <div class="bar"><span>reforce</span><span class="track"><span class="fill" style="width:16.7%; background:var(--ramp)"></span></span><span class="val">~0.2 cores</span></div>
+    </div>
+    <p class="aside">Measured on an M4 Pro with each app's normal slideshow, in the same size window. The trick is where
+      the work happens: G-Force does it on the processor, reforce hands the per-pixel work to the graphics chip. Even
+      on its heaviest scenes reforce stays under half of G-Force's CPU.</p>
+  </div>
+</section>
+
+<!-- ======================= BEAT ======================= -->
+<section class="col" id="beat">
+  <div class="eyebrow"><span class="day">Days 2 – 6</span><span>Hearing the beat</span></div>
+  <h2>Teaching it to count to four</h2>
+  <div class="prose">
+    <p class="lede">G-Force reacts to loudness. A DJ wants pictures that land <i>on</i> the beat.</p>
+    <p>The first plan was to work the beat out from the sound alone, the way a person listening would. That's
+      harder than it sounds. House music has breakdowns with no kick for a minute, and DJs nudge the tempo up and
+      down mid-mix.</p>
+    <p>The secret weapon was Peter's own record collection: thousands of songs whose beats Peter had already lined
+      up by hand in rekordbox. That became an answer key. reforce listened to every song, its guesses were scored,
+      and it learned from its mistakes.</p>
+  </div>
+  <div class="pipeline">
+    <div><b>Hear hits</b><span>100 times a second, look for sudden jumps in nine frequency bands.</span></div>
+    <div><b>Is it the beat?</b><span>A small model trained on Peter's songs scores each hit: kick on the beat, or a snare in between?</span></div>
+    <div><b>Find the tempo</b><span>Look for repeats one, two and four beats apart; prefer 80–160 BPM.</span></div>
+    <div><b>Hold steady</b><span>Keep counting through breakdowns; follow a DJ's 1–3 BPM nudge within about 2 seconds.</span></div>
+  </div>
+  <div class="beforeafter">
+    <div class="ba">
+      <div class="head"><span>Tempo right (within 2%)</span><span class="num">77.5% → 94.7%</span></div>
+      <div class="tracks"><span class="t before"><i style="width:77.5%"></i></span><span class="t after"><i style="width:94.7%"></i></span></div>
+    </div>
+    <div class="ba">
+      <div class="head"><span>Locked on the beat</span><span class="num">42.2% → 89.7%</span></div>
+      <div class="tracks"><span class="t before"><i style="width:42.2%"></i></span><span class="t after"><i style="width:89.7%"></i></span></div>
+    </div>
+    <div class="legend"><span><i style="background:#5c5070"></i>First try, Nov 15</span><span><i style="background:var(--ember)"></i>A day of tuning later, Nov 16</span></div>
+    <p class="aside">Scored on 600 songs it never trained on. In the 2,000 most recent songs: 96.5% and 92.8%. It also
+      practised on 400 simulated DJ mixes, blends and tempo nudges included.</p>
+    <p class="aside">The weak spot was the moment a DJ nudges the tempo by 1–3 BPM.
+      Around a nudge it was on the beat only 77.6% of the time, and each fix bought a couple of points.</p>
+  </div>
+
+</section>
+
+<!-- ======================= REKORDBOX ======================= -->
+<section class="col" id="rekordbox">
+  <div class="eyebrow"><span class="day">Days 6 – 9</span><span>Plan B: ask rekordbox</span></div>
+  <h2>Stop guessing, start asking</h2>
+  <div class="prose">
+    <p class="lede">Back on day 4, while planning the beat-synced dance videos, Claude had mentioned a long shot: a
+      tool that reads the beat straight out of rekordbox's memory. Two days of squeezing the detector for another
+      percent later, Peter remembered it and asked: could that work instead? rekordbox, the DJ software on Peter's
+      laptop, already <i>knows</i> the beat (Peter lined those beats up by hand), the tempo and which song is playing.
+      It just doesn't tell anyone.</p>
+    <p>An open-source tool called <b>rkbx_link</b> (by grufkork) does exactly that, by reading rekordbox's memory while it
+      runs, finding the tempo and beat position, and broadcasting them over Ableton Link, which reforce already
+      speaks. The catch: it relies on knowing exactly where in memory rekordbox keeps each value, those places move
+      with every rekordbox release, and nobody had mapped Peter's version (7.2.19 on Apple Silicon).</p>
+  </div>
+  <div class="chain" role="img" aria-label="rekordbox's memory is read by rkbx_link, which sends tempo, beats, deck positions and track titles to reforce">
+    <div class="node"><b>rekordbox</b><span>Plays the music. Knows tempo, beat, master deck and track titles, but keeps them to itself.</span></div>
+    <span class="arrow" aria-hidden="true">→</span>
+    <div class="node mid"><b>rkbx_link, patched</b><span>Reads those values out of rekordbox's memory many times a second.</span></div>
+    <span class="arrow" aria-hidden="true">→</span>
+    <div class="node"><b>reforce</b><span>Gets the tempo and beat over Ableton Link, plus deck positions and titles over a private feed.</span></div>
+  </div>
+  <ol class="steps">
+    <li><span><b>Get permission to look</b>macOS doesn't let one program read another's memory, so rkbx_link needs extra permission
+      to do it, set up again after every rekordbox update.</span></li>
+    <li><span><b>Treasure hunt</b>Play a song, change the tempo, and watch which numbers in memory change with it. That
+      found the tempo, the beat position, and the waveform analysis. The hard one was the master deck (the deck
+      rekordbox treats as "the" tempo). One promising value turned out to change only when you pressed the MASTER
+      button. Peter chose to find the real one rather than settle for a guess, and it was found.</span></li>
+    <li><span><b>Following the trail to song titles</b>Search memory for the text "Title: ", then work backwards
+      through the chain of pointers from each deck to where its title lives, so it can be found again every time.
+      That gives reforce the artist and title on every deck.</span></li>
+    <li><span><b>Teaching rkbx_link to talk to reforce</b>A new output sends each deck's position, beat and tempo to
+      reforce, along with titles and Peter's tags. reforce combines that with the DDJ-1000's faders to work out which
+      song the crowd is actually hearing.</span></li>
+  </ol>
+  <div class="prose">
+    <p><b>What it unlocked.</b> reforce follows rekordbox's own beat exactly. Phrase lines start from wherever Peter dropped each song in. And the song titles
+      made something else possible.</p>
+  </div>
+  <h3>Now playing, moved inside</h3>
+  <div class="prose">
+    <p>Peter's streams show the artist, title and year of the current song in the corner. That caption came
+      from <b>history_server</b>, a small program from Peter's own DJ tools. It checked rekordbox's play history once
+      a second and served a web page, which OBS laid over the stream as a separate layer.</p>
+    <p>With titles coming straight from the decks, reforce now draws that caption itself, in the same style: bold
+      capitals, bottom left, a fade-in, and a vocal track on its own line above.</p>
+  </div>
+  <div class="duo">
+    <div><h3>Before: history_server in OBS</h3><ul>
+      <li>One more program to start, plus a browser layer in OBS</li>
+      <li>Showed the newest entry in rekordbox's history, which rekordbox writes on its own schedule</li>
+      <li>Had no idea which deck the crowd was hearing</li>
+      <li>Plain text on top of whatever was behind it</li></ul></div>
+    <div><h3>Now: drawn by reforce</h3><ul>
+      <li>Nothing extra to run: it's part of reforce's picture</li>
+      <li>Follows the mix: the channel faders and crossfader on Peter's DDJ-1000 say which deck you hear, and a deck
+        takes over once it has been louder for 3 seconds</li>
+      <li>A soft shadow appears only where the visuals behind the text are bright, so it's always readable</li>
+      <li>Layered properly: it stays solid over the see-through output, sits above the camera and dancers, and the room
+        lights never pick it up</li></ul></div>
+  </div>
+</section>
+
+<!-- ======================= BEYOND ======================= -->
+<section class="wide" id="beyond">
+  <div class="col prose" style="margin:0 auto; width:100%">
+    <div class="eyebrow"><span class="day">Days 4 – 8</span><span>Past G-Force</span></div>
+    <h2>Then it stopped being a copy</h2>
+    <p>Once the old scenes were right, Peter started coming up with new kinds of picture to put on top, and Claude
+      built them.</p>
+  </div>
+  <figure class="shot">
+    <img src="data:image/jpeg;base64,@ORGANICS_JPG@" alt="A grid of twenty procedural organics in white on black: oak, willow, roots, lightning, neurons, kelp, radial bloom, pendulum waves, sunflower, spiral galaxy, harmonographs, Rule 30, Sierpinski triangle, Game of Life, fern, bush and a Clifford attractor" width="2400" height="1080" loading="lazy">
+    <figcaption>Organics. Peter wanted generative things that grow, swing or evolve over a lifetime, and Claude
+      proposed the algorithms. The trees are grown by "space colonisation", the same idea botanists use to model how
+      branches compete for light.</figcaption>
+  </figure>
+  <figure class="shot">
+    <div class="solidpair">
+      <video src="data:video/mp4;base64,@DODECA_MP4@" autoplay muted loop playsinline aria-label="Dodecahedron Beat: a glowing dodecahedron snapping round on each beat"></video>
+      <video src="data:video/mp4;base64,@SPHERE_MP4@" autoplay muted loop playsinline aria-label="Sphere Bounce: a ball of glowing lines bouncing once per beat"></video>
+    </div>
+    <figcaption>3D solids, Peter's idea: shapes whose faces are covered in the live visuals, each moving to its own
+      beat-synced script. Left, <b>Dodecahedron Beat</b> snaps a fifth of a turn on every beat. Right, <b>Sphere
+      Bounce</b> bounces once per beat. Rendered by reforce over a simple scene of our own, while it listened to a
+      120 BPM test kick drum, so its beat clock is locked just as it would be on a set.</figcaption>
+  </figure>
+  <div class="col dv" style="margin:0 auto; width:100%">
+    <span class="idea">Peter's idea</span>
+    <h3 class="dv-title">Dance videos that dance to your music</h3>
+    <div class="prose">
+      <p>Peter collects dance clips: music-video dancers, silhouettes, VJ loops. The idea was to play them in reforce so
+        the dancer hits the beat of whatever is playing, which means speeding each clip up or slowing it down to
+        match the song. That turned out to be three problems.</p>
+    </div>
+    <ol class="steps">
+      <li><span><b>The frame timing lies</b>Many clips had been converted between frame rates along the way, leaving
+        repeated frames and an uneven stutter (2, 2, 1 frames apart, over and over). To a beat finder that stutter looks
+        just like rhythm. So the first step finds and undoes it: two clips that measured 150 and 100 BPM turned out to
+        be about 113 once cleaned up.</span></li>
+      <li><span><b>The clips are silent</b>So the beat has to come from the dancing. A tool measures two kinds of
+        motion: <i>bounce</i>, the body dipping on each beat (upper body, hips and legs), and <i>hits</i>, moves that
+        stop or snap back. It fits a steady beat grid to both and keeps whichever is more confident.</span></li>
+      <li><span><b>Slow motion looks choppy</b>Stretching a 25 fps clip to fit a slower song shows every frame. So each
+        clip goes through RIFE, an AI that invents the frames in between, at four times the frame rate. Slowed down,
+        it stays smooth. For seamless loops it even fills in the jump from the last frame back to the first.</span></li>
+    </ol>
+    <div class="prose">
+      <figure class="clip">
+        <div class="clip-labels"><span>As it came</span><span>Smoothed by RIFE</span></div>
+        <video src="data:video/mp4;base64,@LUMA_MP4@" autoplay muted loop playsinline controls
+          aria-label="A silhouette dancer at half speed, the original clip beside the smoothed one, with borders flashing on the beat"></video>
+        <figcaption>One of the silhouette clips at half speed, four bars long. On the left, the clip as it came: at this
+          speed it shows only about seven different pictures a second. On the right, after RIFE, about fifty. The borders flash on
+          every beat found from the dancer's own motion, red on the "one". Turn the sound on to hear the click.</figcaption>
+      </figure>
+      <p>Every clip gets a preview to check by eye and ear: the border flashes on each beat (red on the "one"), a click
+        plays along, and the motion signals scroll past underneath.</p>
+      <p>Seamless VJ loops get their tempo from their exact length, so they never drift. This one by Beeple is exactly
+        40 beats long, so as it repeats, the beat carries straight across the seam.</p>
+    </div>
+    <figure class="clip">
+      <video src="data:video/mp4;base64,@BEEPLE_MP4@" autoplay muted loop playsinline controls
+        aria-label="A colourful Beeple VJ loop with its border flashing on every beat"></video>
+      <figcaption>"Harvest" by Beeple, a seamless loop at 128.1 BPM, the whole loop at normal speed. The border
+        flashes on every beat (red on the "one"). Turn the sound on for the click.</figcaption>
+    </figure>
+    <div class="prose">
+      <p>In reforce, a synced clip follows the beat clock (rekordbox's beat when it's there, otherwise what reforce
+        hears) and every loop starts on a downbeat. Not everything can be tamed: montages whose cuts ignore the music,
+        stop-motion, and clips that change speed partway were left out.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= DANCERS ======================= -->
+<section class="wide" id="dancers">
+  <div class="col prose" style="margin:0 auto; width:100%">
+    <div class="eyebrow"><span class="day">Days 8 – 11</span><span>The dance floor</span></div>
+    <h2>Then they started dancing</h2>
+    <p class="lede">Peter's next idea: cartoon dancers along the bottom of the stream, lit by the visuals, on a
+      reflective disco floor. Peter shaped them from there too: the styles, the looks, mocap instead of hand-made
+      moves, and letting stream guests join in.</p>
+    <p>The ones below aren't a video. This is reforce's actual dancer code, compiled to run in your browser, dancing
+      real motion capture of professional dancers. Pick a style, dress them up, change the tempo.</p>
+  </div>
+  <div class="floor" id="floor">
+    <div class="crew" id="crew"></div>
+    <div class="controls" style="justify-content:center">
+      <span class="label">Tempo</span>
+      <input type="range" id="bpm" min="96" max="140" step="1" value="124" aria-label="Tempo in BPM">
+      <span class="num" id="bpmVal">124 BPM</span>
+    </div>
+    <p class="note">Each style cycles through its basic moves, then a full routine.</p>
+  </div>
+  <div class="col" style="margin:0 auto; width:100%">
+    <ul class="list">
+      <li><span><b>Real moves.</b> 543 moves from AIST++, a research dataset of professional dancers in 3D, turned into
+        size-free poses. Whole 16-bar routines start on 8- or 16-bar phrase lines, the way a dancer would.</span></li>
+      <li><span><b>Nine styles.</b> House, pop, locking, breaking, disco, stomp, hip-hop, jazz and ballet, each dressed for
+        its scene.</span></li>
+      <li><span><b>They notice each other.</b> Dancers walk around the floor without bumping, using
+        time-to-collision steering, and sometimes turn to watch one another.</span></li>
+      <li><span><b>A bit human.</b> Arms lag the body slightly, every beat lands a few milliseconds differently, and
+        ponytails and long hair swing on springs.</span></li>
+    </ul>
+    <h3 class="dv-title" style="margin-top:2.2rem">Stream guests: how a viewer joins the dance floor</h3>
+    <div class="prose">
+      <p>People watching Peter's stream can put themselves on the dance floor. It takes three pieces working together:
+        a web page on Peter's site, a small guest service in the cloud, and reforce on Peter's Mac.</p>
+    </div>
+    <div class="chain" role="img" aria-label="The viewer's web page talks to the guest service, which reforce checks every 5 seconds">
+      <div class="node"><b>The /dance page</b><span>On the viewer's phone or laptop. Make a dancer, then tap "I'm here".</span></div>
+      <span class="arrow" aria-hidden="true">→</span>
+      <div class="node mid"><b>Guest service</b><span>A Cloudflare Worker and a small database. Keeps each guest's dancer, check-ins and messages.</span></div>
+      <span class="arrow" aria-hidden="true">→</span>
+      <div class="node"><b>reforce</b><span>Asks for new check-ins every 5 seconds and puts each guest on the floor.</span></div>
+    </div>
+    <ol class="steps">
+      <li><span><b>Make a dancer from a photo</b>A guest can upload a selfie. The guest service sends it to Claude,
+        which designs a cartoon dancer to match: hair, clothes, colours, glasses, beard. Claude answers in the same
+        settings a reforce dancer file uses. The photo is never stored. Or the guest skips the photo and builds a dancer by hand from the menus.</span></li>
+      <li><span><b>See the real thing</b>The preview on the page isn't an approximation. It's reforce's own dancer
+        code compiled to run in the browser (the same trick as the dancers above), doing real motion-capture moves in
+        the style they picked. What they see is exactly what will show up on stream.</span></li>
+      <li><span><b>No accounts</b>Saving stores the dancer and a name, and gives the browser a secret key. That key
+        lets the guest come back to change their look or check in again, with no password.</span></li>
+      <li><span><b>"I'm here"</b>Tapping it while watching records a check-in. The page shows LIVE whenever reforce
+        has been in touch in the last minute, so guests know Peter is on.</span></li>
+      <li><span><b>Onto the floor</b>Every 5 seconds reforce asks the guest service for new check-ins, on a separate
+        thread so the visuals never wait. Each one becomes a dancer with the guest's name over their head, dancing for
+        30 minutes. reforce remembers the last check-in it handled, so a restart never brings anyone on twice.</span></li>
+      <li><span><b>Say something</b>A guest can type a message of up to 140 characters, emoji included. It appears in
+        a speech bubble above their dancer for 30 seconds.</span></li>
+    </ol>
+  </div>
+</section>
+
+<!-- ======================= ROOM ======================= -->
+<section class="col" id="room">
+  <div class="eyebrow"><span class="day">Days 10 – 11</span><span>Out of the screen</span></div>
+  <h2>Into the room</h2>
+  <div class="prose">
+    <p class="lede">Then Peter's ideas took reforce off the screen and into the room.</p>
+    <p><b>Camera backdrop.</b> Peter's webcam can sit under the visuals, showing through wherever the picture is dark.
+      This used to take a stack of OBS filters.</p>
+  </div>
+  <h3>Seeing the person</h3>
+  <div class="prose">
+    <p>With the camera inside reforce, reforce can look at it. Apple's Vision framework, built into macOS, finds the
+      person in every camera frame: a <b>silhouette</b> (a cut-out mask of exactly where they are) and <b>19 body
+      joints</b>, head to ankles. On Peter's Mac that takes about 17 milliseconds, so it keeps up with every frame
+      the camera sends. reforce can even hold the camera image back by that one step, so the cut-out lines up with the
+      person exactly. The joints are smoothed so they sit still when you do but follow quickly when you move.</p>
+    <p>Then the visuals react. The silhouette is written into the same picture the FlowField keeps moving, so the scene
+      carries it off, swirls it and colours it like anything else it draws.</p>
+  </div>
+  <div class="stage" id="bodyStage">
+    <canvas id="bodyCanvas" aria-label="A dancing silhouette drawn into a live visualizer"></canvas>
+    <span class="badge">Silhouette in the flow</span>
+  </div>
+  <div class="controls" role="group" aria-label="Body tracking demo controls">
+    <button class="primary" id="playBtn3" type="button">▶ Play a beat</button>
+    <span class="label">Silhouette</span>
+    <span class="seg" id="bodySeg">
+      <button type="button" data-v="0" aria-pressed="false">Off</button>
+      <button type="button" data-v="1" aria-pressed="false">Fill</button>
+      <button type="button" data-v="2" aria-pressed="true">Outline</button>
+      <button type="button" data-v="3" aria-pressed="false">Motion</button>
+    </span>
+    <button type="button" id="frontBtn" aria-pressed="true">Person in front</button>
+  </div>
+  <p class="aside">A made-up dancer stands in for the camera here, so you don't need one. In reforce it's the real
+    silhouette from Apple Vision.</p>
+  <ul class="list">
+    <li><span><b>Fill.</b> The whole body glows into the scene and streams away with the flow.</span></li>
+    <li><span><b>Outline.</b> Only the edge, so the scene keeps drawing your contour and carrying it off.</span></li>
+    <li><span><b>Motion.</b> Only what moved since the last frame: stand still and nothing happens, dance and you
+      leave trails.</span></li>
+    <li><span><b>Person in front.</b> The camera image cuts through the visuals so you stand in front of them, while
+      the dancers and the now-playing caption still stay in front of you.</span></li>
+  </ul>
+  <div class="prose">
+  </div>
+</section>
+
+<!-- ======================= LIGHTS ======================= -->
+<section class="wide" id="lights">
+  <div class="col prose" style="margin:0 auto; width:100%">
+    <div class="eyebrow"><span class="day">Day 11</span><span>Room lights</span></div>
+    <h2>The wall joins in</h2>
+    <p class="lede">Peter has 24 Nanoleaf triangles on the wall behind the decks. They used to copy the screen through
+      Nanoleaf's own app. Peter wanted them to follow the visuals properly, and Claude suggested reforce could drive
+      them itself.</p>
+    <p>Up to 30 times a second, reforce grabs the finished visuals, before the camera, the dancers and the captions
+      are added, so those never tint the room. It shrinks the frame to about 120 pixels wide and stretches the panel
+      layout over it. Each panel takes the colour of the patch underneath, with the brightest pixels counting most,
+      so even a thin bright line lights its panel. The colours go out over Wi-Fi 20 times a second. Panels brighten
+      quickly and fade more slowly, so they flash with the music without flickering. Turning the lights off, or
+      quitting, puts the panels back to whatever they were showing before.</p>
+  </div>
+  <div class="lightsdemo">
+    <figure>
+      <div class="stage"><canvas id="lightsCanvas" aria-label="A small live visualizer"></canvas><span class="badge">The visuals</span></div>
+    </figure>
+    <figure>
+      <div class="wall"><svg id="wall" role="img" aria-label="Peter's 24 triangle panels, coloured from the visuals"></svg><span class="badge">Peter's wall</span></div>
+    </figure>
+  </div>
+  <div class="controls"><button class="primary" id="playBtn4" type="button">▶ Play a beat</button></div>
+  <div class="col prose" style="margin:0 auto; width:100%">
+    <p class="aside">The wall is the real layout of Peter's panels, read from the panels themselves, and it's coloured
+      the way reforce colours it.</p>
+  </div>
+</section>
+
+<!-- ======================= HOW ======================= -->
+<section class="col" id="how">
+  <div class="eyebrow"><span>How it was made</span></div>
+  <h2>A DJ and an AI, eleven days</h2>
+  <div class="timeline" aria-label="Day by day">
+    <div class="tday"><span class="date"><b>11</b>Nov</span><div><span class="commits"><i style="width:57%"></i>57 commits</span><p>The big bang. Scene-format spec, expression compiler, Metal renderer, Syphon to OBS, the first six probe runs, the parity suite, the web control panel, particles, sprites, video, and an installable app. All on day one.</p></div></div>
+    <div class="tday"><span class="date"><b>12</b>Nov</span><div><span class="commits"><i style="width:23%"></i>23 commits</span><p>Joins rekordbox's tempo over Ableton Link. CPU face-off with G-Force. A movie-review tool for picking clips.</p></div></div>
+    <div class="tday"><span class="date"><b>13</b>Nov</span><div><span class="commits"><i style="width:11%"></i>11 commits</span><p>Probe runs 28–44 pin down how sprites blend, fade and replace each other.</p></div></div>
+    <div class="tday"><span class="date"><b>14</b>Nov</span><div><span class="commits"><i style="width:9%"></i>9 commits</span><p>Dance videos get their beats found and re-timed with AI frame interpolation.</p></div></div>
+    <div class="tday"><span class="date"><b>15</b>Nov</span><div><span class="commits"><i style="width:29%"></i>29 commits</span><p>3D solids, built in five phases. Beat detection starts training on Peter's record collection.</p></div></div>
+    <div class="tday"><span class="date"><b>16</b>Nov</span><div><span class="commits"><i style="width:8%"></i>8 commits</span><p>Simulated DJ mixes; the beat clock learns to follow quick tempo nudges. rkbx_link is mapped to Peter's rekordbox, so reforce gets the beat straight from the decks.</p></div></div>
+    <div class="tday"><span class="date"><b>17</b>Nov</span><div><span class="commits"><i style="width:9%"></i>9 commits</span><p>While Peter was away: organics, the rhythm panel, ripples and fractals, ready to try on return.</p></div></div>
+    <div class="tday"><span class="date"><b>18</b>Nov</span><div><span class="commits"><i style="width:3%"></i>3 commits</span><p>Few commits, big ones: the rhythm section lands, phrase lines start where each song came in, and the first dancers arrive (9 styles, 81 hand-made moves).</p></div></div>
+    <div class="tday"><span class="date"><b>19</b>Nov</span><div><span class="commits"><i style="width:16%"></i>16 commits</span><p>Dancers learn to walk, avoid each other and look human. Now-playing text from the decks. Transparent output for OBS.</p></div></div>
+    <div class="tday"><span class="date"><b>20</b>Nov</span><div><span class="commits"><i style="width:29%"></i>29 commits</span><p>Camera backdrop and body tracking. Hair that swings. Stream guests with name tags and speech bubbles.</p></div></div>
+    <div class="tday"><span class="date"><b>21</b>Nov</span><div><span class="commits"><i style="width:43%"></i>43 commits</span><p>Motion capture replaces the hand-made moves. Beards. The Nanoleaf panels join in.</p></div></div>
+  </div>
+</section>
+
+<footer class="col">
+  <div class="wordmark" aria-hidden="true">reforce</div>
+  <p>Dance motion from the AIST++ dataset (Li et al., Google Research), licensed CC BY 4.0. G-Force is a product of
+    SoundSpectrum; reforce is an independent personal project, not affiliated with it, and this page contains no
+    G-Force content. The visuals on this page are drawn live by your browser.</p>
+</footer>
+
+<!-- The dancer engine (reforce's C++ compiled to WebAssembly), its WebGL renderer, and the motion-capture sample. -->
+<script type="application/octet-stream" id="b-dancerjs">@DANCER_JS@</script>
+<script type="application/octet-stream" id="b-dancergl">@DANCER_GL@</script>
+<script type="application/octet-stream" id="b-moves">@MOVES_BIN@</script>
+
+<script>
+"use strict";
+/* ================= Shared audio: a tiny 124 BPM groove, synthesised ================= */
+const Audio = (() => {
+  const BPM = 124, SPB = 60 / BPM;
+  let ctx = null, analyser, master, playing = false, timer = 0, nextT = 0, step = 0, noise, t0a = 0;
+  const beats = [];               // audio-clock times of scheduled kicks
+  const td = new Float32Array(2048), fd = new Uint8Array(1024);
+  const listeners = new Set();
+
+  function init() {
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = ctx.createAnalyser(); analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0.6;
+    const comp = ctx.createDynamicsCompressor();
+    master = ctx.createGain(); master.gain.value = 0.55;
+    master.connect(comp); comp.connect(analyser); analyser.connect(ctx.destination);
+    noise = ctx.createBuffer(1, ctx.sampleRate * 0.5, ctx.sampleRate);
+    const d = noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  function env(g, t, a, peak, dec) { g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + a); g.gain.exponentialRampToValueAtTime(0.0001, t + dec); }
+  function kick(t) {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.setValueAtTime(155, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.13);
+    env(g, t, 0.002, 1.0, 0.42); o.connect(g); g.connect(master); o.start(t); o.stop(t + 0.45);
+  }
+  function hat(t, v) {
+    const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    s.buffer = noise; f.type = "highpass"; f.frequency.value = 7500;
+    env(g, t, 0.001, v, 0.06); s.connect(f); f.connect(g); g.connect(master); s.start(t); s.stop(t + 0.08);
+  }
+  function bass(t, hz) {
+    const o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    o.type = "sawtooth"; o.frequency.value = hz; f.type = "lowpass"; f.frequency.setValueAtTime(900, t);
+    f.frequency.exponentialRampToValueAtTime(180, t + 0.18); env(g, t, 0.004, 0.28, 0.22);
+    o.connect(f); f.connect(g); g.connect(master); o.start(t); o.stop(t + 0.25);
+  }
+  function stab(t) {
+    for (const hz of [220, 261.63, 329.63, 392]) {
+      const o = ctx.createOscillator(), g = ctx.createGain(), f = ctx.createBiquadFilter();
+      o.type = "sawtooth"; o.frequency.value = hz; f.type = "lowpass"; f.frequency.value = 1800;
+      env(g, t, 0.01, 0.045, 0.55); o.connect(f); f.connect(g); g.connect(master); o.start(t); o.stop(t + 0.6);
+    }
+  }
+  const bassLine = [55, 55, 65.41, 49];
+  function schedule() {
+    while (nextT < ctx.currentTime + 0.12) {
+      const s16 = step % 16;
+      if (s16 % 4 === 0) { kick(nextT); beats.push(nextT); if (beats.length > 64) beats.shift(); }
+      if (s16 % 4 === 2) { hat(nextT, 0.22); bass(nextT, bassLine[(step >> 4) % 4]); }
+      if (s16 % 2 === 1) hat(nextT, 0.06);
+      if (step % 64 === 6 || step % 64 === 38) stab(nextT);
+      nextT += SPB / 4; step++;
+    }
+  }
+  function start() {
+    if (!ctx) init();
+    ctx.resume();
+    playing = true; step = 0; nextT = ctx.currentTime + 0.06; t0a = nextT; beats.length = 0;
+    schedule(); timer = setInterval(schedule, 25);
+    listeners.forEach((f) => f(true));
+  }
+  function stop() {
+    playing = false; clearInterval(timer);
+    listeners.forEach((f) => f(false));
+  }
+  // Synthetic "music" for when nothing is playing, so the visuals are alive at rest.
+  const t0 = performance.now() / 1000;
+  function frame(N, out) {
+    const now = performance.now() / 1000 - t0;
+    if (playing) {
+      analyser.getFloatTimeDomainData(td);
+      analyser.getByteFrequencyData(fd);
+      let z = 0; for (let i = 1; i < 1024; i++) if (td[i - 1] < 0 && td[i] >= 0) { z = i; break; }
+      for (let i = 0; i < N; i++) out[i] = td[z + i * 4] * 1.5;
+      let lo = 0; for (let i = 1; i < 10; i++) lo += fd[i]; lo /= 9 * 255;
+      const at = ctx.currentTime - (ctx.outputLatency || ctx.baseLatency || 0);
+      let last = -1; for (const b of beats) if (b <= at) last = b;
+      const pulse = last < 0 ? 0 : Math.exp(-(at - last) * 7);
+      return { level: lo, pulse, t: now, beat: (at - t0a) / SPB };
+    }
+    const ph = (now / SPB) % 1, pulse = Math.exp(-ph * 6) * 0.45;
+    for (let i = 0; i < N; i++) {
+      const x = i / N;
+      out[i] = 0.35 * Math.sin(x * 14 + now * 3.1) * Math.sin(x * 3.1 + now * 0.7) + 0.18 * Math.sin(x * 41 - now * 5) * pulse + 0.1 * Math.sin(x * 90 + now * 9);
+    }
+    return { level: 0.25 + 0.2 * pulse, pulse, t: now, beat: now / SPB };
+  }
+  return { start, stop, get playing() { return playing; }, frame, on: (f) => listeners.add(f), BPM };
+})();
+
+/* ================= The toy visualizer: FlowField + WaveShape + ColorMap in WebGL2 ================= */
+const PALETTES = {
+  ember: [[0.02, 0.01, 0.03], [0.55, 0.05, 0.25], [1.0, 0.45, 0.12], [1.0, 0.95, 0.75]],
+  uv:    [[0.01, 0.0, 0.04], [0.18, 0.05, 0.45], [0.75, 0.35, 1.0], [0.98, 0.88, 1.0]],
+  ice:   [[0.0, 0.02, 0.04], [0.02, 0.22, 0.38], [0.3, 0.75, 0.95], [0.92, 1.0, 1.0]],
+  party: [[0.0, 0.0, 0.03], [0.1, 0.15, 0.85], [0.95, 0.2, 0.6], [1.0, 0.85, 0.3]],
+};
+const VS_QUAD = `#version 300 es
+out vec2 uv; void main(){ vec2 p = vec2(float((gl_VertexID<<1)&2), float(gl_VertexID&2)); uv = p; gl_Position = vec4(p*2.0-1.0, 0.0, 1.0); }`;
+const FS_FLOW = `#version 300 es
+precision highp float; in vec2 uv; out vec4 o;
+uniform sampler2D prev; uniform float t, decay, zoom, rot, aspect; uniform int mode;
+mat2 R(float a){ float c=cos(a), s=sin(a); return mat2(c,-s,s,c); }
+void main(){
+  vec2 p = uv - 0.5; p.x *= aspect; float r = length(p);
+  if (mode == 0) { p = R(rot) * p * (1.0 - zoom); }
+  else if (mode == 1) { p = R(rot * 5.0 * (1.0 - smoothstep(0.0, 0.75, r))) * p * (1.0 - zoom * 0.35); }
+  else { p += 0.0035 * vec2(sin(p.y * 11.0 + t * 0.9), cos(p.x * 9.0 - t * 1.2)) + vec2(0.0, -0.0015); p *= 1.0 - zoom * 0.25; }
+  p.x /= aspect;
+  float v = texture(prev, p + 0.5).r * decay;
+  o = vec4(min(v, 1.0), 0.0, 0.0, 1.0);
+}`;
+const VS_LINE = `#version 300 es
+layout(location=0) in vec2 pos; void main(){ gl_Position = vec4(pos, 0.0, 1.0); }`;
+const FS_LINE = `#version 300 es
+precision highp float; uniform float bright; out vec4 o; void main(){ o = vec4(bright, 0.0, 0.0, 1.0); }`;
+const FS_SHOW = `#version 300 es
+precision highp float; in vec2 uv; out vec4 o; uniform sampler2D cur; uniform vec3 c0, c1, c2, c3; uniform float lift; uniform sampler2D mask; uniform float person;
+void main(){
+  float v = clamp(texture(cur, uv).r, 0.0, 1.0); v = pow(v, lift);
+  vec3 c = v < 0.33 ? mix(c0, c1, v / 0.33) : v < 0.7 ? mix(c1, c2, (v - 0.33) / 0.37) : mix(c2, c3, (v - 0.7) / 0.3);
+  float m = texture(mask, uv).r;
+  c = mix(c, vec3(0.13, 0.1, 0.17) + 0.08 * uv.y, m * person);
+  o = vec4(c, 1.0);
+}`;
+const FS_BURN = `#version 300 es
+precision highp float; in vec2 uv; out vec4 o;
+uniform sampler2D mask, prevMask; uniform int mode; uniform float amount; uniform vec2 texel;
+void main(){
+  float m = texture(mask, uv).r, x;
+  if (mode == 1) x = m;
+  else if (mode == 2) {
+    float a = texture(mask, uv + vec2(texel.x, 0.0)).r, b = texture(mask, uv - vec2(texel.x, 0.0)).r;
+    float c = texture(mask, uv + vec2(0.0, texel.y)).r, d = texture(mask, uv - vec2(0.0, texel.y)).r;
+    x = clamp((max(max(a, b), max(c, d)) - min(min(a, b), min(c, d))) * 1.5, 0.0, 1.0);
+  } else x = clamp(abs(m - texture(prevMask, uv).r) * 2.5, 0.0, 1.0);
+  o = vec4(amount * x, 0.0, 0.0, 1.0);
+}`;
+
+/* A made-up dancer's silhouette, standing in for Apple Vision's person mask. Returns the two wrists. */
+function drawFigure(ctx, W, H, t, beat) {
+  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
+  const u = H * 0.8, ph = Math.PI * beat, bar = ((Math.floor(beat / 4) % 3) + 3) % 3;
+  const bounce = Math.abs(Math.sin(ph)) * 0.025 * u, ground = H * 0.97;
+  const hx = W / 2 + Math.sin(t * 0.35) * W * 0.2 + Math.sin(ph / 2) * 0.03 * u, hy = ground - 0.42 * u + bounce;
+  const lean = Math.sin(ph / 2) * 0.04 * u;
+  const neck = [hx + lean, hy - 0.27 * u], head = [neck[0] + lean * 0.3, neck[1] - 0.09 * u];
+  const arm = (s) => {
+    let up, fore;
+    if (bar === 0) { up = -Math.PI / 2 + s * (0.5 + 0.5 * Math.sin(ph)); fore = up + s * 0.6 * Math.sin(ph * 2); }
+    else if (bar === 1) { up = Math.PI / 2 - s * (0.3 + 0.9 * Math.abs(Math.sin(ph))); fore = up - s * 1.4; }
+    else { up = (s > 0 ? 0 : Math.PI) + 0.8 * Math.sin(ph + (s > 0 ? 0 : Math.PI)); fore = up - s * 0.9; }
+    const S = [neck[0] + s * 0.075 * u, neck[1] + 0.02 * u];
+    const E = [S[0] + Math.cos(up) * 0.13 * u, S[1] + Math.sin(up) * 0.13 * u];
+    return [S, E, [E[0] + Math.cos(fore) * 0.12 * u, E[1] + Math.sin(fore) * 0.12 * u]];
+  };
+  const leg = (s) => {
+    const hip = [hx + s * 0.045 * u, hy], foot = [hx + s * 0.07 * u, ground];
+    return [hip, [(hip[0] + foot[0]) / 2 + s * (0.02 * u + bounce * 0.8), (hip[1] + foot[1]) / 2], foot];
+  };
+  ctx.strokeStyle = ctx.fillStyle = "#fff"; ctx.lineCap = ctx.lineJoin = "round";
+  const path = (pts, w) => { ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(...pts[0]); for (const q of pts.slice(1)) ctx.lineTo(...q); ctx.stroke(); };
+  path([neck, [hx, hy]], 0.13 * u);
+  const L = arm(-1), Rt = arm(1);
+  for (const limb of [L, Rt, leg(-1), leg(1)]) path(limb, 0.055 * u);
+  ctx.beginPath(); ctx.arc(head[0], head[1], 0.065 * u, 0, Math.PI * 2); ctx.fill();
+  return [L[2], Rt[2]];
+}
+
+class Viz {
+  bodyPass(a, U) {
+    const gl = this.gl, b = this.o.body, W = 256, H = 144;
+    const wr = drawFigure(this.mctx, W, H, a.t, a.beat || 0);
+    this.mk = 1 - this.mk;
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.maskTex[this.mk]);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.maskCanvas);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.blendEquation(gl.MAX);
+    if (b.mode) {
+      gl.useProgram(this.pBurn); gl.bindVertexArray(this.vao);
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.maskTex[1 - this.mk]);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.maskTex[this.mk]);
+      gl.uniform1i(U(this.pBurn, "mask"), 0); gl.uniform1i(U(this.pBurn, "prevMask"), 1);
+      gl.uniform1i(U(this.pBurn, "mode"), b.mode); gl.uniform1f(U(this.pBurn, "amount"), [0, 0.5, 0.9, 1.0][b.mode]);
+      gl.uniform2f(U(this.pBurn, "texel"), 1.5 / W, 1.5 / H);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    }
+    const far = this.prevWrists && Math.max(...[0, 1].map((i) => Math.hypot(wr[i][0] - this.prevWrists[i][0], wr[i][1] - this.prevWrists[i][1]))) > 24;
+    if (b.trails && this.prevWrists && !far) {
+      const n = this.buildSegs([[this.prevWrists[0], wr[0]], [this.prevWrists[1], wr[1]]], W, H);
+      gl.useProgram(this.pLine); gl.uniform1f(gl.getUniformLocation(this.pLine, "bright"), 1.0);
+      gl.bindVertexArray(this.lineVao); gl.bindBuffer(gl.ARRAY_BUFFER, this.lineBuf);
+      gl.bufferData(gl.ARRAY_BUFFER, this.segBuf.subarray(0, n * 2), gl.STREAM_DRAW);
+      gl.drawArrays(gl.TRIANGLES, 0, n);
+    }
+    gl.blendEquation(gl.FUNC_ADD);
+    this.prevWrists = wr;
+  }
+  buildSegs(segs, W, H) {
+    const out = this.segBuf || (this.segBuf = new Float32Array(64)), { simW, simH } = this.o, aspect = simW / simH;
+    const half = 2.5 / simH * 2; let n = 0;
+    for (const [p, q] of segs) {
+      const P = [p[0] / W * 2 - 1, 1 - p[1] / H * 2], Q = [q[0] / W * 2 - 1, 1 - q[1] / H * 2];
+      let dx = (Q[0] - P[0]) * aspect, dy = Q[1] - P[1]; const len = Math.hypot(dx, dy);
+      if (len < 1e-6) { dx = 1; dy = 0; } else { dx /= len; dy /= len; }
+      const nx = -dy * half / aspect, ny = dx * half, ex = dx * half / aspect, ey = dy * half;
+      const A = [P[0] - ex + nx, P[1] - ey + ny], B = [P[0] - ex - nx, P[1] - ey - ny], C = [Q[0] + ex + nx, Q[1] + ey + ny], D = [Q[0] + ex - nx, Q[1] + ey - ny];
+      for (const v of [A, B, C, B, D, C]) { out[n++] = v[0]; out[n++] = v[1]; }
+    }
+    return n / 2;
+  }
+  constructor(canvas, opts) {
+    this.canvas = canvas;
+    this.o = Object.assign({ simW: 800, simH: 450, precision: "fine", decay: 0.955, mode: 0, palette: "ember", lift: 0.8, width: 2.2 }, opts);
+    const gl = canvas.getContext("webgl2", { antialias: true, premultipliedAlpha: false, preserveDrawingBuffer: !!(opts && opts.preserve) });
+    if (!gl) { this.failed = true; canvas.closest(".stage").insertAdjacentHTML("beforeend", '<p style="position:absolute;inset:auto 0 40% 0;text-align:center;color:#aaa">This browser has no WebGL2, so the live demo is off.</p>'); return; }
+    this.gl = gl;
+    this.fine = this.o.precision === "fine" && !!gl.getExtension("EXT_color_buffer_float");
+    const mk = (vs, fs) => {
+      const p = gl.createProgram();
+      for (const [type, src] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) {
+        const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s));
+        gl.attachShader(p, s);
+      }
+      gl.linkProgram(p); return p;
+    };
+    this.pFlow = mk(VS_QUAD, FS_FLOW); this.pLine = mk(VS_LINE, FS_LINE); this.pShow = mk(VS_QUAD, FS_SHOW);
+    this.pBurn = mk(VS_QUAD, FS_BURN);
+    const tex1 = () => {
+      const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+      for (const [k, v] of [[gl.TEXTURE_MIN_FILTER, gl.LINEAR], [gl.TEXTURE_MAG_FILTER, gl.LINEAR], [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+      return t;
+    };
+    this.blank = tex1();
+    if (this.o.body) {
+      this.maskCanvas = document.createElement("canvas"); this.maskCanvas.width = 256; this.maskCanvas.height = 144;
+      this.mctx = this.maskCanvas.getContext("2d"); this.maskTex = [tex1(), tex1()]; this.mk = 0; this.prevWrists = null;
+    }
+    this.vao = gl.createVertexArray(); this.lineVao = gl.createVertexArray();
+    gl.bindVertexArray(this.lineVao);
+    this.lineBuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, this.lineBuf);
+    gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.bindVertexArray(null);
+    this.N = 220; this.samples = new Float32Array(this.N); this.strip = new Float32Array(this.N * 4 + 8);
+    this.makeTargets(); this.visible = true;
+    new IntersectionObserver((es) => { this.visible = es[0].isIntersecting; }).observe(canvas);
+  }
+  makeTargets() {
+    const gl = this.gl, { simW: w, simH: h } = this.o;
+    this.tex = []; this.fbo = [];
+    for (let i = 0; i < 2; i++) {
+      const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+      if (this.fine) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
+      else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      const f = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+      gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+      this.tex.push(t); this.fbo.push(f);
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null); this.cur = 0;
+  }
+  clear() {
+    if (this.failed) return; const gl = this.gl;
+    for (const f of this.fbo) { gl.bindFramebuffer(gl.FRAMEBUFFER, f); gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT); }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  }
+  buildWave(a) {
+    const N = this.N, s = this.samples, out = this.strip, { simW, simH } = this.o, aspect = simW / simH;
+    const half = this.o.width / simH * 2;   // half line width in clip units (vertical)
+    const pts = [];
+    if (this.o.mode === 0) {
+      for (let i = 0; i <= N; i++) {
+        const k = i % N, ang = (k / N) * Math.PI * 2 + a.t * 0.4, r = 0.32 + s[k] * 0.16 + a.pulse * 0.05;
+        pts.push([Math.cos(ang) * r / aspect, Math.sin(ang) * r]);
+      }
+    } else {
+      for (let i = 0; i < N; i++) pts.push([-0.92 + 1.84 * i / (N - 1), s[i] * 0.42 + Math.sin(a.t * 0.5) * 0.12]);
+    }
+    let n = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i], q = pts[Math.min(i + 1, pts.length - 1)], r = pts[Math.max(i - 1, 0)];
+      let dx = (q[0] - r[0]) * aspect, dy = q[1] - r[1]; const L = Math.hypot(dx, dy) || 1; dx /= L; dy /= L;
+      const nx = -dy * half / aspect, ny = dx * half;
+      out[n++] = p[0] + nx; out[n++] = p[1] + ny; out[n++] = p[0] - nx; out[n++] = p[1] - ny;
+    }
+    return n / 2;
+  }
+  frame(a) {
+    if (this.failed) return;
+    if (!this.visible) { this.prevWrists = null; return; }
+    const gl = this.gl, o = this.o, src = this.cur, dst = 1 - src;
+    // 1. FlowField: move and fade last frame
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo[dst]); gl.viewport(0, 0, o.simW, o.simH);
+    gl.disable(gl.BLEND); gl.useProgram(this.pFlow); gl.bindVertexArray(this.vao);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.tex[src]);
+    const U = (p, n) => gl.getUniformLocation(p, n);
+    gl.uniform1i(U(this.pFlow, "prev"), 0); gl.uniform1f(U(this.pFlow, "t"), a.t);
+    gl.uniform1f(U(this.pFlow, "decay"), o.decay); gl.uniform1f(U(this.pFlow, "aspect"), o.simW / o.simH);
+    gl.uniform1f(U(this.pFlow, "zoom"), 0.006 + 0.03 * a.pulse); gl.uniform1f(U(this.pFlow, "rot"), 0.004 + 0.012 * a.level);
+    gl.uniform1i(U(this.pFlow, "mode"), o.mode);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    // 2. WaveShape: draw the sound on top
+    const verts = this.buildWave(a);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
+    gl.useProgram(this.pLine); gl.uniform1f(U(this.pLine, "bright"), 0.75 + 0.25 * a.pulse);
+    gl.bindVertexArray(this.lineVao); gl.bindBuffer(gl.ARRAY_BUFFER, this.lineBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, this.strip.subarray(0, verts * 2), gl.STREAM_DRAW);
+    if (o.wave !== false) gl.drawArrays(gl.TRIANGLE_STRIP, 0, verts);
+    if (o.body) this.bodyPass(a, U);
+    gl.disable(gl.BLEND);
+    // 3. ColorMap: brightness to colour, on screen
+    const dpr = Math.min(window.devicePixelRatio || 1, 2), cw = Math.round(this.canvas.clientWidth * dpr), ch = Math.round(this.canvas.clientHeight * dpr);
+    if (this.canvas.width !== cw || this.canvas.height !== ch) { this.canvas.width = cw; this.canvas.height = ch; }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, cw, ch);
+    gl.useProgram(this.pShow); gl.bindVertexArray(this.vao);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, o.body ? this.maskTex[this.mk] : this.blank);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.tex[dst]);
+    gl.uniform1i(U(this.pShow, "mask"), 1); gl.uniform1f(U(this.pShow, "person"), o.body && o.body.front ? 0.9 : 0.0);
+    gl.uniform1i(U(this.pShow, "cur"), 0); gl.uniform1f(U(this.pShow, "lift"), o.lift);
+    const P = PALETTES[o.palette]; ["c0", "c1", "c2", "c3"].forEach((k, i) => gl.uniform3fv(U(this.pShow, k), P[i]));
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    this.cur = dst;
+  }
+}
+
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const hero = new Viz(document.getElementById("heroCanvas"), { simW: 960, simH: 540 });
+const lo = new Viz(document.getElementById("loCanvas"), { simW: 480, simH: 360, precision: "coarse", decay: 0.985, mode: 1, palette: "ice", lift: 0.5, width: 1.6 });
+const hi = new Viz(document.getElementById("hiCanvas"), { simW: 480, simH: 360, precision: "fine", decay: 0.985, mode: 1, palette: "ice", lift: 0.5, width: 1.6 });
+const bodyViz = new Viz(document.getElementById("bodyCanvas"), { simW: 960, simH: 540, mode: 2, palette: "uv", wave: false, decay: 0.95, lift: 0.75, body: { mode: 2, trails: false, front: true } });
+const lightsViz = new Viz(document.getElementById("lightsCanvas"), { simW: 640, simH: 360, mode: 0, palette: "party", decay: 0.96, lift: 0.7, width: 3, preserve: true });
+const vizzes = [hero, lo, hi, bodyViz, lightsViz];
+if (hi.gl && !hi.fine) document.querySelector("#hiCanvas + .badge").textContent = "Fine steps not supported here";
+
+let pairFrames = 0;
+const samp = new Float32Array(220);
+function loop() {
+  requestAnimationFrame(loop);
+  if (reduceMotion && !Audio.playing) return;
+  const a = Audio.frame(220, samp);
+  for (const v of vizzes) { if (!v.failed) { v.samples.set(samp); v.frame(a); } }
+  pairFrames++;
+}
+// Draw a few frames even with reduced motion, so the page isn't blank.
+if (reduceMotion) { for (let i = 0; i < 40; i++) { const a = Audio.frame(220, samp); for (const v of vizzes) if (!v.failed) { v.samples.set(samp); v.frame(a); } } }
+requestAnimationFrame(loop);
+
+document.getElementById("resetPair").addEventListener("click", () => { lo.clear(); hi.clear(); });
+
+function seg(id, apply) {
+  const el = document.getElementById(id);
+  el.addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    for (const x of el.querySelectorAll("button")) x.setAttribute("aria-pressed", String(x === b));
+    apply(b.dataset.v);
+  });
+}
+seg("flowSeg", (v) => { hero.o.mode = +v; });
+seg("palSeg", (v) => { hero.o.palette = v; });
+
+const playBtns = ["playBtn", "playBtn3", "playBtn4"].map((id) => document.getElementById(id));
+seg("bodySeg", (v) => { bodyViz.o.body.mode = +v; });
+for (const [id, key] of [["frontBtn", "front"]]) {
+  const b = document.getElementById(id);
+  b.addEventListener("click", () => { const on = b.getAttribute("aria-pressed") !== "true"; b.setAttribute("aria-pressed", String(on)); bodyViz.o.body[key] = on; });
+}
+for (const b of playBtns) b.addEventListener("click", () => (Audio.playing ? Audio.stop() : Audio.start()));
+Audio.on((on) => { for (const b of playBtns) b.textContent = on ? "■ Stop the beat" : "▶ Play a beat"; });
+
+
+/* ================= More G-Force exact vs done right comparisons ================= */
+(() => {
+  const vis = (c) => { let on = true; new IntersectionObserver((e) => { on = e[0].isIntersecting; }).observe(c); return () => on; };
+  // --- Thin lines: G-Force snaps points by truncation toward the centre and draws one pixel per column ---
+  const tl = document.getElementById("thinL"), tr = document.getElementById("thinR");
+  const lx = tl.getContext("2d"), rx = tr.getContext("2d"), TW = tl.width, TH = tl.height;
+  const tlOn = vis(tl), img = lx.createImageData(TW, TH);
+  function shape(t) {
+    const pts = [], rot = t * 0.07, N = 90;
+    for (let i = 0; i <= N; i++) {
+      const u = i / N * 2 - 1, x = u * 0.85, y = 0.32 * Math.sin(u * 3.2 + t * 0.35);
+      pts.push([x * Math.cos(rot) - y * Math.sin(rot), x * Math.sin(rot) + y * Math.cos(rot)]);
+    }
+    return pts;
+  }
+  const W8 = 0.7; // line weight, under one pixel
+  function drawThin(t) {
+    const pts = shape(t), d = img.data; d.fill(0); for (let i = 3; i < d.length; i += 4) d[i] = 255;
+    const snap = ([x, y]) => [TW / 2 + Math.trunc(x * TW / 2), TH / 2 + Math.trunc(-y * TH / 2)];
+    const plot = (c, r) => { if (c < 0 || r < 0 || c >= TW || r >= TH) return; const k = (r * TW + c) * 4, v = Math.round(255 * W8); d[k] = Math.max(d[k], v); d[k + 1] = Math.max(d[k + 1], v); d[k + 2] = Math.max(d[k + 2], v); };
+    for (let i = 1; i < pts.length; i++) {
+      const [c0, r0] = snap(pts[i - 1]), [c1, r1] = snap(pts[i]), n = Math.max(Math.abs(c1 - c0), Math.abs(r1 - r0), 1);
+      for (let k = 0; k <= n; k++) plot(Math.round(c0 + (c1 - c0) * k / n), Math.round(r0 + (r1 - r0) * k / n));
+    }
+    lx.putImageData(img, 0, 0);
+    rx.fillStyle = "#000"; rx.fillRect(0, 0, TW, TH);
+    rx.strokeStyle = `rgba(255,255,255,${W8})`; rx.lineWidth = 1; rx.lineJoin = rx.lineCap = "round"; rx.beginPath();
+    pts.forEach(([x, y], i) => { const X = TW / 2 + x * TW / 2, Y = TH / 2 - y * TH / 2; i ? rx.lineTo(X, Y) : rx.moveTo(X, Y); });
+    rx.stroke();
+  }
+  // --- See-through pictures ---
+  const al = document.getElementById("alphaL"), ar = document.getElementById("alphaR"), AW = al.width, AH = al.height;
+  const ax = [al.getContext("2d"), ar.getContext("2d")], alOn = vis(al);
+  const junk = document.createElement("canvas"); junk.width = junk.height = 140;
+  (() => { const j = junk.getContext("2d"); j.fillStyle = "#cfd6c4"; j.fillRect(0, 0, 140, 140);
+    j.strokeStyle = "#8f9a84"; j.lineWidth = 3; for (let i = 0; i < 7; i++) { j.beginPath(); j.moveTo(8 + i * 19, 6); j.lineTo(2 + i * 21, 134); j.stroke(); }
+    j.fillStyle = "#9aa58c"; j.font = "bold 15px sans-serif"; j.fillText("old_layer", 10, 126); })();
+  const logo = document.createElement("canvas"); logo.width = logo.height = 140;
+  (() => { const g = logo.getContext("2d"); g.translate(70, 70); g.fillStyle = "#fff"; g.beginPath();
+    for (let i = 0; i < 10; i++) { const r = i % 2 ? 26 : 62, a = -Math.PI / 2 + i * Math.PI / 5; g.lineTo(Math.cos(a) * r, Math.sin(a) * r); } g.closePath(); g.fill(); })();
+  function drawAlpha(t) {
+    ax.forEach((c, side) => {
+      c.globalCompositeOperation = "source-over"; c.fillStyle = "#07040d"; c.fillRect(0, 0, AW, AH);
+      for (const [cx, cy, r, col] of [[0.3 + 0.15 * Math.sin(t * 0.5), 0.4, 0.55, "rgba(181,123,255,0.55)"], [0.72, 0.65 + 0.1 * Math.cos(t * 0.4), 0.5, "rgba(255,79,139,0.45)"]]) {
+        const g = c.createRadialGradient(cx * AW, cy * AH, 0, cx * AW, cy * AH, r * AW); g.addColorStop(0, col); g.addColorStop(1, "rgba(0,0,0,0)"); c.fillStyle = g; c.fillRect(0, 0, AW, AH);
+      }
+      const x = AW / 2 - 70 + Math.sin(t * 0.6) * 60, y = AH / 2 - 70 + Math.cos(t * 0.45) * 30;
+      c.globalCompositeOperation = "lighten";
+      if (side === 0) c.drawImage(junk, x, y);
+      c.drawImage(logo, x, y);
+      c.globalCompositeOperation = "source-over";
+    });
+  }
+  // --- Colour morphs: RGB vs OKLab ---
+  const lin = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4), gam = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
+  function toLab([r, g, b]) {
+    [r, g, b] = [r, g, b].map((v) => lin(v / 255));
+    const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b), m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b), s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+    return [0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s, 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s];
+  }
+  function fromLab([L, A, B]) {
+    const l = (L + 0.3963377774 * A + 0.2158037573 * B) ** 3, m = (L - 0.1055613458 * A - 0.0638541728 * B) ** 3, s = (L - 0.0894841775 * A - 1.291485548 * B) ** 3;
+    return [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s, -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s].map((v) => Math.round(255 * gam(Math.min(1, Math.max(0, v)))));
+  }
+  const pairs = [[[255, 122, 0], [30, 91, 255]], [[255, 42, 42], [32, 208, 96]], [[224, 64, 255], [255, 224, 48]]];
+  ["morphL", "morphR"].forEach((id, side) => {
+    const c = document.getElementById(id), x = c.getContext("2d"), W = c.width, H = c.height, rowH = H / pairs.length;
+    pairs.forEach(([a, b], row) => {
+      const la = toLab(a), lb = toLab(b);
+      for (let i = 0; i < W; i++) {
+        const t = i / (W - 1);
+        const col = side === 0 ? a.map((v, k) => Math.round(v + (b[k] - v) * t)) : fromLab(la.map((v, k) => v + (lb[k] - v) * t));
+        x.fillStyle = `rgb(${col})`; x.fillRect(i, row * rowH, 1, rowH - (row < pairs.length - 1 ? 4 : 0));
+      }
+    });
+  });
+  const t0 = performance.now();
+  (function tick() {
+    requestAnimationFrame(tick);
+    const t = (performance.now() - t0) / 1000;
+    if (tlOn()) drawThin(t);
+    if (alOn()) drawAlpha(t);
+  })();
+})();
+
+/* ================= Room lights: Peter's real panel layout, coloured the way reforce does it ================= */
+(() => {
+  // From the panels (GET panelLayout/layout): x, y (Nanoleaf: y up), rotation in degrees; triangles, side 150.
+  const LAYOUT = [[449,43,180],[449,129,240],[524,173,180],[524,259,240],[599,303,60],[599,389,120],[674,433,60],
+    [749,389,240],[749,303,300],[824,259,240],[824,173,60],[899,129,0],[899,43,180],[374,173,60],[374,259,240],
+    [299,303,60],[299,389,0],[224,433,60],[149,389,240],[150,303,300],[75,259,120],[74,173,60],[0,129,240],[0,43,60]];
+  const SIDE = 150, R = SIDE / Math.sqrt(3), svg = document.getElementById("wall"), NS = "http://www.w3.org/2000/svg";
+  const xs = LAYOUT.map((p) => p[0]), ys = LAYOUT.map((p) => p[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  let bx0 = Infinity, bx1 = -Infinity, by0 = Infinity, by1 = -Infinity;
+  const shapes = LAYOUT.map(([x, y, o]) => [0, 1, 2].map((k) => {
+    const a = ((90 + o + k * 120) * Math.PI) / 180, px = x + R * 0.93 * Math.cos(a), py = -(y + R * 0.93 * Math.sin(a));
+    bx0 = Math.min(bx0, px); bx1 = Math.max(bx1, px); by0 = Math.min(by0, py); by1 = Math.max(by1, py);
+    return `${px.toFixed(1)},${py.toFixed(1)}`;
+  }).join(" "));
+  const pad = 30;
+  svg.setAttribute("viewBox", `${bx0 - pad} ${by0 - pad} ${bx1 - bx0 + 2 * pad} ${by1 - by0 + 2 * pad}`);
+  svg.innerHTML = `<defs><filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="22"/></filter></defs>`;
+  const glowG = document.createElementNS(NS, "g"); glowG.setAttribute("filter", "url(#glow)"); glowG.setAttribute("opacity", "0.75");
+  const mainG = document.createElementNS(NS, "g");
+  svg.append(glowG, mainG);
+  const polys = shapes.map((pts) => {
+    const pair = [glowG, mainG].map((g) => { const el = document.createElementNS(NS, "polygon"); el.setAttribute("points", pts); el.setAttribute("fill", "#000"); g.appendChild(el); return el; });
+    pair[1].setAttribute("stroke", "#2a2330"); pair[1].setAttribute("stroke-width", "4"); pair[1].setAttribute("stroke-linejoin", "round");
+    return pair;
+  });
+  const src = document.getElementById("lightsCanvas"), FW = 120, FH = 68;
+  const small = document.createElement("canvas"); small.width = FW; small.height = FH;
+  const sx = small.getContext("2d", { willReadFrequently: true });
+  const rad = 0.5 * SIDE / (x1 - x0) * FW, state = LAYOUT.map(() => [0, 0, 0]);
+  let last = performance.now();
+  (function tick() {
+    requestAnimationFrame(tick);
+    const now = performance.now();
+    if (now - last < 50 || lightsViz.failed || !lightsViz.visible || !src.width) return;   // 20 updates a second
+    const dt = Math.min(0.25, (now - last) / 1000); last = now;
+    sx.drawImage(src, 0, 0, FW, FH);
+    const px = sx.getImageData(0, 0, FW, FH).data;
+    LAYOUT.forEach(([x, y], i) => {
+      const cx = (x - x0) / (x1 - x0) * (FW - 1), cy = (1 - (y - y0) / (y1 - y0)) * (FH - 1);
+      let sw = 0, sr = 0, sg = 0, sb = 0, sl = 0, n = 0;
+      for (let yy = Math.max(0, Math.floor(cy - rad)); yy <= Math.min(FH - 1, Math.ceil(cy + rad)); yy++)
+        for (let xx = Math.max(0, Math.floor(cx - rad)); xx <= Math.min(FW - 1, Math.ceil(cx + rad)); xx++) {
+          if ((xx - cx) ** 2 + (yy - cy) ** 2 > rad * rad) continue;
+          const k = (yy * FW + xx) * 4, r = px[k] / 255, g = px[k + 1] / 255, b = px[k + 2] / 255, l = Math.max(r, g, b);
+          const w = 0.002 + l * l; sw += w; sr += w * r; sg += w * g; sb += w * b; sl += l; n++;
+        }
+      let c = [sr / sw, sg / sw, sb / sw];
+      const m = Math.max(...c) || 1; c = c.map((v) => v / m);
+      const grey = (c[0] + c[1] + c[2]) / 3; c = c.map((v) => Math.min(1, Math.max(0, grey + (v - grey) * 1.3)));
+      const level = Math.sqrt(n ? sl / n : 0);
+      const st = state[i];
+      for (let ch = 0; ch < 3; ch++) {
+        const target = c[ch] * level, tau = target > st[ch] ? 0.05 : 0.3;
+        st[ch] += (target - st[ch]) * (1 - Math.exp(-dt / tau));
+      }
+      const hex = "#" + st.map((v) => Math.round(Math.min(1, v) * 255).toString(16).padStart(2, "0")).join("");
+      polys[i][0].setAttribute("fill", hex); polys[i][1].setAttribute("fill", hex);
+    });
+  })();
+})();
+</script>
+
+<script type="module">
+/* ================= Dancers: reforce's own dancer code (WebAssembly) + its WebGL renderer ================= */
+const raw = (id) => Uint8Array.from(atob(document.getElementById(id).textContent.trim()), (c) => c.charCodeAt(0));
+const blobUrl = (bytes, type) => URL.createObjectURL(new Blob([bytes], { type }));
+const crew = document.getElementById("crew");
+const STYLES = [["house", "House"], ["pop", "Popping"], ["lock", "Locking"], ["break", "Breaking"], ["disco", "Disco"], ["stomp", "Stomp"], ["hiphop", "Hip-hop"], ["jazz", "Jazz"], ["ballet", "Ballet"]];
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
+const SKIN = ["#f6d2b8", "#f1c7a5", "#e0ac85", "#c68863", "#a86b47", "#7a4a2f", "#5a3622"];
+const HAIR = ["#1a1a1a", "#2b1b12", "#4a2d17", "#6b4a2a", "#a8733a", "#c9a15c", "#8a8a8a", "#d9d4ca"];
+const DYED = ["#ff4fa3", "#5ce1e6", "#7b5cff", "#9dff57"];
+const TOPS = ["#ff4fa3", "#3a6ea5", "#2e8b57", "#ff7b39", "#7b5cff", "#f2d14b", "#1d1d24", "#e8e3da", "#c0392b", "#5ce1e6"];
+const FEM = { hair: ["bob", "ponytail", "pigtails", "bun", "long", "curly", "afro", "pixie", "bangs", "wavy", "braid", "sidepony", "spacebuns", "topknot", "layers", "halfup", "longcurls", "lob", "locs"], outfit: ["tee", "tank", "dress", "croptop", "skirt", "jumpsuit", "hoodie"] };
+const MASC = { hair: ["short", "buzz", "crew", "quiff", "undercut", "pompadour", "hightop", "afro", "mohawk", "spiky", "manbun", "curtains", "sidepart", "locs", "coils", "balding"], outfit: ["tee", "tank", "hoodie", "suit", "overalls"] };
+function randomLook(style) {
+  const fem = Math.random() < 0.5, set = fem ? FEM : MASC;
+  const k = { Style: style, Skin: pick(SKIN), HairStyle: pick(set.hair), Hair: Math.random() < 0.15 ? pick(DYED) : pick(HAIR), Outfit: pick(set.outfit), Top: pick(TOPS), Accent: pick(TOPS) };
+  if (!fem && Math.random() < 0.35) k.Beard = pick(["goatee", "full", "moustache", "short", "stubble", "handlebar"]);
+  const r = Math.random();
+  if (r < 0.12) { k.Glasses = pick(["round", "aviator", "cateye", "heart"]); }
+  else if (r < 0.22) { k.Glasses = pick(["round", "square"]); k.Lens = "clear"; }
+  if (Math.random() < 0.12) k.Hat = pick(["cap", "beanie", "headphones"]);
+  return k;
+}
+
+async function boot() {
+  if (!document.createElement("canvas").getContext("webgl2")) throw new Error("no WebGL2");
+  const dancerJs = blobUrl(raw("b-dancerjs"), "text/javascript");
+  const glSrc = new TextDecoder().decode(raw("b-dancergl")).replace("from './dancer.js'", `from '${dancerJs}'`);
+  const { createDancerView } = await import(blobUrl(glSrc, "text/javascript"));
+  const moves = blobUrl(raw("b-moves"), "application/octet-stream");
+  const start = ["house", "disco", "break"];
+  const views = [];
+  for (let i = 0; i < 3; i++) {
+    const wrap = document.createElement("div"); wrap.className = "dancer";
+    const canvas = document.createElement("canvas");
+    canvas.setAttribute("aria-label", "A live 3D dancer");
+    const who = document.createElement("div"); who.className = "who";
+    const sel = document.createElement("select"); sel.id = "style" + i; sel.setAttribute("aria-label", "Dance style");
+    for (const [v, n] of STYLES) sel.add(new Option(n, v, false, v === start[i]));
+    const again = document.createElement("button"); again.type = "button"; again.textContent = "New look";
+    who.append(sel, again); wrap.append(canvas, who); crew.append(wrap);
+    let keys = randomLook(start[i]);
+    const view = await createDancerView(canvas, { keys, bpm: 124, seed: 11 + i * 17, moves });
+    views.push(view);
+    sel.addEventListener("change", () => { keys = randomLook(sel.value); view.setKeys(keys); });
+    again.addEventListener("click", () => { keys = randomLook(sel.value); view.setKeys(keys); });
+  }
+  const bpm = document.getElementById("bpm"), bv = document.getElementById("bpmVal");
+  bpm.addEventListener("input", () => { bv.textContent = bpm.value + " BPM"; for (const v of views) v.setBpm(+bpm.value); });
+}
+boot().catch((e) => {
+  console.error(e);
+  crew.outerHTML = '<p class="fail">The live dancers need WebGL2 and WebAssembly, which this browser didn\'t allow. (' + String(e.message || e).replace(/[<>&]/g, "") + ')</p>';
+});
+</script>
+</body>
+</html>

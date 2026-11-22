@@ -1,0 +1,5 @@
+// reforce probe: pure rotation by +0.3 rad per frame. Morph against "rotate minus" to see linear vs polar blending.
+Aspc=1
+srcR="r"
+srcT="theta + .3"
+Vers=100

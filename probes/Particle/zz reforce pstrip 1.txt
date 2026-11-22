@@ -1,0 +1,10 @@
+// #waveshape-particle-only
+// reforce probe (5B.2 particle fade, dense): one dot at (.99, -0.15), Pen 1, PDur 2, on FlowField 'zz reforce morph a'
+// (scrolls left 1 px/frame): column age + pixel value = the fade envelope x 255, frame by frame.
+Stps=1
+ConB=0
+LWdt=3
+PDur=2
+X0=".99"
+Y0="-0.15"
+Vers=270

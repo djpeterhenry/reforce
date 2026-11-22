@@ -1,0 +1,4 @@
+Vers=100
+Meta="reforce dancer: someone new every time: a breaking dancer (toprock: upright battle stepping), dressed to match (body, colours, outfit, prints, fabrics, sunglasses, face)."
+Style="break"
+Random="1"

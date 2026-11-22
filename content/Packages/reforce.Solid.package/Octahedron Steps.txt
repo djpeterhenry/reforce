@@ -1,0 +1,19 @@
+Vers=100
+Meta="reforce solid: an octahedron showing the frame itself (Text=1) that makes a quarter turn into each beat, alternately about the horizontal and the vertical axis, and swells as it lands, while the beat clock is locked (SYNC_*), else at 120 BPM."
+Mesh="octahedron"
+Text="1"
+B0="t - START_TIME"
+B1="SYNC_ON * SYNC_BEAT + (1 - SYNC_ON) * 2 * B0"
+B2="wrap(B1)"
+// the turn takes the last 40% of the beat, eased in and out
+B3="clamp((B2 - .6) / .4)"
+B4="B3 * B3 * (3 - 2 * B3)"
+// 0 when the coming turn is about X, 1 when about Y
+B5="floor(B1) - 2 * floor(floor(B1) / 2)"
+X=".15 * sin(.17 * B0)"
+Y=".08 * sin(.23 * B0)"
+Z="0"
+Scal=".55 * (1 + .1 * exp(-8 * B2))"
+RotX="1.5708 * (floor((floor(B1) + 1) / 2) + (1 - B5) * B4)"
+RotY="1.5708 * (floor(floor(B1) / 2) + B5 * B4)"
+RotZ=".3"

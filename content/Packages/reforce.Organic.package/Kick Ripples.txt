@@ -1,0 +1,12 @@
+Vers=100
+Meta="reforce organic: a stone dropped in still water on every beat, at a random spot; the rings spread, cross and run off the edges of the frame."
+Kind="ripples"
+// one drop per beat; drop radius in frame heights; wave speed in frame heights per second; rings fade to 1/e in Decy s
+Rate="1"
+Rad=".022"
+Spd=".45"
+Decy="1.4"
+Edge="0"
+Amp="1"
+Gain="3"
+Pen=".9"

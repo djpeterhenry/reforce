@@ -1,0 +1,10 @@
+Vers=100
+Meta="reforce organic: a pendulum wave seen from above. Fifteen pendulums, the first swinging once per bar, each next one a little faster, so they drift into snakes, waves and chaos and line up again exactly on every phrase line (16 bars; 32 s at 120 BPM without a beat clock)."
+Kind="pendulums"
+Num="15"
+Cyc="16"
+Sprd="3"
+BobW="14"
+Wdth="2"
+Amp=".55"
+Strg=".35"

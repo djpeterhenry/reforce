@@ -1,0 +1,9 @@
+Vers=100
+Meta="reforce organic: Wolfram's rule 30 cellular automaton, one row per eighth note scrolling up the frame, chaos growing out of a single cell."
+Kind="automaton"
+Rule="30"
+Cols="121"
+Rows="66"
+Rate="2"
+Seed="0"
+Cell=".8"

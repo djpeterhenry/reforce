@@ -1,0 +1,15 @@
+// reforce probe (Phase 5B.4 ColorMap corpus sweep): 256 separate dots per row, dot k at x = -.96 + 1.92 k/255
+// with Pen = k/255 (+ a quarter level, so truncating and rounding the intensity both give level k), in three
+// rows (y = .5, 0, -.5). On the 'void' FlowField each screenshot shows one frame: reading the dot centers gives
+// the ColorMap's 256-entry palette directly (with ColorMap.MapFunction = "i").
+Stps=256
+ConB=0
+LWdt=3
+Pen="s+.00098"
+X0="-.96+1.92*s"
+Y0=".5"
+X1="-.96+1.92*s"
+Y1="0"
+X2="-.96+1.92*s"
+Y2="-.5"
+Vers=270

@@ -1,0 +1,4 @@
+Vers=100
+Meta="reforce dancer: someone new every time: a house dancer (club footwork, shuffles, the jack), dressed to match (body, colours, outfit, prints, fabrics, sunglasses, face)."
+Style="house"
+Random="1"

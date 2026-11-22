@@ -1,0 +1,13 @@
+Vers=100
+Meta="reforce organic: a light rain on a pond walled in by the frame (the rings bounce off its edges), and a big drop on every bar; the rain thickens through a breakdown (SYNC_BUILD)."
+Kind="ripples"
+// a big drop every 4 beats (on the bar with the beat clock); Rain: small drops per second
+Rate=".25"
+Rad=".03"
+Spd=".35"
+Decy="2"
+Edge="1"
+Amp="1.4"
+Rain="3 + 12 * SYNC_BUILD"
+Gain="2.6"
+Pen=".85"

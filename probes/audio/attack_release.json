@@ -1,0 +1,86 @@
+{
+ "file": "attack_release.wav",
+ "description": "Attack/release step x3: 0.5 s silence -> 2 s pink noise (20 Hz-20 kHz, -12 dBFS RMS, instantaneous on/off) -> 2 s silence.",
+ "sample_rate": 44100,
+ "channels": 1,
+ "sample_format": "s16",
+ "duration": 17.5,
+ "samples": 771750,
+ "sync": {
+  "t": 0.5,
+  "duration": 0.05,
+  "freq_hz": 2000.0,
+  "peak_dbfs": -6.0
+ },
+ "content_start": 2.0,
+ "segments": [
+  {
+   "t0": 2.0,
+   "t1": 2.5,
+   "kind": "silence",
+   "label": "pre"
+  },
+  {
+   "kind": "pink_noise",
+   "index": 0,
+   "rms_dbfs": -12,
+   "lo_hz": 20,
+   "hi_hz": 20000,
+   "clipped_samples": 6,
+   "t0": 2.5,
+   "t1": 4.5
+  },
+  {
+   "t0": 4.5,
+   "t1": 6.5,
+   "kind": "silence",
+   "label": "release"
+  },
+  {
+   "t0": 6.5,
+   "t1": 7.0,
+   "kind": "silence",
+   "label": "pre"
+  },
+  {
+   "kind": "pink_noise",
+   "index": 1,
+   "rms_dbfs": -12,
+   "lo_hz": 20,
+   "hi_hz": 20000,
+   "clipped_samples": 4,
+   "t0": 7.0,
+   "t1": 9.0
+  },
+  {
+   "t0": 9.0,
+   "t1": 11.0,
+   "kind": "silence",
+   "label": "release"
+  },
+  {
+   "t0": 11.0,
+   "t1": 11.5,
+   "kind": "silence",
+   "label": "pre"
+  },
+  {
+   "kind": "pink_noise",
+   "index": 2,
+   "rms_dbfs": -12,
+   "lo_hz": 20,
+   "hi_hz": 20000,
+   "clipped_samples": 11,
+   "t0": 11.5,
+   "t1": 13.5
+  },
+  {
+   "t0": 13.5,
+   "t1": 15.5,
+   "kind": "silence",
+   "label": "release"
+  }
+ ],
+ "levels": "tones/sweep/kick: dBFS peak (0 dBFS = full-scale sine); noise: dBFS RMS",
+ "generator": "tools/audio_signals/gen_signals.py"
+}

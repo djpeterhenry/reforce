@@ -1,0 +1,11 @@
+#!/bin/bash
+# Runs a dance_sync tool in its venv, creating the venv on first use:  tools/dance_sync/run dance_beats.py CLIP --preview
+set -euo pipefail
+here="$(cd "$(dirname "$0")" && pwd)"
+if [[ ! -x "$here/.venv/bin/python" ]]; then
+    py="$(command -v python3.11 || command -v python3.12 || command -v python3)"
+    "$py" -m venv "$here/.venv"
+    "$here/.venv/bin/pip" install -q -r "$here/requirements.txt"
+fi
+tool="$1"; shift
+exec "$here/.venv/bin/python" "$here/$tool" "$@"

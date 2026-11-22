@@ -1,0 +1,11 @@
+Vers=100
+Meta="reforce solid: an octahedron whose faces show the frame itself (Text=1), so it repeats inside itself."
+Mesh="octahedron"
+Text="1"
+B0="t - START_TIME"
+X=".4 * sin(.27 * B0)"
+Y=".18 * sin(.41 * B0)"
+Z=".5 * sin(.15 * B0)"
+Scal=".5"
+RotX=".3"
+RotY=".5 * B0"

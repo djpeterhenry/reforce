@@ -1,0 +1,5 @@
+// reforce probe: content shrinks toward the center each frame (source = 1.03 * p). Makes the active field easy to see.
+Aspc=0
+srcX="x * 1.03"
+srcY="y * 1.03"
+Vers=100

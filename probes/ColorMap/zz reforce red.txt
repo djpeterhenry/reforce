@@ -1,0 +1,5 @@
+// reforce probe: black at i=0, pure red elsewhere.
+H="0"
+S="1"
+V="i > .01"
+Vers=100

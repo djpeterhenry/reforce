@@ -1,0 +1,9 @@
+// reforce probe: path0 dot at (-.5,0), path1 dot at (.2,.3). Morph to "one dot" -> path1 is unmatched (dilation fit in x and y).
+Stps=1
+ConB=0
+LWdt=8
+X0="-.5"
+Y0="0"
+X1=".2"
+Y1=".3"
+Vers=270

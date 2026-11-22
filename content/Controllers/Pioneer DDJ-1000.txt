@@ -1,0 +1,25 @@
+// Pioneer DDJ-1000 in rekordbox mode. Numbers from rekordbox's own DDJ-1000.midi.csv.
+// Format: src/sync/ControllerMap.hpp. Decks and MIDI channels count from 1.
+Name = "Pioneer DDJ-1000"
+Match = "DDJ-1000"
+
+// Channel faders (14-bit): Fader = DECK, CHANNEL, CC, CC_LSB
+Fader = 1, 1, 0x13, 0x33
+Fader = 2, 2, 0x13, 0x33
+Fader = 3, 3, 0x13, 0x33
+Fader = 4, 4, 0x13, 0x33
+
+// Crossfader (14-bit): Crossfader = CHANNEL, CC, CC_LSB
+Crossfader = 7, 0x1F, 0x3F
+
+// Crossfader assign switches: Assign = DECK, CHANNEL, NOTE_A, NOTE_THRU, NOTE_B
+Assign = 1, 1, 0x16, 0x1D, 0x18
+Assign = 2, 2, 0x16, 0x1D, 0x18
+Assign = 3, 3, 0x16, 0x1D, 0x18
+Assign = 4, 4, 0x16, 0x1D, 0x18
+
+// Hot cue pads (pad mode HOT CUE, without SHIFT): HotCues = DECK, CHANNEL, FIRST_NOTE, LAST_NOTE
+HotCues = 1, 8, 0x00, 0x07
+HotCues = 2, 10, 0x00, 0x07
+HotCues = 3, 12, 0x00, 0x07
+HotCues = 4, 14, 0x00, 0x07

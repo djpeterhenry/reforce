@@ -1,0 +1,19 @@
+Vers=100
+Meta="reforce solid: an icosahedron that punches towards you on every beat and sinks back, twice as hard on the bar's first beat, turning a step with each punch, while the beat clock is locked (SYNC_*), else at 120 BPM."
+Mesh="icosahedron"
+Text="0"
+B0="t - START_TIME"
+B1="SYNC_ON * SYNC_BEAT + (1 - SYNC_ON) * 2 * B0"
+B2="wrap(B1)"
+// punch envelope: 0 at the beat, peaks (1) a tenth of a beat later, then decays
+B3="(B2 / .1) * exp(1 - B2 / .1)"
+// 1.6 on the bar's first beat, 1 on the others
+B4="1 + .6 * max(0, 1 - floor(4 * wrap(B1 / 4) + .0001))"
+X=".25 * sin(.21 * B0)"
+Y=".12 * sin(.33 * B0)"
+Z="-.5 + .9 * B4 * B3"
+Scal=".45"
+RotX=".35"
+RotY=".2 * B0 + .7 * (floor(B1) + 1 - exp(-6 * B2))"
+Fill=".15 + .4 * B3"
+Edge=".6 + .4 * B3"

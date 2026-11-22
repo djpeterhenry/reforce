@@ -1,0 +1,6 @@
+CategoryTitle = "Pendulums"
+Include.List = "
+Pendulum Wave
+Pendulum Wave (Side)
+Pendulum Ring
+"

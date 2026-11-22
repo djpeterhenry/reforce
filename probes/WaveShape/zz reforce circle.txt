@@ -1,0 +1,7 @@
+// reforce probe: one closed circle path (for morph tests).
+Stps=100
+ConB=1
+LWdt=4
+X0=".5 * cos(2 * PI * s)"
+Y0=".5 * sin(2 * PI * s)"
+Vers=270

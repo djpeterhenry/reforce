@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#0d0f14">
+<title>reforce control</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="app.css">
+<script src="app.js" defer></script>
+</head>
+<body>
+<header class="bar">
+  <div class="brand">
+    <span class="dot" id="conn" title="connecting"></span>
+    <span class="logo">reforce</span>
+  </div>
+  <div class="global">
+    <label class="field compact">
+      <span>Theme</span>
+      <select id="theme" aria-label="Theme"></select>
+    </label>
+    <button class="toggle" id="slideshowAll" aria-pressed="false" title="Slideshow on/off for all layers">Slideshow</button>
+    <button class="toggle" id="holdAll" aria-pressed="false" title="Hold/unhold every layer">Hold all</button>
+    <button class="toggle" id="windowVisuals" aria-pressed="false" title="For room lights that mirror the screen (Nanoleaf Desktop): the reforce window shows the visuals alone (movie layer and sprites included), without the camera backdrop, dancers, name tags or song text. Syphon (OBS) always gets everything. Also in the View menu. Lit (highlighted) = on. Saved to settings.json (reforce.Window.VisualsOnly)">Visuals only</button>
+    <button class="toggle" id="lights" aria-pressed="false" title="Room lights: the Nanoleaf panels follow the visuals (not the camera, dancers or text). Also in the View menu. Saved to settings.json (reforce.Lights.Enabled)">Lights</button>
+    <div class="stats" id="stats" aria-live="off">–</div>
+    <label class="field compact live-rate" title="How often the meters, Link, progress bars and countdowns update. Each step costs the browser CPU (about 15% of a core at 10 Hz, 21% at 20 Hz in Chrome). The Link beat dots step on the beat at any rate. Stored in this browser. A hidden tab stops updating either way.">
+      <span>Live</span>
+      <select id="liveRate" aria-label="Live update rate">
+        <option value="20">20 Hz</option><option value="10">10 Hz</option><option value="5">5 Hz</option><option value="0">off</option>
+      </select>
+    </label>
+    <div class="perf-hist" id="perfHist" aria-hidden="true" hidden></div>
+    <div class="meters" id="meters" hidden title="Audio: BASS, MID, TREBLE (0..2), BEAT pulse, TEMPO (reforce extensions besides BASS)">
+      <span class="meter" data-k="bass"><i></i><b>B</b></span>
+      <span class="meter" data-k="mid"><i></i><b>M</b></span>
+      <span class="meter" data-k="treble"><i></i><b>T</b></span>
+      <span class="meter beat" data-k="beat"><i></i><b>♪</b></span>
+      <span class="bpm" id="bpm">– BPM</span>
+      <span class="link" id="link" hidden title="Ableton Link"><b>LINK</b> <span id="linkInfo"></span>
+        <span class="beats" id="linkBar" aria-hidden="true"><i></i><i></i><i></i><i></i></span></span>
+    </div>
+    <div class="beatoff" title="Beat offset: makes everything that follows the beat clock (beat-synced movies, SYNC_* scenes, Link BEAT) happen this much earlier, to make up for audio and display latency. + = earlier. Click ±5 ms, Shift-click ±1 ms, double-click the value for 0. Saved to settings.json (reforce.BeatClock.OffsetMs)">
+      <span class="lbl">Beat</span>
+      <button id="boMinus" aria-label="Beat offset later">‹</button>
+      <span id="boVal">+0 ms</span>
+      <button id="boPlus" aria-label="Beat offset earlier">›</button>
+    </div>
+  </div>
+</header>
+
+<section class="favs" id="favs" aria-label="Favourites">
+  <span class="favs-title" title="Favourites: star (☆) a scene in any list to add it here">★</span>
+  <div class="fav-buttons" id="favButtons"></div>
+  <button class="fav-clear" id="favClear" title="Fade out every sprite on screen, movie sprites included (quick fade)">Clear sprites</button>
+</section>
+
+<nav class="tabs" id="tabs" role="tablist" aria-label="Layers"></nav>
+
+<main>
+  <section class="extras" id="extras" aria-label="More layers" hidden>
+    <div class="extra-grid" id="extraGrid"></div>
+  </section>
+  <section class="layers" id="layers"></section>
+  <section class="video" id="lightsCard" aria-labelledby="ltTitle">
+   <details class="fold" id="ltWrap">
+    <summary title="The Nanoleaf panels follow the visuals (not the camera, dancers or text), each panel its own part of the picture. docs/lights.md">
+      <span class="vsum-title">Room lights</span> <span class="vsum-note" id="ltSummary">off</span></summary>
+    <article class="card">
+      <header class="card-head">
+        <h2 id="ltTitle">Room lights</h2>
+        <span class="chip status" id="ltStatus">off</span>
+      </header>
+      <div class="now">
+        <div class="current" id="ltNow">–</div>
+        <div class="vmeta" id="ltMeta"></div>
+      </div>
+      <svg class="lt-preview" id="ltPreview" role="img" aria-label="The panels as they hang, in the colours last sent"></svg>
+      <div class="row buttons">
+        <button class="primary" id="ltOn" title="Drive the panels from the visuals. Quit the Nanoleaf Desktop app first: both would fight over them. Saved to settings.json (reforce.Lights.Enabled)">Turn on</button>
+        <button id="ltPair" title="Pair with the panels (first time, or after a reset): reforce finds them, then you hold the controller's power button 5-7 s until its lights flash. The panels stop following the visuals while pairing">Pair…</button>
+      </div>
+      <div class="settings vsettings cols3">
+        <label class="field" title="How bright the panels are for a given picture (100% = as measured). Saved to settings.json (reforce.Lights.Brightness)"><span>Brightness <em id="ltBrightnessVal"></em></span>
+          <input type="range" id="ltBrightness" min="0" max="2" step="0.05" aria-label="Lights brightness"></label>
+        <label class="field" title="Colour strength (1× = as on screen). Saved to settings.json (reforce.Lights.Saturation)"><span>Saturation <em id="ltSaturationVal"></em></span>
+          <input type="range" id="ltSaturation" min="0" max="3" step="0.05" aria-label="Lights saturation"></label>
+        <label class="field" title="The panels never go darker than this, keeping their colour. Saved to settings.json (reforce.Lights.Floor)"><span>Floor <em id="ltFloorVal"></em></span>
+          <input type="range" id="ltFloor" min="0" max="0.5" step="0.01" aria-label="Lights floor"></label>
+        <label class="field" title="How slowly a panel falls back when its part of the picture goes darker (it rises six times faster). Saved to settings.json (reforce.Lights.Smoothing)"><span>Smoothing <em id="ltSmoothingVal"></em></span>
+          <input type="range" id="ltSmoothing" min="0" max="2" step="0.05" aria-label="Lights smoothing"></label>
+      </div>
+      <div class="hint" id="ltHint" hidden></div>
+    </article>
+   </details>
+  </section>
+  <section class="video" id="backdrop" aria-labelledby="bdTitle">
+   <details class="fold" id="bdWrap">
+    <summary title="A camera (or Syphon server / movie) under everything, showing through where the visuals are keyed: what OBS showed with the camera below reforce and Syphon alpha on. While it is on, the Syphon output is opaque: hide the camera in OBS.">
+      <span class="vsum-title">Camera backdrop</span> <span class="vsum-note" id="bdSummary">off</span></summary>
+    <article class="card">
+      <header class="card-head">
+        <h2 id="bdTitle">Camera backdrop</h2>
+        <span class="chip status" id="bdStatus">off</span>
+      </header>
+      <div class="now">
+        <div class="current" id="bdNow">–</div>
+        <div class="vmeta" id="bdMeta"></div>
+      </div>
+      <div class="row filters">
+        <select id="bdSource" aria-label="Backdrop source"></select>
+        <button id="bdRefresh" title="List cameras, Syphon servers and movies again (a camera plugged in after this page opened)">↻</button>
+      </div>
+      <div class="row buttons">
+        <button class="primary" id="bdStart" title="Show this source under the visuals (fades in). Saved to settings.json (reforce.Backdrop.Source): it comes back at the next start">Show backdrop</button>
+        <button id="bdStop" title="Fade the backdrop out; the Syphon output gets its alpha again">Off</button>
+        <label class="beatsync" title="Flip the backdrop left-right. Saved to settings.json (reforce.Backdrop.Mirror)"><input type="checkbox" id="bdMirror"> Mirror</label>
+      </div>
+      <div class="settings vsettings cols4">
+        <label class="field" title="Fades the backdrop towards black. Saved to settings.json (reforce.Backdrop.Opacity)"><span>Brightness <em id="bdOpacityVal"></em></span>
+          <input type="range" id="bdOpacity" min="0" max="1" step="0.01" aria-label="Backdrop brightness"></label>
+        <label class="field" title="Saved to settings.json (reforce.Backdrop.Fit)"><span>Fit</span>
+          <select id="bdFit"><option>cover</option><option>contain</option><option>stretch</option></select></label>
+        <label class="field" title="How dark the visuals must be to show the backdrop: OBS Color Key Similarity (1-1000), the same setting as the Syphon alpha. Saved to settings.json (reforce.Syphon.KeySimilarity)"><span>Key similarity <em id="bdKeySimVal"></em></span>
+          <input type="range" id="bdKeySim" min="1" max="400" step="1" aria-label="Key similarity"></label>
+        <label class="field" title="How soft the edge from backdrop to visuals is: OBS Color Key Smoothness (1-1000), the same setting as the Syphon alpha. Saved to settings.json (reforce.Syphon.KeySmoothness)"><span>Key smoothness <em id="bdKeySmoothVal"></em></span>
+          <input type="range" id="bdKeySmooth" min="1" max="400" step="1" aria-label="Key smoothness"></label>
+      </div>
+      <div class="vmeta" id="bdNote">While the backdrop is on, the Syphon output is opaque: hide the camera source in OBS.</div>
+      <div class="hint" id="bdError" hidden></div>
+    </article>
+   </details>
+  </section>
+  <section class="video" id="body" aria-labelledby="bodyTitle">
+   <details class="fold" id="bodyWrap">
+    <summary title="Tracks the person on the camera backdrop (Apple Vision: silhouette and body pose) and lets the visuals react: the person in front of the visuals, the silhouette burned into the trails, light trails from the hands.">
+      <span class="vsum-title">Body tracking</span> <span class="vsum-note" id="bodySummary">off</span></summary>
+    <article class="card">
+      <header class="card-head">
+        <h2 id="bodyTitle">Body tracking</h2>
+        <span class="chip status" id="bodyStatus">off</span>
+      </header>
+      <div class="now">
+        <div class="vmeta" id="bodyMeta">Tracks the camera backdrop: turn that on first.</div>
+      </div>
+      <div class="row buttons">
+        <label class="beatsync" title="Run the tracker on the camera backdrop (~15 ms of Vision work per camera frame, off the render thread). Saved to settings.json (reforce.Body.Track)"><input type="checkbox" id="bodyTrack"> Track</label>
+        <label class="beatsync" title="Tint the silhouette red and mark the joints green on the output, to check the tracking. Saved to settings.json (reforce.Body.Show)"><input type="checkbox" id="bodyShow"> Show tracking</label>
+        <label class="beatsync" title="The backdrop shows the camera frame the silhouette was computed from, so the person and their cut-out line up exactly (the camera image runs one tracker step, ~10-20 ms, later). Off: the newest camera frame, the silhouette a frame or so behind it. Saved to settings.json (reforce.Body.Sync)"><input type="checkbox" id="bodySync"> Sync camera</label>
+        <label class="field inline" title="Balanced: a 512 x 384 silhouette (~10 ms). Fast: 256 x 192 (~4 ms), coarser edges. Saved to settings.json (reforce.Body.Quality)"><span>Quality</span>
+          <select id="bodyQuality"><option>balanced</option><option>fast</option></select></label>
+      </div>
+      <div class="settings vsettings cols2">
+        <label class="field" title="The person cuts through the visuals, so the camera shows them in front. Saved to settings.json (reforce.Body.Front)"><span>Person in front <em id="bodyFrontVal"></em></span>
+          <input type="range" id="bodyFront" min="0" max="1" step="0.01" aria-label="Person in front"></label>
+        <label class="field" title="Light trails drawn from both hands into the visuals' trails (0 = off). Saved to settings.json (reforce.Body.Trails)"><span>Hand trails <em id="bodyTrailsVal"></em></span>
+          <input type="range" id="bodyTrails" min="0" max="1" step="0.01" aria-label="Hand trails"></label>
+        <label class="field" title="The silhouette drawn into the visuals' trails every frame, so the flow carries it: fill, outline, or only where it moves. Saved to settings.json (reforce.Body.Burn)"><span>Silhouette in visuals</span>
+          <select id="bodyBurn"><option>off</option><option>fill</option><option>outline</option><option>motion</option></select></label>
+        <label class="field" title="Hand trail width, pixels at 1080 lines. Saved to settings.json (reforce.Body.TrailWidth)"><span>Trail width <em id="bodyTrailWidthVal"></em></span>
+          <input type="range" id="bodyTrailWidth" min="1" max="40" step="1" aria-label="Trail width"></label>
+        <label class="field" title="How bright the silhouette is in the visuals. Saved to settings.json (reforce.Body.BurnAmount)"><span>Silhouette amount <em id="bodyBurnAmountVal"></em></span>
+          <input type="range" id="bodyBurnAmount" min="0" max="1" step="0.01" aria-label="Silhouette amount"></label>
+      </div>
+      <div class="hint" id="bodyError" hidden></div>
+    </article>
+   </details>
+  </section>
+  <section class="video" id="video" aria-labelledby="videoTitle">
+   <details class="fold" id="videoWrap">
+    <summary title="A full-frame colour video (file, camera or Syphon) over or under the visualizer, with blend modes and keying. Movie sprites, and cameras / Syphon as live sprites, are on the Movie sprites card.">
+      <span class="vsum-title">Video layer</span> <span class="vsum-note" id="vSummary">off</span></summary>
+    <article class="card">
+      <header class="card-head">
+        <h2 id="videoTitle">Video layer</h2>
+        <span class="chip status" id="vStatus">off</span>
+      </header>
+      <div class="now">
+        <div class="current" id="vNow" title="Colour layer source">–</div>
+        <div class="vmeta" id="vMeta"></div>
+        <div class="vmeta" id="vWaiting" hidden></div>
+      </div>
+      <div class="progress" aria-hidden="true"><div class="fill" id="vFade"></div></div>
+      <div class="row filters">
+        <select id="vSource" aria-label="Video source"></select>
+        <button id="vRefresh" title="List files, cameras and Syphon servers again">↻</button>
+      </div>
+      <div class="row buttons">
+        <button class="primary" id="vPlayLayer" title="Crossfade the colour layer to this source">Play on layer</button>
+      </div>
+      <div class="row buttons">
+        <button id="vStopLayer">Stop layer</button>
+        <button id="vHoldSprites" title="The movie sprite playing now loops and stays until you stop it (this playback only)">⟳ Loop until stopped</button>
+        <label id="vBeatSyncLabel" class="beatsync" title="Movies with a BPM (found by tools/dance_sync), as sprites or on the colour layer, play locked to the beat: Link when it runs, else the audio. Saved to settings.json (reforce.Video.BeatSync)"><input type="checkbox" id="vBeatSync"> Beat sync <em id="vBeatClock"></em></label>
+        <label id="vSpriteColourLabel" class="beatsync" title="Movie and live sprites in full colour, drawn over the visualizer (alpha = fade × (0.5 + 0.5 × Mix)) instead of as luminance in it. Off = G-Force. Saved to settings.json (reforce.MovieSprite.Colour)"><input type="checkbox" id="vSpriteColour"> Full colour</label>
+      </div>
+      <div class="row buttons">
+        <label class="beatsync" title="Send transparency in the Syphon output's alpha (the window is unchanged): the visuals are keyed like OBS's Color Key on black, the dancers stay opaque, and so do full-colour movie sprites whose .reforce.txt says ColorKey = 0. In OBS: tick Allow Transparency on the Syphon source and remove its Color Key filter. Saved to settings.json (reforce.Syphon.Alpha)"><input type="checkbox" id="vSyphonAlpha"> Syphon alpha</label>
+      </div>
+      <div class="settings vsettings" id="vSyphonKey">
+        <label class="field" title="OBS Color Key Similarity (1-1000): colours this close to black are fully transparent. Saved to settings.json (reforce.Syphon.KeySimilarity)"><span>Key similarity <em id="vKeySimVal"></em></span>
+          <input type="range" id="vKeySim" min="1" max="400" step="1" aria-label="Key similarity"></label>
+        <label class="field" title="OBS Color Key Smoothness (1-1000): how far past Similarity the fade to opaque runs. Saved to settings.json (reforce.Syphon.KeySmoothness)"><span>Key smoothness <em id="vKeySmoothVal"></em></span>
+          <input type="range" id="vKeySmooth" min="1" max="400" step="1" aria-label="Key smoothness"></label>
+      </div>
+      <div class="settings vsettings">
+        <label class="field"><span>Opacity <em id="vOpacityVal"></em></span>
+          <input type="range" id="vOpacity" min="0" max="1" step="0.01" aria-label="Opacity"></label>
+        <label class="field"><span>Crossfade <em id="vXfadeVal"></em></span>
+          <input type="range" id="vXfade" min="0" max="10" step="0.1" aria-label="Crossfade seconds"></label>
+        <label class="field"><span>Blend</span>
+          <select id="vBlend"><option>normal</option><option>add</option><option>screen</option><option>multiply</option></select></label>
+        <label class="field"><span>Order</span>
+          <select id="vOrder"><option value="over">over visualizer</option><option value="under">under visualizer</option></select></label>
+        <label class="field"><span>Fit</span>
+          <select id="vFit"><option>cover</option><option>contain</option><option>stretch</option></select></label>
+        <label class="field"><span>Key</span>
+          <select id="vKey"><option>none</option><option>luma</option><option>chroma</option></select></label>
+        <label class="field vkey-luma"><span>Luma threshold <em id="vThresholdVal"></em></span>
+          <input type="range" id="vThreshold" min="0" max="1" step="0.01"></label>
+        <label class="field vkey-chroma"><span>Key colour</span>
+          <input type="color" id="vKeyColor" value="#00ff00"></label>
+        <label class="field vkey-chroma"><span>Tolerance <em id="vToleranceVal"></em></span>
+          <input type="range" id="vTolerance" min="0" max="0.8" step="0.01"></label>
+        <label class="field vkey-any"><span>Softness <em id="vSoftnessVal"></em></span>
+          <input type="range" id="vSoftness" min="0" max="0.5" step="0.01"></label>
+        <label class="field"><span>Rate (next file) <em id="vRateVal"></em></span>
+          <input type="range" id="vRate" min="0" max="4" step="0.05"></label>
+        <div class="row checks">
+          <label title="Colour layer only: loop the movie on the layer (now and the next ones). Sprites: per movie (.reforce.txt) or Loop until stopped"><input type="checkbox" id="vLoop"> Loop layer movies</label>
+          <label title="Off: Syphon gets the plain visualizer, the window shows the composite"><input type="checkbox" id="vSyphon"> In Syphon output</label>
+        </div>
+      </div>
+      <div class="hint" id="vError" hidden></div>
+      <div class="hint" id="vCamera" hidden><span id="vCameraText"></span>
+        <a id="vCameraLink" href="x-apple.systempreferences:com.apple.preference.security?Privacy_Camera">Open System Settings › Camera</a></div>
+    </article>
+   </details>
+  </section>
+  <section class="rhythm" id="rhythm" aria-labelledby="rhythmTitle">
+    <article class="card">
+      <header class="card-head">
+        <h2 id="rhythmTitle">Rhythm</h2>
+        <span class="chip status" id="rhStatus" title="Where the phrase lines come from">no beat clock</span>
+      </header>
+      <div class="phrase" id="rhPhrase" title="The bars of the current phrase; the lit one is now. A phrase line (the first bar) is where big changes land when a quantize choice below is “phrase”." aria-hidden="true"></div>
+      <div class="row buttons">
+        <button class="primary" id="rhNow" title="A new phrase starts now: tap on the first beat of a phrase (a drop, the start of a breakdown). Snaps to the nearest bar with Link, else the nearest beat. Auto-align keeps it unless the music keeps changing elsewhere.">Phrase starts now</button>
+        <button id="rhEarlier" title="Phrase lines one bar earlier">‹ bar</button>
+        <button id="rhLater" title="Phrase lines one bar later">bar ›</button>
+        <button class="toggle" id="rhDecks" aria-pressed="true" title="Each song you bring in sets the phrase lines: its last start (Play, Cue, a hot cue) is a phrase line once its channel fader is past a third. Needs rkbx_link (its reforce output) and the DDJ-1000's MIDI. Starts made with the fader down count only if the fader comes up before the next start. Loops and beat jumps keep the phrase going. Saved to settings.json (reforce.Phrase.DeckStarts).">Deck starts</button>
+        <button class="toggle" id="rhAuto" aria-pressed="true" title="Find the phrase lines by themselves: where the loudness changes (drops, breakdowns), learnt over a few phrases. Saved to settings.json (reforce.Phrase.AutoAlign).">Auto-align</button>
+        <label class="field compact" title="Bars per phrase. Saved to settings.json (reforce.Phrase.Bars).">
+          <span>Bars</span>
+          <select id="rhBars"><option value="4">4</option><option value="8">8</option><option value="16">16</option><option value="32">32</option></select>
+        </label>
+      </div>
+      <h3 class="rh-sub" title="Artist, title and year of the song you are playing, over the output (window and Syphon), like djtools' history_server overlay. Read from rekordbox through rkbx_link; the deck you hear most by the DDJ-1000's faders (rekordbox's master deck without the controller). Year and vocal come from the [#yNN] / [#vocal] tags djtools puts in the title; a vocal deck gets its own line above.">Now playing</h3>
+      <div class="row buttons">
+        <button class="toggle" id="rhNp" aria-pressed="false" title="Show the now-playing text over the output. Saved to settings.json (reforce.NowPlaying.Show).">Show now playing</button>
+        <label class="field compact" title="Which corner. Saved to settings.json (reforce.NowPlaying.Corner).">
+          <span>Corner</span>
+          <select id="rhNpCorner"><option value="bl">bottom left</option><option value="br">bottom right</option><option value="tl">top left</option><option value="tr">top right</option></select>
+        </label>
+      </div>
+      <div class="rh-grid">
+        <label class="field" title="Text size; 100 % = history_server's (48 px type on a 1080 p output). Saved to settings.json (reforce.NowPlaying.Size).">
+          <span>Size <b id="rhNpSizeVal">100 %</b></span><input type="range" id="rhNpSize" min="25" max="300" step="5"></label>
+        <label class="field" title="A deck that becomes the loudest takes over after leading this long (a brief swing of the faders does not flip it). Saved to settings.json (reforce.NowPlaying.SwitchSeconds).">
+          <span>Switch after <b id="rhNpSwitchVal">3 s</b></span><input type="range" id="rhNpSwitch" min="0" max="20" step="0.5"></label>
+        <label class="field" title="A soft dark shadow around the letters, only where the picture behind them is bright (averaged over a quarter second, so flashes do not pump it). On dark scenes the text stays plain white. 0 = off. Saved to settings.json (reforce.NowPlaying.Shadow).">
+          <span>Shadow on bright <b id="rhNpShadowVal">80 %</b></span><input type="range" id="rhNpShadow" min="0" max="1" step="0.05"></label>
+        <label class="field" title="How bright the picture behind the text must be before the shadow starts (0 = black, 1 = white); it is full 0.3 above this. Lower = it comes in sooner. Saved to settings.json (reforce.NowPlaying.ShadowFrom).">
+          <span>Shadow starts at <b id="rhNpShadowFromVal">0.55</b></span><input type="range" id="rhNpShadowFrom" min="0" max="0.95" step="0.05"></label>
+      </div>
+      <p class="rh-decks" id="rhNpLine" title="What the now-playing text shows (also while it is hidden)"></p>
+      <p class="rh-decks" id="rhDeckLine" title="Decks seen through rkbx_link: ▶ playing, ■ stopped; up / down = channel fader (down? = not moved yet, counts as down); ★ the start that set the phrase lines, ✓ a start used before, (start) one waiting for its fader"></p>
+      <div class="rh-grid">
+        <label class="field" title="Slideshow changes (FlowField, WaveShape, ColorMap) wait for the next line. Beat and bar: with Link only. Saved to settings.json (reforce.Link.Quantize).">
+          <span>Slideshow changes on</span><select id="rhQuantize"><option value="off">off</option><option value="beat">beat</option><option value="bar">bar</option><option value="phrase">phrase</option></select></label>
+        <label class="field" title="Switches you make (library, Next, favourites) wait for the next line. Saved to settings.json (reforce.Link.QuantizeManual).">
+          <span>Manual switches on</span><select id="rhQuantizeManual"><option value="off">off</option><option value="beat">beat</option><option value="bar">bar</option><option value="phrase">phrase</option></select></label>
+        <label class="field" title="Slideshow particles, sprites, solids and organics wait for the next line. Saved to settings.json (reforce.Quantize.Spawn).">
+          <span>New particles, sprites, solids, organics on</span><select id="rhQuantizeSpawn"><option value="off">off</option><option value="beat">beat</option><option value="bar">bar</option><option value="phrase">phrase</option></select></label>
+      </div>
+      <h3 class="rh-sub">Kick zoom <span class="kickmeter" aria-hidden="true"><i id="rhKick"></i></span></h3>
+      <div class="rh-grid">
+        <label class="field" title="On every beat the FlowField pushes out by up to this much per frame, then settles: trails surge outward with the kick. 0 = off. Saved to settings.json (reforce.Kick.Zoom).">
+          <span>Zoom <b id="rhZoomVal">0</b></span><input type="range" id="rhZoom" min="0" max="0.03" step="0.0005"></label>
+        <label class="field" title="... and turns by up to this many degrees per frame (+ = anticlockwise). Saved to settings.json (reforce.Kick.Rotate).">
+          <span>Turn <b id="rhRotVal">0°</b></span><input type="range" id="rhRot" min="-2" max="2" step="0.05"></label>
+        <label class="field" title="How quickly the push dies away after each beat. Saved to settings.json (reforce.Kick.DecayMs).">
+          <span>Decay <b id="rhDecayVal">120 ms</b></span><input type="range" id="rhDecay" min="40" max="600" step="10"></label>
+      </div>
+      <h3 class="rh-sub" title="A breakdown is several beats with much less bass than usual; the drop is the bass coming back. Scenes read SYNC_BUILD (0..1 through a breakdown) and SYNC_DROP (1 at a drop, fading over a bar). A drop also tells the phrase clock a phrase starts there.">Drops <span class="kickmeter build" aria-hidden="true"><i id="rhBuild"></i></span> <span class="rh-drop" id="rhDropText">–</span></h3>
+      <div class="row buttons">
+        <button class="toggle" id="rhDropSwitch" aria-pressed="false" title="On a drop, cut FlowField, WaveShape and ColorMap to their next configs (0.4 s). Saved to settings.json (reforce.Drop.Switch).">On a drop: change scenes</button>
+      </div>
+    </article>
+  </section>
+  <section class="look" id="look" aria-labelledby="lookTitle" hidden>
+   <details class="fold" id="lookWrap">
+    <summary title="Rendering-quality choices: G-Force exact or done right, with A/B slots (key b works while closed too)">
+      <span class="vsum-title">Look</span> <span class="vsum-note" id="lookSummary"></span></summary>
+    <article class="card">
+      <header class="card-head">
+        <h2 id="lookTitle">Look</h2>
+        <span class="chip status" id="lookSlot" title="Active A/B slot">custom</span>
+      </header>
+      <div class="row buttons">
+        <button class="primary" id="lookAB" title="Flip every Look setting between slot A and slot B (key: b)">A/B <kbd>b</kbd></button>
+        <button id="lookGForce" title="Every setting the way G-Force does it">G-Force exact</button>
+        <button id="lookRight" title="Every setting done right (precise)">Done right</button>
+      </div>
+      <p class="look-hint">Changes apply on the next frame and last for this session. A starts as “G-Force exact”, B as “Done right”;
+        while a slot is active, changes go into that slot.</p>
+      <div class="look-rows" id="lookRows"></div>
+      <div class="row buttons">
+        <button id="lookSaveAll" title="Write every Look value into settings.json">Save all as default</button>
+        <button id="lookResetAll" title="Back to the values in settings.json">Reset all to saved</button>
+      </div>
+    </article>
+   </details>
+  </section>
+  <details class="log">
+    <summary>Engine log</summary>
+    <ol id="log"></ol>
+  </details>
+</main>
+
+<dialog class="review" id="review" aria-labelledby="reviewTitle">
+  <header class="review-head">
+    <h2 id="reviewTitle">Review image sprites</h2>
+    <span class="review-count" id="reviewCount"></span>
+    <div class="review-tools">
+      <div class="seg" role="group" aria-label="Show">
+        <button class="toggle" data-show="all" aria-pressed="true">All</button>
+        <button class="toggle" data-show="shown" aria-pressed="false">Shown</button>
+        <button class="toggle" data-show="hidden" aria-pressed="false">Hidden</button>
+      </div>
+      <input type="search" id="reviewSearch" placeholder="Search…" aria-label="Search image sprites" autocomplete="off" spellcheck="false">
+      <button class="primary" id="reviewDone">Done</button>
+    </div>
+  </header>
+  <p class="review-hint" id="reviewHint">Click an image to hide it. Hidden images never come up, in the slideshow or by hand; click again to bring one back. Keys: arrows move, Space hides / shows, P shows it on screen now.</p>
+  <div class="review-body" id="reviewBody"></div>
+</dialog>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<template id="layerTpl">
+  <article class="card layer" role="tabpanel">
+    <header class="card-head">
+      <h2 class="lname"></h2>
+      <span class="chip status"></span>
+    </header>
+    <div class="now">
+      <div class="current" title="Current config"></div>
+      <div class="target"><span class="arrow">→</span> <span class="tname"></span></div>
+    </div>
+    <div class="progress" aria-hidden="true"><div class="fill"></div></div>
+    <div class="meta"><span class="countdown"></span><span class="blendinfo"></span></div>
+    <div class="row buttons">
+      <button class="prev" title="Previous config (quick transition)">◀ Prev</button>
+      <button class="next" title="Next config (quick transition)">Next ▶</button>
+      <button class="toggle hold" aria-pressed="false" title="Pause the slideshow for this layer">Hold</button>
+    </div>
+    <div class="fader">
+      <label class="field">
+        <span>Crossfader <em class="faderval"></em></span>
+        <input type="range" class="xfade" min="0" max="1" step="0.001" value="0" aria-label="Crossfader">
+      </label>
+      <small class="hint">Drag to take over the transition weight; release to resume.</small>
+    </div>
+    <div class="settings">
+      <label class="field">
+        <span>Interval <em class="ival"></em></span>
+        <input type="range" class="interval" min="1" max="180" step="1" aria-label="Slideshow interval" title="Saved to settings.json when released">
+      </label>
+      <label class="field">
+        <span>Transition <em class="dval"></em></span>
+        <input type="range" class="duration" min="0" max="60" step="0.5" aria-label="Transition duration" title="Saved to settings.json when released">
+      </label>
+      <label class="field wide">
+        <span>Blend mode</span>
+        <select class="blend" aria-label="Blend mode"></select>
+      </label>
+    </div>
+    <details class="library">
+      <summary>Library <span class="count"></span></summary>
+      <div class="row filters">
+        <input type="search" class="search" placeholder="Search…" aria-label="Search configs" autocomplete="off" spellcheck="false">
+        <select class="filter" aria-label="Filter"></select>
+      </div>
+      <ul class="list" role="listbox" aria-label="Configs"></ul>
+      <div class="row switchrow"><span></span><button class="primary switch" disabled>Switch now</button></div>
+    </details>
+  </article>
+</template>
+
+<template id="extraTpl">
+  <article class="card extra">
+    <header class="card-head">
+      <h3 class="lname"></h3>
+      <span class="chip status"></span>
+    </header>
+    <div class="current"></div>
+    <div class="settings spawn" hidden>
+      <label class="field" title="Seconds from one slideshow start to the next (±10%). At 0 the slideshow starts none.">
+        <span><span class="ilabel">Interval</span> <em class="ival"></em></span>
+        <input type="range" class="interval" min="0" max="900" step="5" aria-label="Slideshow interval">
+      </label>
+      <label class="field movie" title="Movie sprites have their own shuffle and timer. At 0 the slideshow starts no movies.">
+        <span>Movie interval <em class="mval"></em></span>
+        <input type="range" class="movie-interval" min="0" max="900" step="5" aria-label="Movie sprite interval">
+      </label>
+      <label class="field" title="Seconds at full strength, between the fade-in and fade-out (±20%). A config's own PDur wins; movies that play once last their length.">
+        <span>Duration <em class="lval"></em></span>
+        <input type="range" class="life" min="2" max="180" step="1" aria-label="Duration">
+      </label>
+      <label class="field mixfield" title="How much the sprite covers what is under it. 0 = G-Force (a half-way lighten); 1 = the sprite replaces the visualizer in its rectangle. Applies to the ones on screen now too. Saved to settings.json when released. Keys [ and ] (Shift: movies).">
+        <span>Mix <em class="xval"></em></span>
+        <input type="range" class="mix" min="0" max="1" step="0.05" aria-label="Sprite mix">
+      </label>
+    </div>
+    <div class="meta"><span class="countdown"></span></div>
+    <div class="row buttons">
+      <button class="prev">◀ Prev</button>
+      <button class="next">Next ▶</button>
+    </div>
+    <details class="library">
+      <summary>Library <span class="count"></span></summary>
+      <div class="row filters">
+        <input type="search" class="search" placeholder="Search…" aria-label="Search" autocomplete="off" spellcheck="false">
+        <select class="filter" aria-label="Filter"></select>
+      </div>
+      <ul class="list" role="listbox"></ul>
+      <div class="row switchrow"><span></span><button class="primary switch" disabled>Switch now</button></div>
+    </details>
+  </article>
+</template>
+</body>
+</html>

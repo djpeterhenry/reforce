@@ -1,0 +1,5 @@
+// reforce probe: identity field. With a WaveShape that draws briefly, measures per-frame decay.
+Aspc=0
+srcX="x"
+srcY="y"
+Vers=100

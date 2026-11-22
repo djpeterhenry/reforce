@@ -1,0 +1,276 @@
+{
+ "file": "kick120.wav",
+ "description": "Synthetic kick (150->55 Hz glide, 150 ms decay, -3 dBFS peak) at 120 BPM for 16 s (32 hits, one every 0.5 s; each segment is one hit + its silence).",
+ "sample_rate": 44100,
+ "channels": 1,
+ "sample_format": "s16",
+ "duration": 20.0,
+ "samples": 882000,
+ "sync": {
+  "t": 0.5,
+  "duration": 0.05,
+  "freq_hz": 2000.0,
+  "peak_dbfs": -6.0
+ },
+ "content_start": 2.0,
+ "segments": [
+  {
+   "kind": "kick",
+   "index": 0,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 2.0,
+   "t1": 2.5
+  },
+  {
+   "kind": "kick",
+   "index": 1,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 2.5,
+   "t1": 3.0
+  },
+  {
+   "kind": "kick",
+   "index": 2,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 3.0,
+   "t1": 3.5
+  },
+  {
+   "kind": "kick",
+   "index": 3,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 3.5,
+   "t1": 4.0
+  },
+  {
+   "kind": "kick",
+   "index": 4,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 4.0,
+   "t1": 4.5
+  },
+  {
+   "kind": "kick",
+   "index": 5,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 4.5,
+   "t1": 5.0
+  },
+  {
+   "kind": "kick",
+   "index": 6,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 5.0,
+   "t1": 5.5
+  },
+  {
+   "kind": "kick",
+   "index": 7,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 5.5,
+   "t1": 6.0
+  },
+  {
+   "kind": "kick",
+   "index": 8,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 6.0,
+   "t1": 6.5
+  },
+  {
+   "kind": "kick",
+   "index": 9,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 6.5,
+   "t1": 7.0
+  },
+  {
+   "kind": "kick",
+   "index": 10,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 7.0,
+   "t1": 7.5
+  },
+  {
+   "kind": "kick",
+   "index": 11,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 7.5,
+   "t1": 8.0
+  },
+  {
+   "kind": "kick",
+   "index": 12,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 8.0,
+   "t1": 8.5
+  },
+  {
+   "kind": "kick",
+   "index": 13,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 8.5,
+   "t1": 9.0
+  },
+  {
+   "kind": "kick",
+   "index": 14,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 9.0,
+   "t1": 9.5
+  },
+  {
+   "kind": "kick",
+   "index": 15,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 9.5,
+   "t1": 10.0
+  },
+  {
+   "kind": "kick",
+   "index": 16,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 10.0,
+   "t1": 10.5
+  },
+  {
+   "kind": "kick",
+   "index": 17,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 10.5,
+   "t1": 11.0
+  },
+  {
+   "kind": "kick",
+   "index": 18,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 11.0,
+   "t1": 11.5
+  },
+  {
+   "kind": "kick",
+   "index": 19,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 11.5,
+   "t1": 12.0
+  },
+  {
+   "kind": "kick",
+   "index": 20,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 12.0,
+   "t1": 12.5
+  },
+  {
+   "kind": "kick",
+   "index": 21,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 12.5,
+   "t1": 13.0
+  },
+  {
+   "kind": "kick",
+   "index": 22,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 13.0,
+   "t1": 13.5
+  },
+  {
+   "kind": "kick",
+   "index": 23,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 13.5,
+   "t1": 14.0
+  },
+  {
+   "kind": "kick",
+   "index": 24,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 14.0,
+   "t1": 14.5
+  },
+  {
+   "kind": "kick",
+   "index": 25,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 14.5,
+   "t1": 15.0
+  },
+  {
+   "kind": "kick",
+   "index": 26,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 15.0,
+   "t1": 15.5
+  },
+  {
+   "kind": "kick",
+   "index": 27,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 15.5,
+   "t1": 16.0
+  },
+  {
+   "kind": "kick",
+   "index": 28,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 16.0,
+   "t1": 16.5
+  },
+  {
+   "kind": "kick",
+   "index": 29,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 16.5,
+   "t1": 17.0
+  },
+  {
+   "kind": "kick",
+   "index": 30,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 17.0,
+   "t1": 17.5
+  },
+  {
+   "kind": "kick",
+   "index": 31,
+   "peak_dbfs": -3,
+   "hit_len": 0.45,
+   "t0": 17.5,
+   "t1": 18.0
+  }
+ ],
+ "levels": "tones/sweep/kick: dBFS peak (0 dBFS = full-scale sine); noise: dBFS RMS",
+ "generator": "tools/audio_signals/gen_signals.py"
+}

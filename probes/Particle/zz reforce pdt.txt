@@ -1,0 +1,10 @@
+// #waveshape-particle-only
+// reforce probe (run 33): particle timing variables. Three dots: y .5 x = dt*1.8 - .9; y 0 x = (END_TIME - START_TIME)/25 - .9;
+// y -.5 x = (t - START_TIME)/25 - .9. PDur 4.
+Stps=3
+ConB=0
+LWdt=10
+PDur=4
+X0="(s < .25)*(dt*1.8 - .9) + (s > .25)*(s < .75)*((END_TIME - START_TIME)/25 - .9) + (s > .75)*((t - START_TIME)/25 - .9)"
+Y0=".5 - s"
+Vers=270

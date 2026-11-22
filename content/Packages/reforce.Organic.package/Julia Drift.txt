@@ -1,0 +1,15 @@
+Vers=100
+Meta="reforce organic: a Julia set whose constant c travels once every 16 bars (one phrase) just outside the edge of the Mandelbrot set's main cardioid, so the fractal melts from cauliflower to spirals to snowflakes and back; it turns slowly."
+Kind="julia"
+Iter="140"
+B0="t - START_TIME"
+// bars: the beat clock's (aligned to the phrase) when it is on, else 120 BPM
+B1="SYNC_ON * SYNC_BAR + (1 - SYNC_ON) * .5 * B0"
+B2="2 * PI * B1 / 16"
+// the main cardioid's edge, e^(i B2) / 2 - e^(2i B2) / 4, pushed 3 % outward
+CRe="1.03 * (.5 * cos(B2) - .25 * cos(2 * B2))"
+CIm="1.03 * (.5 * sin(B2) - .25 * sin(2 * B2))"
+Rot=".04 * B0"
+Scal="1"
+Gain="1.25"
+Pen=".9"

@@ -1,0 +1,3 @@
+// reforce probe: right half (x>0) takes the incoming field, left half keeps the outgoing one.
+ALFA="x > 0"
+Vers=250

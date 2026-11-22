@@ -1,0 +1,12 @@
+CategoryTitle = "Trees"
+Include.List = "
+Oak
+Willow
+Roots
+Lightning
+Neurons
+Kelp Forest
+Radial Bloom
+Fern
+Bush
+"

@@ -1,0 +1,40 @@
+# Build reforce and run the unit tests on macOS for every push to main and every pull request.
+# While the repository is private it only runs when started by hand (Actions tab > CI > Run workflow): macOS minutes
+# on private repositories count ten times against the free allowance.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    if: ${{ !github.event.repository.private || github.event_name == 'workflow_dispatch' }}
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache fetched dependencies
+        uses: actions/cache@v4
+        with:
+          path: build/_deps/*-src
+          key: deps-${{ runner.os }}-${{ hashFiles('cmake/*.cmake', 'CMakeLists.txt') }}
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=RelWithDebInfo
+
+      - name: Build
+        run: cmake --build build -j "$(sysctl -n hw.ncpu)"
+
+      - name: Test
+        env:
+          # The runner's GPU is virtual: report time budgets, don't enforce them (tests/PerfBudget.hpp).
+          REFORCE_NO_PERF_BUDGETS: "1"
+        run: ctest --test-dir build --output-on-failure -j 3

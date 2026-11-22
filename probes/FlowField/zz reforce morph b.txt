@@ -1,0 +1,7 @@
+// reforce probe (5B.1 FlowField morph timing): like 'zz reforce morph a', but the region y <= .3 also moves DOWN
+// by 4 px per frame (source 8/1260 above). During a morph a -> b (linear source lerp, probe #10) that region
+// moves down by 4 px x w per frame, so the trail of a dot drawn every frame at y = .25 records w frame by frame.
+Aspc=0
+srcX="(y > .3) * (y <= .4) * 9 + ((y <= .3) + (y > .4)) * (x + 2/1980)"
+srcY="(y > .3) * (y <= .4) * 9 + (y > .4) * y + (y <= .3) * (y + 8/1260)"
+Vers=100

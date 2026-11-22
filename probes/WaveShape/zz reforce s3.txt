@@ -1,0 +1,7 @@
+// reforce probe: Stps=3 dots at x = s - .5 (away from edges). Inclusive: -.5, 0, .5. Exclusive i/N: -.5, -.17, .17.
+Stps=3
+ConB=0
+LWdt=10
+X0="s - .5"
+Y0="0"
+Vers=270

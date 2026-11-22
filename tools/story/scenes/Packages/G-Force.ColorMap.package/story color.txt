@@ -1,0 +1,5 @@
+// story page (our own scene, not G-Force's): violet through pink to warm orange
+H=".78 + .28 * i"
+S=".85 - .3 * i * i"
+V="min(1, 1.7 * i)"
+Vers=100

@@ -1,0 +1,6 @@
+CategoryTitle = "Cells"
+Include.List = "
+Rule 30
+Sierpinski
+Game of Life
+"

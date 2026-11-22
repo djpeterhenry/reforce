@@ -1,0 +1,26 @@
+# Local copy of G-Force content (SoundSpectrum-owned; never commit). Populate with scripts/sync-scenes.sh
+/scenes/
+
+.DS_Store
+
+# Build output
+/build/
+/build-*/
+/cmake-build-*/
+/out/
+/.cache/
+compile_commands.json
+
+# G-Force screenshots from probe runs (local only)
+/probes/captures/
+
+# Generated audio test signals (tools/audio_signals/gen_signals.py); the .json schedules are committed
+/probes/audio/*.wav
+
+# Phase 5B.4 sweep: derived (de-randomized) copies of G-Force configs, staged only during tools/sweep/run_gforce_sweeps.sh
+/probes/FlowField/zz sweep/
+/probes/ColorMap/zz sweep/
+
+# Python caches
+__pycache__/
+*.pyc

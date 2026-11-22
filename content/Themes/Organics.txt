@@ -1,0 +1,3 @@
+ThemeName = "Organics"
+About = "reforce: everything as in (Standard), plus an organic from any group (trees, pendulums, spirals, curves, cells, water, fractals) every 30 seconds or so."
+Organic.Slideshow.Interval.Duration = 30

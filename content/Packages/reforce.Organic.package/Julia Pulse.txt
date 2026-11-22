@@ -1,0 +1,13 @@
+Vers=100
+Meta="reforce organic: the 'San Marco' Julia set, breathing: it swells on every beat and its constant wanders a little over 8 bars."
+Kind="julia"
+Iter="120"
+B0="t - START_TIME"
+B1="SYNC_ON * SYNC_BEAT + (1 - SYNC_ON) * 2 * B0"
+// 0 on the beat, rising to 1 before the next: the pulse decays over the beat
+B2="wrap(B1)"
+CRe="-.75 + .06 * sin(2 * PI * B1 / 32)"
+CIm=".11 + .05 * cos(2 * PI * B1 / 24)"
+Scal="1.1 + .14 * exp(-6 * B2)"
+Gain="1 + .4 * exp(-6 * B2)"
+Pen=".9"

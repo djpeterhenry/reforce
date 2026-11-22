@@ -1,0 +1,6 @@
+// reforce probe: every pixel samples far outside the frame -> screen cleared each frame (no trails).
+// Screenshots then show exactly one frame of drawing.
+Aspc=0
+srcX="9"
+srcY="9"
+Vers=100

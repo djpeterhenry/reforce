@@ -1,0 +1,5 @@
+// reforce probe: linear gray ramp, so screenshots read intensity directly (with ColorMap.MapFunction set to "i").
+R="i"
+G="i"
+B="i"
+Vers=100

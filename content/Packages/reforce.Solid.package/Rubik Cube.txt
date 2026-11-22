@@ -1,0 +1,31 @@
+Vers=100
+Meta="reforce solid: a Rubik's cube that is solved on every 8-bar line. On the line it scrambles itself in two beats (30 turns, speeding up, while it spins once), then undoes those turns one per beat, each landing on the beat, so the last one lands on the next 8-bar line (bar lines from the phrase clock while the beat clock is locked, else 120 BPM from the start). The six sticker colours are picked from the current ColorMap so they read as six colours; Over 1 draws it opaque (exact sticker colours, the plastic covering what is behind); ColorKey 0 keeps the whole cube opaque over the camera."
+Mesh="rubik"
+Text="2"
+Over="1"
+ColorKey="0"
+Moves="30"
+PDur="120"
+B0="t - START_TIME"
+// beats: the beat clock when locked, else 2 per second
+B1="SYNC_ON * SYNC_BEAT + (1 - SYNC_ON) * 2 * B0"
+// beats into the 8-bar cycle (0..32) and the cycle number (the scramble's seed)
+B2="SYNC_ON * 32 * wrap(SYNC_BAR / 8) + (1 - SYNC_ON) * 32 * wrap(B1 / 32)"
+B3="SYNC_ON * floor(SYNC_BAR / 8) + (1 - SYNC_ON) * floor(B1 / 32)"
+// beats 0..2: 30 scramble turns, speeding up; beats 2..32: one turn back per beat, in the last 45% of the beat,
+// accelerating into it
+B4="clamp(B2 / 2)"
+B5="max(0, B2 - 2)"
+Turn="(B2 < 2) * 30 * B4 * B4 + (B2 >= 2) * (30 + floor(B5) + clamp((wrap(B5) - .55) / .45) ^ 2)"
+Seed="B3"
+X="0"
+Y="0"
+Z="0"
+// a pop when it comes out solved, and one extra spin during the scramble
+Scal=".52 * (1 + .08 * exp(-5 * B2))"
+RotX=".5 + .15 * sin(.23 * B0)"
+RotY=".6 + .25 * B0 + 6.2832 * B4 * B4 * (3 - 2 * B4)"
+RotZ=".1 * sin(.17 * B0)"
+Shad="0"
+Pen="1"
+EPen="1"

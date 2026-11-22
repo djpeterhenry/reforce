@@ -1,0 +1,7 @@
+// reforce probe: D-var rnd -> per-pixel jitter expected; C-var rnd -> per-row offsets expected (left/right halves).
+Aspc=0
+C0="rnd(.05)"
+D0="rnd(.05)"
+srcX="x + (x < 0) * C0 + (x >= 0) * D0"
+srcY="y"
+Vers=100

@@ -1,0 +1,9 @@
+Vers=100
+Meta="reforce organic: a sunflower head that fills in one seed per sixteenth note at the golden angle, each new seed swelling in, the whole head slowly turning."
+Kind="phyllotaxis"
+Num="900"
+Rate="4"
+Spc=".031"
+DotW="6"
+B0="t - START_TIME"
+Rot=".04 * B0"

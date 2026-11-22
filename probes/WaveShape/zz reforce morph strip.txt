@@ -1,0 +1,17 @@
+// reforce probe (5B.1/5B.2 strip clock; use with FlowField 'zz reforce morph a'/'b'). One dot per path per frame
+// at x = .99 (scrolls left 1 px/frame). s = 0 / 1: rails at u = -.1 / 1.1; s = .5: the value.
+//   path 0  time  u = wrap(t / 8)        y = .72 + .2 * u
+//   path 1  B0    u = clamp(B0 / 1024)   y = .45 + .18 * u   (B0 = frames since this config started)
+//   path 2  morph dot at y = .25 (LWdt 3) in the region that 'zz reforce morph b' moves down
+// Two identical copies ('zz reforce morph strip' and '... strip 2') so a timeline can restart the clock.
+Stps=3
+ConB=0
+B0="B0 + 1"
+LWdt="1 + PATH_ID * (PATH_ID - 1)"
+X0=".99"
+Y0=".72 + .2 * (-.1 * (s < .25) + 1.1 * (s > .75) + (s > .25) * (s < .75) * wrap(t / 8))"
+X1=".99"
+Y1=".45 + .18 * (-.1 * (s < .25) + 1.1 * (s > .75) + (s > .25) * (s < .75) * clamp(B0 / 1024))"
+X2=".99"
+Y2=".25"
+Vers=270

@@ -1,0 +1,5 @@
+// reforce probe: R exceeds 1 and G goes negative -> clamp vs wrap.
+R="2 * i"
+G="-1 + i"
+B="0"
+Vers=100

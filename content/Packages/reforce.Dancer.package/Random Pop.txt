@@ -1,0 +1,4 @@
+Vers=100
+Meta="reforce dancer: someone new every time: a popping dancer (sharp hits, robot isolations, waves), dressed to match (body, colours, outfit, prints, fabrics, sunglasses, face)."
+Style="pop"
+Random="1"

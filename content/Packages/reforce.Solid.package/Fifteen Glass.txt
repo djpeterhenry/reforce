@@ -1,0 +1,33 @@
+Vers=100
+Meta="reforce solid: the 15 puzzle as clear glass buttons (Glas 1), drawn over the visuals, which keep running underneath and show through. The buttons are 3D (rounded, with walls and a rounded top edge), all the same light glass: half clear, half frosted (Fros), bent by their shape (Bend), lightly tinted (Tint), with a sheen on the edges and walls; the numbers are etched near-white on a soft dark halo, readable on any visuals. Solved on every 8-bar line: on the line the tiles leap from the solved board into a scramble, then slide back one per beat (31 slides, each landing on the beat), so the last lands on the next 8-bar line (bar lines from the phrase clock while the beat clock is locked, else 120 BPM from the start). ColorKey 0 keeps the buttons opaque in the Syphon alpha."
+Mesh="fifteen"
+Text="2"
+Glas="1"
+// the glass: blur in pixels at 1080p, how much each row's colour tints it, how strongly the rims bend the view
+Fros="8"
+Tint=".15"
+Bend="1"
+ColorKey="0"
+Moves="31"
+PDur="120"
+B0="t - START_TIME"
+// beats: the beat clock when locked, else 2 per second
+B1="SYNC_ON * SYNC_BEAT + (1 - SYNC_ON) * 2 * B0"
+// beats into the 8-bar cycle (0..32) and the cycle number (the scramble's seed)
+B2="SYNC_ON * 32 * wrap(SYNC_BAR / 8) + (1 - SYNC_ON) * 32 * wrap(B1 / 32)"
+B3="SYNC_ON * floor(SYNC_BAR / 8) + (1 - SYNC_ON) * floor(B1 / 32)"
+// beat 0..1: the leap into the scramble (over the first three quarters); beats 1..32: one slide per beat, in the last
+// 45% of the beat, accelerating into it, so slides land on beats 2..32
+B4="max(0, B2 - 1)"
+Shuf="clamp(B2 / .75)"
+Turn="floor(B4) + clamp((wrap(B4) - .55) / .45) ^ 2"
+Seed="B3"
+// a pop when it comes out solved; the board drifts slowly around the middle and towards / away from the viewer, tipping
+// and turning as it goes, always mostly facing the viewer
+X=".28 * sin(.11 * B0) + .08 * sin(.29 * B0)"
+Y=".14 * sin(.17 * B0 + 1)"
+Z=".35 * sin(.07 * B0)"
+Scal=".6 * (1 + .06 * exp(-5 * B2))"
+RotX="-.3 + .14 * sin(.21 * B0)"
+RotY=".38 * sin(.13 * B0 + .5)"
+RotZ=".08 * sin(.17 * B0)"
