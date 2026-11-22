@@ -50,7 +50,8 @@ std::unique_ptr<audio::CoreAudioInput> AudioDriver::openInput(const std::string&
     io.device = device;
     if (!in->open(io)) {
         std::fprintf(stderr, "[reforce] audio device \"%s\": %s\n", device.c_str(), in->lastError().c_str());
-        if (device.empty()) return nullptr;
+        // System Audio failing does not fall back to a microphone.
+        if (device.empty() || device == audio::kSystemAudioId) return nullptr;
         std::fprintf(stderr, "[reforce] falling back to the system default input\n");
         in = std::make_unique<audio::CoreAudioInput>();
         io.device.clear();
@@ -178,6 +179,11 @@ std::string AudioDriver::deviceName() const {
 bool AudioDriver::followsDefault() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return device_ != nullptr && source_.load() == device_.get() && requested_.empty();
+}
+
+bool AudioDriver::isSystemAudio() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return device_ != nullptr && source_.load() == device_.get() && requested_ == audio::kSystemAudioId;
 }
 
 std::string AudioDriver::deviceUid() const {

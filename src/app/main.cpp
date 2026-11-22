@@ -20,7 +20,8 @@
 //                         flowfield=gforce|polar|crossfade); also settings reforce.Blend.<Type>
 //   --set KEY=VALUE       override one setting (G-Force pref name), e.g. --set FlowField.Transition.Duration=4
 // Audio:
-//   --audio-device NAME   input device name or UID (default: settings Audio.InputSource, else system default)
+//   --audio-device NAME   input device name or UID, or "system" for System Audio (everything the Mac plays;
+//                         macOS 14.2+) (default: settings Audio.InputSource, else system default)
 //   --audio-file PATH     analyze a file instead (never played out loud)
 //   --no-audio            silence
 // Rendering:
@@ -126,6 +127,7 @@
 #include "app/Visualizer.hpp"
 #include "render/SolidPipeline.hpp"
 #include "audio/MicPermission.hpp"
+#include "audio/SystemAudioTap.hpp"
 #include "engine/Commands.hpp"
 #include "engine/DanceClips.hpp"
 #include "engine/Prefs.hpp"
@@ -563,6 +565,12 @@ int main(int argc, char** argv) {
                 if (!audio->openFile(audioFile, deterministic, !offscreen)) rc = 1;
             } else if (offscreen) {
                 // Offline without a file: silence (deterministic).
+            } else if (dev == audio::kSystemAudioId) {
+                // System Audio: no microphone permission involved (macOS asks for its own,
+                // "System Audio Recording Only"). Opened from the frame loop on the audio control
+                // thread, so a permission prompt never holds up the window.
+                micAnswer = std::make_shared<std::atomic<int>>(1);
+                deferredDevice = dev;
             } else {
                 // Live input: ask for microphone permission first (TCC).
                 const audio::MicPermission perm = audio::microphonePermission();

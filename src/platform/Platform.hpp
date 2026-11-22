@@ -55,7 +55,7 @@ std::string bundleResourcesDir();
 
 // Audio > input device menu entries.
 struct AudioInputItem {
-    std::string id;     // what selectAudioInput takes: device name, "default" or "none"
+    std::string id;     // what selectAudioInput takes: device name, "default", "system" or "none"
     std::string title;  // menu text
     bool checked = false;
     bool separatorBefore = false;

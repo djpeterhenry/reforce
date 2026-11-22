@@ -54,7 +54,7 @@ Everything here is optional. reforce runs without any of it, and without a camer
 
 | What | How it connects | Setup |
 |---|---|---|
-| Audio | Any macOS input device (a Loopback / BlackHole device for system audio) | Audio menu; macOS asks for microphone access once |
+| Audio | Any macOS input device, or everything the Mac plays (no Loopback / BlackHole needed; macOS 14.2+) | Audio menu; macOS asks once for microphone access (input devices) or for system audio recording (Everything the Mac Plays) |
 | OBS and video apps | Syphon server `reforce`, with transparency | [docs/usage.md](docs/usage.md#output-window--syphon-for-obs) |
 | Cameras, movies, Syphon input | Colour video layer, movie sprites, a camera backdrop, body tracking | macOS asks for camera access the first time one is opened |
 | Ableton Link | Tempo and bar sync with rekordbox, Ableton Live, Traktor | Automatic on the local network |

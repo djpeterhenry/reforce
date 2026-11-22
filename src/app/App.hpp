@@ -64,7 +64,8 @@ public:
     void onShutdown() override;
     bool onKey(const platform::KeyEvent& key) override;
     std::vector<platform::AudioInputItem> audioInputs() override;
-    // "default" = system default input, "none" = silence, else a device name/UID.
+    // "default" = system default input, "system" = System Audio (everything the Mac plays),
+    // "none" = silence, else a device name/UID.
     void selectAudioInput(const std::string& id) override;
     // Called after the user picked an input in the Audio menu (to save it).
     // Opens input `id` (see selectAudioInput) from the frame loop once *answer

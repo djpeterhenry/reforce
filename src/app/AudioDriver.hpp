@@ -2,7 +2,8 @@
 // Audio for the app: one source (live CoreAudio device, or a file) feeding the
 // Analyzer, configured from the G-Force prefs.
 //
-//  * live device: CoreAudioInput (prefs Audio.InputSource, else system default)
+//  * live device: CoreAudioInput (prefs Audio.InputSource, else system default;
+//    "system" = System Audio, see audio/SystemAudioTap.hpp)
 //  * file, realtime: AudioFileSource paced by the wall clock, NOT played out loud
 //  * file, deterministic: exactly sampleRate / fps samples per frame
 //  * none: silence (the analyzer decays to zero)
@@ -54,6 +55,7 @@ public:
     bool hasDevice() const;
     bool hasFile() const { return file_ != nullptr; }
     bool followsDefault() const;
+    bool isSystemAudio() const;  // the live input is System Audio
     std::string deviceName() const;  // "" if none
     std::string deviceUid() const;
 

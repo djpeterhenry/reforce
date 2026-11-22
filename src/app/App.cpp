@@ -538,10 +538,16 @@ std::vector<platform::AudioInputItem> App::audioInputs() {
     std::vector<platform::AudioInputItem> items;
     if (!audio_ || audio_->hasFile()) return items;  // --audio-file: no live input to choose
     const std::string cur = audio_->deviceName(), curUid = audio_->deviceUid();
-    items.push_back({"default", "System Default", audio_->followsDefault(), false});
+    const auto devices = audio::listInputDevices();
+    std::string defaultTitle = "Default Input";
+    for (const auto& d : devices)
+        if (d.isDefaultInput) defaultTitle += " (" + d.name + ")";
+    items.push_back({"default", defaultTitle, audio_->followsDefault(), false});
+    const bool system = audio_->isSystemAudio();
+    if (audio::systemAudioSupported()) items.push_back({audio::kSystemAudioId, audio::kSystemAudioName, system, false});
     bool first = true;
-    for (const auto& d : audio::listInputDevices()) {
-        const bool on = audio_->hasDevice() && !audio_->followsDefault() && (d.uid == curUid || d.name == cur);
+    for (const auto& d : devices) {
+        const bool on = audio_->hasDevice() && !audio_->followsDefault() && !system && (d.uid == curUid || d.name == cur);
         items.push_back({d.name, d.name, on, first});
         first = false;
     }

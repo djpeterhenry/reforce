@@ -111,8 +111,18 @@ Behaviour for Dock launches:
     `--ui-lan` mode.
   - *Scene*: Next WaveShape / ColorMap / FlowField, Hold / Release All, Start Particle, Start
     Sprite, Look A/B. These send the same commands as the window hotkeys.
-  - *Audio*: System Default, every input device (✓ on the current one), and No Audio. A choice
-    switches the input live and saves it as `Audio.InputSource`.
+  - *Audio*: Default Input (the input chosen in System Settings → Sound, named in brackets), Everything the
+    Mac Plays, every input device (✓ on the current one), and No Audio.
+    A choice switches the input live and saves it as `Audio.InputSource`.
+
+**Everything the Mac Plays** (macOS 14.2 or later) listens to all the Mac's sound, from any app and whatever
+output device it plays to, with no Loopback or BlackHole device. It uses a Core Audio process tap
+(`src/audio/SystemAudioTap.*`), and what you hear does not change. The
+setting is `Audio.InputSource = "system"` (`--audio-device system` on the command line). The first time,
+macOS asks whether reforce may record system audio (System Settings → Privacy & Security → Screen & System
+Audio Recording, "System Audio Recording Only"); this is separate from the microphone permission, which
+this input does not need. Without it the input runs but stays silent. If it cannot start,
+reforce stays silent rather than switching to a microphone.
 
 The icon is original artwork drawn by [tools/icon/make_icon.m](../tools/icon/make_icon.m), a
 CoreGraphics rendering of a video-feedback swirl. `scripts/make-icon.sh` regenerates

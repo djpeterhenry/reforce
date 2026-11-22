@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>reforce listens to an audio input (e.g. a Loopback device) to drive the visuals. Audio is analyzed live and never recorded.</string>
+	<key>NSAudioCaptureUsageDescription</key>
+	<string>reforce listens to what your Mac plays when you pick Everything the Mac Plays in the Audio menu, to drive the visuals. Audio is analyzed live and never recorded.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>reforce joins Ableton Link sessions on your local network (for example rekordbox with LINK on) to follow the DJ's tempo and beat.</string>
 	<key>NSCameraUsageDescription</key>

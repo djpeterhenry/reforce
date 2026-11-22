@@ -1,4 +1,4 @@
-# reforce_audio: CoreAudio input (AUHAL), file source (ExtAudioFile), SPSC ring
+# reforce_audio: CoreAudio input (AUHAL; System Audio via a process tap), file source (ExtAudioFile), SPSC ring
 # buffer, vDSP analyzer. Plus the reforce-audio-probe CLI and audio unit tests.
 # Included from the top-level CMakeLists.txt (paths are relative to it).
 
@@ -8,10 +8,11 @@ add_library(reforce_audio STATIC
     src/audio/AudioFileSource.cpp
     src/audio/CoreAudioInput.cpp
     src/audio/MicPermission.mm
+    src/audio/SystemAudioTap.mm
 )
 target_include_directories(reforce_audio PUBLIC src)
 target_compile_options(reforce_audio PRIVATE ${REFORCE_WARNINGS})
-set_source_files_properties(src/audio/MicPermission.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+set_source_files_properties(src/audio/MicPermission.mm src/audio/SystemAudioTap.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
 target_link_libraries(reforce_audio PUBLIC
     "-framework Accelerate" "-framework AudioToolbox" "-framework CoreAudio"
     "-framework CoreFoundation" "-framework AVFoundation" "-framework Foundation")

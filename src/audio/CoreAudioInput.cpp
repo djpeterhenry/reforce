@@ -125,8 +125,9 @@ std::vector<InputDeviceInfo> listInputDevices() {
         if (ch <= 0) continue;
         InputDeviceInfo d;
         d.id = id;
-        d.name = getStringProp(id, kAudioObjectPropertyName);
         d.uid = getStringProp(id, kAudioDevicePropertyDeviceUID);
+        if (isSystemAudioAggregateUid(d.uid)) continue;
+        d.name = getStringProp(id, kAudioObjectPropertyName);
         d.inputChannels = ch;
         d.sampleRate = nominalRate(id);
         d.isDefaultInput = (id == def);
@@ -225,7 +226,8 @@ uint64_t CoreAudioInput::renderErrors() const { return rt_ ? rt_->renderErrors.l
 uint64_t CoreAudioInput::oversizeCallbacks() const { return rt_ ? rt_->oversize.load() : 0; }
 
 std::string CoreAudioInput::description() const {
-    std::string s = "input \"" + dev_.name + "\" (" + dev_.uid + ") ";
+    std::string s = "input \"" + dev_.name + "\" ";
+    if (!tap_) s += "(" + dev_.uid + ") ";  // System Audio's UID is a new random one each time
     s += std::to_string(static_cast<int>(sampleRate())) + " Hz, " + sourceStateName(state());
     return s;
 }
@@ -267,7 +269,21 @@ bool CoreAudioInput::start() {
     // Resolve the device.
     const auto devices = listInputDevices();
     const InputDeviceInfo* found = nullptr;
-    if (opts_.device.empty()) {
+    InputDeviceInfo systemAudio;
+    if (opts_.device == kSystemAudioId) {
+        tap_ = std::make_unique<SystemAudioTap>();
+        if (!tap_->create(lastError_)) {
+            tap_.reset();
+            state_ = systemAudioSupported() ? SourceState::Error : SourceState::Disconnected;
+            return false;
+        }
+        systemAudio.id = tap_->aggregateDevice();
+        systemAudio.name = kSystemAudioName;
+        systemAudio.uid = tap_->aggregateUid();
+        systemAudio.inputChannels = inputChannelCount(systemAudio.id);
+        systemAudio.sampleRate = nominalRate(systemAudio.id);
+        found = &systemAudio;
+    } else if (opts_.device.empty()) {
         for (const auto& d : devices) if (d.isDefaultInput) found = &d;
     } else {
         for (const auto& d : devices) if (d.uid == opts_.device) { found = &d; break; }
@@ -378,7 +394,10 @@ bool CoreAudioInput::start() {
 }
 
 void CoreAudioInput::teardown() {
-    if (!rt_) return;
+    if (!rt_) {
+        tap_.reset();
+        return;
+    }
     if (rt_->unit) {
         AudioOutputUnitStop(rt_->unit);  // synchronous: no callback runs after this returns
         AudioUnitUninitialize(rt_->unit);
@@ -388,6 +407,7 @@ void CoreAudioInput::teardown() {
     if (rt_->device != kAudioObjectUnknown)
         for (const auto& a : kDeviceProps) AudioObjectRemovePropertyListener(rt_->device, &a, deviceListener, this);
     rt_.reset();
+    tap_.reset();  // after the unit is gone
 }
 
 void CoreAudioInput::service() {
@@ -406,7 +426,9 @@ void CoreAudioInput::service() {
         start();
         return;
     }
-    if (flagDevicesChanged_.exchange(false) &&
+    // (System Audio does not wait for a device; retrying it here would loop, as
+    // its own aggregate device coming and going changes the device list.)
+    if (flagDevicesChanged_.exchange(false) && opts_.device != kSystemAudioId &&
         (s == SourceState::Disconnected || s == SourceState::Error)) {
         start();
     }

@@ -17,6 +17,10 @@
 // Disconnected when the device dies, and reopens it when a device with the
 // same UID (or, for a name, the same name) appears again.
 //
+// System Audio (device "system", see SystemAudioTap.hpp): start() creates a
+// process tap and its private aggregate device and reads that; teardown()
+// removes both.
+//
 // Microphone permission (TCC): when the process is not authorised, CoreAudio
 // still runs the callback but delivers zeros. See MicPermission.hpp.
 
@@ -26,6 +30,7 @@
 #include <vector>
 
 #include "audio/AudioSource.hpp"
+#include "audio/SystemAudioTap.hpp"
 
 namespace reforce::audio {
 
@@ -38,12 +43,13 @@ struct InputDeviceInfo {
     bool isDefaultInput = false;
 };
 
-// Devices with at least one input channel.
+// Devices with at least one input channel (not System Audio's own aggregate).
 std::vector<InputDeviceInfo> listInputDevices();
 
 struct InputOptions {
     // Device UID, or exact name, or case-insensitive name. Empty = the system
-    // default input (followed when the default changes).
+    // default input (followed when the default changes). kSystemAudioId =
+    // System Audio.
     std::string device;
     // 0-based device channels to average into mono. Empty = all channels.
     std::vector<int> channels;
@@ -89,6 +95,7 @@ private:
     InputDeviceInfo dev_;
     std::unique_ptr<SpscRingBuffer> ring_;
     std::unique_ptr<Rt> rt_;
+    std::unique_ptr<SystemAudioTap> tap_;  // System Audio only
     std::atomic<double> sampleRate_{0.0};
     std::atomic<SourceState> state_{SourceState::Stopped};
     std::string lastError_;
