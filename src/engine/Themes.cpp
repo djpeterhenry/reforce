@@ -114,10 +114,10 @@ std::map<std::string, std::string> parseKeyValueFile(const std::string& text) {
     return kv;
 }
 
-bool Category::matches(const std::string& configName) const {
+bool Category::matches(const std::string& configName, const std::string& id) const {
     const std::string n = lower(configName);
     const bool inc = std::find(includeList.begin(), includeList.end(), n) != includeList.end() ||
-                     regexMatch(includePattern, configName);
+                     regexMatch(includePattern, configName) || (!id.empty() && regexMatch(includeIdPattern, id));
     if (!inc) return false;
     const bool exc = std::find(excludeList.begin(), excludeList.end(), n) != excludeList.end() ||
                      regexMatch(excludePattern, configName);
@@ -170,6 +170,7 @@ void ThemeLibrary::addCategory(const std::string& typeName, const std::string& t
     c.excludeList = lines(get("exclude.list"));
     c.includePattern = trim(get("include.pattern"));
     c.excludePattern = trim(get("exclude.pattern"));
+    c.includeIdPattern = trim(get("include.id"));
     categories_[lower(typeName)].push_back(std::move(c));
 }
 
@@ -235,7 +236,8 @@ const Category* ThemeLibrary::category(const std::string& typeName, const std::s
 
 std::vector<std::string> ThemeLibrary::filter(const Theme* theme, const std::string& typeName,
                                               const std::vector<std::string>& names,
-                                              std::vector<std::string>* warnings) const {
+                                              std::vector<std::string>* warnings,
+                                              const std::vector<std::string>* ids) const {
     if (!theme) return names;
     auto it = theme->categoryExpr.find(lower(typeName));
     if (it == theme->categoryExpr.end()) return names;
@@ -245,8 +247,8 @@ std::vector<std::string> ThemeLibrary::filter(const Theme* theme, const std::str
         if (term.size() < 2 || (term[0] != '+' && term[0] != '-')) continue;
         (term[0] == '+' ? plus : minus).push_back({true, trim(term.substr(1))});
     }
-    auto inCategory = [&](const std::string& title, const std::string& name) {
-        if (const Category* c = category(typeName, title)) return c->matches(name);
+    auto inCategory = [&](const std::string& title, const std::string& name, const std::string& id) {
+        if (const Category* c = category(typeName, title)) return c->matches(name, id);
         if (lower(title) == "(suggested)") return true;  // built in for this type: everything
         return false;
     };
@@ -257,14 +259,16 @@ std::vector<std::string> ThemeLibrary::filter(const Theme* theme, const std::str
                     warnings->push_back(typeName + " category \"" + title + "\" not found");
     }
     std::vector<std::string> out;
-    for (const std::string& name : names) {
+    for (std::size_t i = 0; i < names.size(); ++i) {
+        const std::string& name = names[i];
+        const std::string id = ids && i < ids->size() ? (*ids)[i] : std::string();
         bool in = plus.empty();
         for (const auto& [_, title] : plus)
-            if (!in && inCategory(title, name)) in = true;
+            if (!in && inCategory(title, name, id)) in = true;
         if (!in) continue;
         bool out_ = false;
         for (const auto& [_, title] : minus)
-            if (!out_ && inCategory(title, name)) out_ = true;
+            if (!out_ && inCategory(title, name, id)) out_ = true;
         if (!out_) out.push_back(name);
     }
     return out;

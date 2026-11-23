@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Renders the story page's 3D solid examples: reforce draws each solid offline over our own small scenes
-(tools/story/scenes: a flow, a wave and a colour scheme we wrote; no G-Force content), and ffmpeg makes a short
+(tools/story/scenes: a flow, a wave and a color scheme we wrote; no G-Force content), and ffmpeg makes a short
 looping video of a whole number of beats. reforce listens to a 120 BPM kick test signal of our own while it renders,
 so its beat clock locks and the solids move on real beats.
 

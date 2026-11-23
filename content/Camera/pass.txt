@@ -1,0 +1,6 @@
+// reforce camera preset (docs/model-design.md "The camera"): the camera holds off to one side while the model approaches, slides past and recedes; it pans to follow.
+// Copy these lines into a model scene to change them; a scene's own K lines win over its Move preset.
+//      t     eye x  eye y  eye z    aim x aim y aim z   fov  [roll]
+K1="    0      2.4    0.3   -6.5       0     0     0    40"
+K2="    1      2.4    0.3    6.5       0     0     0    40"
+Ease=".25"

@@ -1,4 +1,4 @@
-// Visualizer: the colour video layer, video sprites, the camera backdrop, body tracking and beat-synced movies.
+// Visualizer: the color video layer, video sprites, the camera backdrop, body tracking and beat-synced movies.
 #include "app/Visualizer.hpp"
 
 #include <Foundation/Foundation.hpp>
@@ -407,11 +407,11 @@ std::string Visualizer::setVideoParam(const std::string& key, const std::string&
     std::string k, v;
     for (char c : key) k.push_back(char(std::tolower(static_cast<unsigned char>(c))));
     for (char c : value) v.push_back(char(std::tolower(static_cast<unsigned char>(c))));
-    if (k == "spritecolour" || k == "spritecolor") {
-        if (v == "over" || v == "1" || v == "on" || v == "true" || v == "yes") movieColourOver_ = true;
-        else if (v == "off" || v == "0" || v == "false" || v == "no") movieColourOver_ = false;
-        else return "spritecolour: over | off";
-        rlog("[reforce] full-colour movie sprites %s\n", movieColourOver_ ? "on (over)" : "off");
+    if (k == "spritecolor" || k == "spritecolor") {
+        if (v == "over" || v == "1" || v == "on" || v == "true" || v == "yes") movieColorOver_ = true;
+        else if (v == "off" || v == "0" || v == "false" || v == "no") movieColorOver_ = false;
+        else return "spritecolor: over | off";
+        rlog("[reforce] full-color movie sprites %s\n", movieColorOver_ ? "on (over)" : "off");
         return {};
     }
     if (k == "syphonalpha") {
@@ -662,7 +662,7 @@ void Visualizer::videoState(engine::VideoState& v, double t) const {
                                 (s.held ? " (looping until stopped)" : ""));
     v.spritesHeld = videoSpritesHeld();
     v.beatSync = movieBeatSyncOn();
-    v.spriteColour = movieColourOver_ ? "over" : "off";
+    v.spriteColor = movieColorOver_ ? "over" : "off";
     v.syphonAlpha = syphonAlpha_;
     v.windowVisuals = windowVisualsOnly_;
     v.lightsAvailable = lightsOut_ != nullptr;
@@ -681,13 +681,13 @@ void Visualizer::videoState(engine::VideoState& v, double t) const {
         v.lightsPulsing = ls.pulsing;
         v.lightsSide = ls.sideLength;
         v.lightsLayout.clear();
-        v.lightsColours.clear();
+        v.lightsColors.clear();
         static const char* hex = "0123456789abcdef";
         for (const lights::PanelView& p : lightsOut_->panels()) {
             v.lightsLayout.insert(v.lightsLayout.end(), {p.x, p.y, p.o});
-            for (std::uint8_t b : {p.colour.r, p.colour.g, p.colour.b}) {
-                v.lightsColours.push_back(hex[b >> 4]);
-                v.lightsColours.push_back(hex[b & 15]);
+            for (std::uint8_t b : {p.color.r, p.color.g, p.color.b}) {
+                v.lightsColors.push_back(hex[b >> 4]);
+                v.lightsColors.push_back(hex[b & 15]);
             }
         }
     }

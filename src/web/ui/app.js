@@ -84,7 +84,7 @@
   const fmtSpan = (s) => (s <= 0 ? 'off' : s >= 120 ? `${+(s / 60).toFixed(1)} min` : fmtSec(s));
   const libLayer = (key) => library.layers.find((l) => l.key === key) || { key, configs: [], categories: [], blendModes: [] };
   const stateLayer = (key) => state && state.layers ? state.layers.find((l) => l.key === key) : undefined;
-  // ---- Favourites (reforce.Favorites): top bar buttons + stars in the lists.
+  // ---- Favorites (reforce.Favorites): top bar buttons + stars in the lists.
   let favorites = [];
   let favSaving = false;
   const isFav = (layer, id) => favorites.some((f) => f.layer === layer && f.id === id);
@@ -109,7 +109,7 @@
       const j = await r.json();
       if (!r.ok) { toast(j.error || `HTTP ${r.status}`); return; }
       favorites = j.favorites || [];
-      if (!j.canSave) toast('Favourite kept for this run only (no settings file)');
+      if (!j.canSave) toast('Favorite kept for this run only (no settings file)');
     } catch { toast('Not connected to reforce'); return; }
     renderFavorites();
     for (const v of views.values()) if (layerOf(v.key) === layer && v.list) renderList(v);
@@ -127,7 +127,7 @@
       kind.className = 'kind';
       kind.textContent = f.layer === 'sprite' ? (cfg && cfg.movie ? 'Movie sprite' : 'Image sprite')
                                               : (TITLES[f.layer] || f.layer).replace(/s$/, '');
-      // A favourite whose scene is gone (removed or renamed; its ☆ is no longer in any list): greyed out, with a ✕ to
+      // A favorite whose scene is gone (removed or renamed; its ☆ is no longer in any list): grayed out, with a ✕ to
       // remove it. Only once that layer's library has loaded, so nothing is flagged before the lists arrive.
       if (!cfg && lib.configs.length > 0) {
         const m = document.createElement('span');
@@ -136,7 +136,7 @@
         const x = document.createElement('button');
         x.className = 'fav-remove';
         x.textContent = '✕';
-        x.title = `Remove the favourite ${f.id}`;
+        x.title = `Remove the favorite ${f.id}`;
         x.addEventListener('click', () => toggleFavorite(f.layer, f.id));
         m.append(document.createTextNode(name), kind, x);
         box.append(m);
@@ -561,7 +561,7 @@
       const star = document.createElement('span');
       star.className = 'star' + (fav ? ' on' : '');
       star.textContent = fav ? '★' : '☆';
-      star.title = fav ? 'Remove from favourites' : 'Add to favourites (button at the top)';
+      star.title = fav ? 'Remove from favorites' : 'Add to favorites (button at the top)';
       li.append(star);
       // Movies: just the name (their folder is the same for all of them and says nothing).
       const slash = cfg.id.lastIndexOf('/');
@@ -593,14 +593,14 @@
         const t = document.createElement('span');
         t.className = 'tag';
         t.textContent = 'no key';
-        t.title = 'ColorKey = 0 in its .reforce.txt: opaque in the Syphon alpha (needs Syphon alpha and Full colour)';
+        t.title = 'ColorKey = 0 in its .reforce.txt: opaque in the Syphon alpha (needs Syphon alpha and Full color)';
         li.append(t);
       }
       if (cfg.beat) {
         const t = document.createElement('span');
         t.className = 'tag bpm';
         t.textContent = '♩';
-        t.title = 'Beat-synced: moves with the beat or tempo (BEAT, TEMPO, LINK_*, SYNC_*)';
+        t.title = 'Beat-synced: moves, grows or plays on the beat clock (its kind, or BEAT, TEMPO, LINK_*, SYNC_* in its expressions)';
         li.append(t);
       }
       if (isCurrent(cfg, ls)) li.classList.add('cur');
@@ -855,8 +855,8 @@
           row.append(hold);
           const beat = $('#vBeatSyncLabel');
           if (beat) row.append(beat);
-          const colour = $('#vSpriteColourLabel');
-          if (colour) row.append(colour);
+          const color = $('#vSpriteColorLabel');
+          if (color) row.append(color);
           $('.row.buttons', root).after(row);
           // No live (camera / Syphon) sprites here: the camera goes under the visuals as the Camera backdrop
           // (Peter 2026-11-22).
@@ -1383,7 +1383,7 @@
     $('#vStopLayer').addEventListener('click', () => post({ action: 'videostop', target: 'layer' }));
     $('#vHoldSprites').addEventListener('click', () => post({ action: 'videohold' }));
     $('#vBeatSync').addEventListener('change', (e) => vset('beatsync', e.target.checked));
-    $('#vSpriteColour').addEventListener('change', (e) => vset('spritecolour', e.target.checked ? 'over' : 'off'));
+    $('#vSpriteColor').addEventListener('change', (e) => vset('spritecolor', e.target.checked ? 'over' : 'off'));
     $('#vSyphonAlpha').addEventListener('change', (e) => vset('syphonalpha', e.target.checked));
     const slider = (id, key, fmt) => {
       const input = $('#' + id);
@@ -1512,8 +1512,8 @@
 
   // ------------------------------------------------------------ room lights (docs/lights.md)
   let ltSig = '';
-  // The panels as they hang (Nanoleaf layout: y up; a triangle points up at 0°, down at 60°), filled with the colours
-  // last sent. Built once per layout, recoloured from the live events.
+  // The panels as they hang (Nanoleaf layout: y up; a triangle points up at 0°, down at 60°), filled with the colors
+  // last sent. Built once per layout, recolored from the live events.
   function drawLightsPreview(L) {
     const svg = $('#ltPreview');
     const lay = L.layout || [];
@@ -1546,7 +1546,7 @@
         svg.appendChild(p);
       }
     }
-    const c = L.on && L.state === 'streaming' ? (L.colours || '') : '';
+    const c = L.on && L.state === 'streaming' ? (L.colors || '') : '';
     const polys = svg.children;
     for (let i = 0; i < polys.length; i++) {
       const hex = c.length >= (i + 1) * 6 ? '#' + c.slice(i * 6, i * 6 + 6) : '#000000';
@@ -1638,7 +1638,7 @@
     setVal('vKeyColor', v.keyColor);
     $('#vLoop').checked = v.loop;
     $('#vBeatSync').checked = !!v.beatSync;
-    $('#vSpriteColour').checked = v.spriteColour === 'over';
+    $('#vSpriteColor').checked = v.spriteColor === 'over';
     const clock = v.beatSource === 'none' ? 'no beat clock'
       : `${v.beatSource === 'link' ? 'Link' : 'audio'}${v.beatBpm ? ' ' + v.beatBpm.toFixed(1) : ''}${v.beatConfident ? '' : ' (not locked)'}`;
     $('#vBeatClock').textContent = clock;
@@ -1690,6 +1690,18 @@
         note: 'Antialiased line edges (G-Force’s default, WaveShape.AntiAlias = 1).' },
       { v: 'off', label: 'Off', tag: '', tagText: '',
         note: 'Hard, aliased line edges (WaveShape.AntiAlias = 0).' },
+    ] },
+    { id: 'edges', title: 'Line edges in color', setting: 'reforce.LineEdges', values: [
+      { v: 'gforce', label: 'G-Force', tag: 'gf', tagText: 'G-Force',
+        note: 'Antialiased edges are in-between intensities, which the ColorMap paints in whatever colors lie between: on a map that isn’t a smooth ramp, multi-colored fringes along lines (as G-Force).' },
+      { v: 'color', label: 'Color', tag: 'ok', tagText: 'reforce',
+        note: 'On screen, a fresh line edge blends the line’s color with the color under it, so edges stay clean on any ColorMap. The flow and trails are unchanged (trails still fade through the map’s colors). Needs Line antialiasing on; live.' },
+    ] },
+    { id: 'supersample', title: 'Supersampling', setting: 'reforce.Supersample', values: [
+      { v: '1x', label: '1x', tag: 'gf', tagText: 'G-Force',
+        note: 'Render at the output size.' },
+      { v: '2x', label: '2x', tag: 'ok', tagText: 'reforce',
+        note: 'Render everything at twice the width and height, color it, then average down to the output size: clean edges everywhere, trails included, for about 4x the GPU work. Applies the next time reforce starts: choose 2x, then Save as default and restart.' },
     ] },
     { id: 'linescale', title: 'Line width scaling', setting: 'reforce.LineScale', values: [
       { v: 'gforce', label: 'G-Force', tag: 'gf', tagText: 'G-Force',
@@ -1937,7 +1949,7 @@
       <details class="dn-more" id="dnMore">
         <summary title="Lighting, reflections, size, outline and how human the dancing looks">Look: light, reflections, size, outline, human</summary>
         <div class="rh-grid">
-        <label class="field" title="How much the visuals light the dancers: 0 = a plain studio light, 1 = lit only by the colours on screen (they still never go darker than half the studio light). Saved to settings.json (reforce.Dancer.Lighting).">
+        <label class="field" title="How much the visuals light the dancers: 0 = a plain studio light, 1 = lit only by the colors on screen (they still never go darker than half the studio light). Saved to settings.json (reforce.Dancer.Lighting).">
           <span>Lit by visuals <b id="dnLightVal">0.75</b></span><input type="range" id="dnLight" min="0" max="1" step="0.05"></label>
         <label class="field" title="The dancers mirrored in the disco floor: 0 = none, 1 = strong; they fade with depth below the floor. Saved to settings.json (reforce.Dancer.Reflection).">
           <span>Reflections <b id="dnReflectVal">0.35</b></span><input type="range" id="dnReflect" min="0" max="1" step="0.05"></label>
@@ -2199,7 +2211,7 @@
       : (r.drops ? `${r.drops} drop${r.drops === 1 ? '' : 's'} so far` : 'waiting for a breakdown'));
     if (r.nowPlayingLine !== undefined) setText($('#rhNpLine'), r.nowPlayingLine || 'nothing yet (needs rkbx_link)');
     if (r.deckInputs !== undefined) {
-      // Decks, then each input coloured by whether it is there (missing ones start with "no ").
+      // Decks, then each input colored by whether it is there (missing ones start with "no ").
       const el = $('#rhDeckLine');
       const key = (r.decks || '') + '|' + (r.deckInputs || '');
       if (el.dataset.key !== key) {
@@ -2292,21 +2304,8 @@
   }
 
   let es = null;
-  // Live update rate (Hz; 0 = full states only, every 2 s or on a change), per browser.
-  const liveRate = () => {
-    const v = Number(store.get('reforce.liveRate'));
-    return [0, 5, 10, 20].includes(v) && store.get('reforce.liveRate') !== null ? v : 10;
-  };
-  function setupLiveRate() {
-    const sel = $('#liveRate');
-    if (!sel) return;
-    sel.value = String(liveRate());
-    sel.addEventListener('change', () => {
-      store.set('reforce.liveRate', sel.value);
-      if (es) { es.close(); es = null; }
-      if (!document.hidden) connect();
-    });
-  }
+  // Live updates (meters, Link, progress bars, countdowns) at 10 Hz (Peter 2026-11-22: no rate menu).
+  const kLiveRate = 10;
 
   function connect() {
     const dot = $('#conn');
@@ -2321,7 +2320,7 @@
       return;
     }
     if (es) return;
-    es = new EventSource(api(`/api/events?live=${liveRate()}`));
+    es = new EventSource(api(`/api/events?live=${kLiveRate}`));
     es.onopen = () => { dot.className = 'dot ok'; dot.title = 'connected'; };
     es.onerror = () => { dot.className = 'dot bad'; dot.title = 'reconnecting…'; };
     es.onmessage = (e) => {
@@ -2349,7 +2348,6 @@
 
   async function init() {
     setupGlobal();
-    setupLiveRate();
     let first = null;
     try {
       const [lr, sr] = await Promise.all([fetch(api('/api/library')), fetch(api('/api/state'))]);

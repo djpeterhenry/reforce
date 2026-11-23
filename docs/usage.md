@@ -83,7 +83,7 @@ certificate in your keychain is the robust fix if it becomes a nuisance.
 | Log | `~/Library/Logs/reforce/reforce.log` (rotated at 4 MB, 3 old files kept; also printed to the terminal when run from one) |
 | Window frame, screen, full-screen state | `defaults read com.reforce.app` (restored at launch) |
 
-Behaviour for Dock launches:
+Behavior for Dock launches:
 
 - **One instance.** A second launch brings the running one to the front and exits.
   `--allow-multiple` turns this off for debugging. `--background` runs a development / test
@@ -141,12 +141,17 @@ reforce's / the precise one, with a one-line note on what changes on screen.
 | Flow resampling | `reforce.FlowRounding` | `fixed16` | `nearest` (also `floor`, `point`, `fixed256` under "other…"; no effect with `hq`) | next frame |
 | FlowField math | `reforce.FlowPrecision` | (float32 is a guess) | `double` | next FlowField build ("Rebuild field now" does a quick switch to the current field) |
 | Line antialiasing | `WaveShape.AntiAlias` | on | on | next frame |
+| Line edges in color | `reforce.LineEdges` | `gforce` (edges are in-between intensities: on a ColorMap that isn't a ramp they fringe in its in-between colors) | `color` (on screen a fresh line edge mixes the line's and the background's colors; flow and trails unchanged; needs antialiasing) | next frame |
+| Supersampling | `reforce.Supersample` | `1x` | `2x` (everything rendered at twice the width and height, colored, then averaged down in linear light: clean edges everywhere, trails too; about 5 ms GPU at 1080p vs about 1) | next start (Save as default, then restart) |
 | Line width scaling | `reforce.LineScale` | `gforce` (width law on G-Force's frame, half size above ~5.2 MP, e.g. Retina full screen) | `frame` (law on reforce's render size: ~14 % thinner lines in Retina full screen, same below ~5.2 MP) | next frame |
 | Sprites and the flow | `reforce.SpriteLayering` | `gforce` "Overlay" (probe #40: EPen-only sprites are a display-only half-way lighten, no trails, nothing wiped; Pen stamps non-black pixels into the flow) | `melt` (reforce's original: sprites stamped into the flow, they stream with it and wipe the trails under them) or `trails` "Overlay + trails" (the overlay plus a soft lighten feed of the image into the flow at `reforce.SpriteTrails`, default 0.35) | next frame |
 
 - **A/B**: the **A/B** button (or the `b` key on the page or in the reforce window, or Scene › Look A/B) flips every choice between slot A ("G-Force exact" to
   start with) and slot B ("Done right": smooth, hq, nearest, double, AA on, frame line scale). While a slot is active, changes go into
   that slot, so you can tune both sides and flip back and forth. "G-Force exact" / "Done right" set all choices at once.
+- **Typos and old names are reported**: at startup the log (and the control panel's log) lists any setting in
+  settings.json that reforce doesn't read ("settings: unknown setting(s) ignored: ...") and any Look value that isn't
+  one of its choices, with the value used instead.
 - **Session-only** until saved: "Save as default" (per choice, or "Save all") merges the key into settings.json;
   "Reset" goes back to the saved value. A choice that differs from settings.json is outlined, with the saved value shown.
 - The same commands work from the command line and `POST /api/command`: `look:intensity:hq`, `look:thinlines:gforce`,
@@ -182,14 +187,14 @@ build/reforce-syphon-probe --alpha    # ... and prints the frame's alpha (shares
 ```
 
 **Syphon alpha** (on by default; `reforce.Syphon.Alpha = 0` or *Syphon alpha* on the Video card turns it off): the Syphon output carries
-transparency in its alpha channel, so OBS can put a camera behind reforce without a Color Key filter. The colours
+transparency in its alpha channel, so OBS can put a camera behind reforce without a Color Key filter. The colors
 (and the window) are unchanged. The visuals are keyed exactly like OBS's Color Key on black (similarity 80,
 smoothness 50 by default: `reforce.Syphon.KeySimilarity` / `KeySmoothness`, in OBS's units). The dancers and their
-disco floor stay opaque, and so do full-colour movie sprites whose `.reforce.txt` has `ColorKey = 0`. In OBS,
+disco floor stay opaque, and so do full-color movie sprites whose `.reforce.txt` has `ColorKey = 0`. In OBS,
 tick *Allow Transparency* on the Syphon Client source and remove the Color Key filter.
 Details: [docs/syphon-alpha.md](syphon-alpha.md).
 
-## Video (movie sprites, colour video layer, cameras, Syphon input)
+## Video (movie sprites, color video layer, cameras, Syphon input)
 
 One video-source layer (`src/video/`, architecture §5c) feeds two places:
 
@@ -201,9 +206,9 @@ One video-source layer (`src/video/`, architecture §5c) feeds two places:
   length (longer or shorter than `Sprite.Duration`; a PDur in the movie's params only shortens it), so the whole
   movie plays and the sprite fades out as it ends (`reforce.Video.Sprite.Loop = 1` loops them for the whole lifetime instead). An extra folder of sprites
   (images and movies) joins the catalog with `reforce.ExternalSpritesDir` (like G-Force's ExternalSprites.Path).
-- **Colour video layer**: a full-colour source composited after the ColorMap, over or under the visualizer,
+- **Color video layer**: a full-color source composited after the ColorMap, over or under the visualizer,
   with blend `normal | add | screen | multiply`, opacity, fit `cover | contain | stretch`, an optional luma key
-  (dark pixels transparent) or chroma key (key colour, tolerance, softness), and a crossfade between sources
+  (dark pixels transparent) or chroma key (key color, tolerance, softness), and a crossfade between sources
   (also from/to nothing when starting/stopping). The window and, by default, the Syphon output show the
   composite; `videoset:syphon:off` (or `reforce.Video.Layer.Syphon = 0`) sends the plain visualizer to Syphon
   while the window keeps the composite.
@@ -212,7 +217,7 @@ One video-source layer (`src/video/`, architecture §5c) feeds two places:
   card and menu show "waiting for permission" / "access denied" with a link to System Settings → Privacy &
   Security → Camera; an app bundle built before the camera usage description was added refuses to ask:
   reinstall it) and **Syphon servers** (our own `reforce` server is refused to avoid a feedback loop, unless
-  `reforce.Syphon.AllowFeedback = 1`). Any source can feed the colour layer or a "live sprite".
+  `reforce.Syphon.AllowFeedback = 1`). Any source can feed the color layer or a "live sprite".
 - **Robustness**: a source that fails after it started (decode error, camera unplugged) fades out with the error
   in the Video card; a Syphon input whose server quits shows nothing (not a frozen frame) and reconnects when
   the server returns. Frames drawn below 0.6× their size (a 4K movie as a small sprite, a 4K layer at 1080p) are
@@ -225,7 +230,7 @@ Syphon server can still be a live sprite by command, `video:sprite:SOURCE`), the
 /api/command` with `{"command": ...}`):
 
 ```
-video:layer:SOURCE      crossfade the colour layer to SOURCE      SOURCE = file:PATH | camera[:ID] | syphon:NAME
+video:layer:SOURCE      crossfade the color layer to SOURCE      SOURCE = file:PATH | camera[:ID] | syphon:NAME
 video:sprite:SOURCE     start SOURCE as a movie / live sprite              | a name from the video library
 videostop:layer         fade the layer out          videostop:sprite   fade all video sprites out
 videoset:KEY:VALUE      opacity 0..1, blend, fit, order over|under, key none|luma|chroma, keycolor #rrggbb,
@@ -238,7 +243,7 @@ Settings: `reforce.VideoDir` (movie folder for the picker), `reforce.ExternalSpr
 `reforce.Video.Layer.<Key>` defaults for every `videoset` key (e.g. `reforce.Video.Layer.Blend = "screen"`),
 `reforce.Video.Sprite.Loop`, `reforce.Syphon.AllowFeedback`.
 
-**Play once vs loop.** Movies play through once by default, as sprites and on the colour layer (the layer fades
+**Play once vs loop.** Movies play through once by default, as sprites and on the color layer (the layer fades
 out over its crossfade time as the movie ends; `reforce.Video.Layer.Loop = 1` or the control panel's "Loop layer movies" checkbox loops; the checkbox also changes
 the movie playing on the layer now). **Loop until stopped** (control panel, Video card; command `videohold`): the movie
 sprite playing now loops, stays (no ageing out, no new slideshow sprites meanwhile) until "Stop video sprites"; this
@@ -250,14 +255,14 @@ ends (and fades out) at End. The movie review writes it: **Loop** button (key `l
 buttons (keys `[` `]`) that take the preview's current position; its search box filters by name (key `/`). and `review.py collect --copy`
 carries it along into `~/reforce/movies` and keeps it in sync. (A plain `<stem>.txt` is G-Force's sprite params file
 and replaces the package defaults, so reforce's options use their own name.) A loop lasts as long as the sprite
-(fade + `Sprite.Duration` hold + fade) or, on the colour layer, until you stop it. Alternatively, list movies in `reforce.Video.Loop` (names separated by `;`, matched like the skip
+(fade + `Sprite.Duration` hold + fade) or, on the color layer, until you stop it. Alternatively, list movies in `reforce.Video.Loop` (names separated by `;`, matched like the skip
 list, e.g. `reforce --write-setting "reforce.Video.Loop=dance_static; koyaanisqatsi_plane"`). `--syphon-name NAME` renames our Syphon server.
 
 Test videos are generated, never committed: `build/reforce-gen-videos --suite build/videos` writes our own
 synthetic patterns (1080p and 2160p, H.264 / HEVC / ProRes 422), and `build/reforce-gen-videos --bench FILE...`
 measures decode cost. Try them with `--set reforce.VideoDir=$PWD/build/videos`.
 
-## Sprite visibility (Mix, movie levels, full-colour movie sprites)
+## Sprite visibility (Mix, movie levels, full-color movie sprites)
 
 G-Force draws a default sprite (EPen only) as a half-way lighten, out = F + ½·max(0, x − F), and the ColorMap's
 MapFunction (default `i^2.1`) then pushes that into the dark end of the palette, so sprites are often hard to see.
@@ -297,14 +302,14 @@ keys (keeping Loop, Start/End and the beat keys) into the original's `.reforce.t
 `~/reforce/movies`. An interpolated copy (`<stem>.rife4x.mov`) reads its original's options, so the levels apply to
 it too. The sprite's start line in the log shows levels that are not the defaults.
 
-**Full-colour movie sprites** (option, `reforce.MovieSprite.Colour = over`; default `off` = G-Force). Movie and live
-sprites are then not drawn as luminance into the intensity buffer: their full-colour frames are composited after
+**Full-color movie sprites** (option, `reforce.MovieSprite.Color = over`; default `off` = G-Force). Movie and live
+sprites are then not drawn as luminance into the intensity buffer: their full-color frames are composited after
 the ColorMap, at the sprite's rectangle, with a normal alpha-over on top of the colorized visualizer (and on top of
-the colour video layer). Alpha = fade envelope × (½ + ½ × `reforce.MovieSprite.Mix`): half transparent at Mix 0,
-opaque at Mix 1. The movie's levels apply per channel and a `~` name inverts the colours; Pen/EPen and the blend flags
-are not used. They are part of the picture in both the window and Syphon (unlike the colour layer, which
-`videoset:syphon:off` can keep out of Syphon). Control panel: **Full colour** on the Movie sprites card (saved);
-command `videoset:spritecolour:over|off`.
+the color video layer). Alpha = fade envelope × (½ + ½ × `reforce.MovieSprite.Mix`): half transparent at Mix 0,
+opaque at Mix 1. The movie's levels apply per channel and a `~` name inverts the colors; Pen/EPen and the blend flags
+are not used. They are part of the picture in both the window and Syphon (unlike the color layer, which
+`videoset:syphon:off` can keep out of Syphon). Control panel: **Full color** on the Movie sprites card (saved);
+command `videoset:spritecolor:over|off`.
 
 ## Objects: 3D solids and organics (one layer)
 
@@ -315,8 +320,12 @@ is still a solid (`reforce.Solid.package`, drawn by the 3D solid pipeline, can s
 EPen) or an organic (`reforce.Organic.package`, drawn into the feedback); the two sections below describe them.
 
 - **Control panel:** the **Objects** card: `Interval`, `Duration`, Start next / Clear, the alive list, the library
-  with group headings, ★ favourites, and **▶ Play <group>** (switches to that group's theme, e.g. `Objects: Arcade`;
+  with group headings, ★ favorites, and **▶ Play <group>** (switches to that group's theme, e.g. `Objects: Arcade`;
   press again to go back to `Objects`). Not in the default slideshow (Interval 0) unless a theme or the card sets it.
+- **♩ (beat-synced):** the Object moves, grows or plays on the beat clock: by its kind (arcade games, ripples, the
+  Mandelbrot dive, seeds and cell automata; pendulums and Julia sets unless `Phas` sets their phase; trees with
+  beat features such as `s`, `SwyB`, `Vib`, `Puls`; model scenes with `MBar` or `Move="cuts"`) or because its
+  expressions read `BEAT`, `TEMPO`, `LINK_*` or `SYNC_*` (engine/ObjectBeat). Its hold in bars (`PBar`) doesn't count.
 - **Commands:** `switch:object:NAME`, `next:object`, `kill:object`, `interval:object:SEC`, `life:object:SEC`.
 - **Start lines:** an object with `SBar=N` starts from the slideshow only on a line every N bars of the phrase clock
   (Lightning: 8, so its 8 strikes fill an 8-bar phrase); started by hand it starts at once. Without a beat clock it
@@ -337,7 +346,7 @@ three face textures (`Text`):
 - `0`: the current WaveShape, drawn again into a square tile (512x512, mipmapped) that every face wears. The tile
   shows the WaveShape's own square, -1..1 in its coordinates, so a circle stays round. The main WaveShape still
   draws in the frame as usual.
-- `1`: the previous frame (its centred square), a recursive, Droste-like look.
+- `1`: the previous frame (its centered square), a recursive, Droste-like look.
 - `2`: flat.
 
 **Scene files** (`reforce.Solid.package`, keys in docs/scene-format.md §5.7) move and spin the solid with
@@ -349,12 +358,12 @@ lock; also in WaveShapes, Particles and Sprites). Ours are committed in `content
 |---|---|
 | Icosahedron Drift | spins at .5 rad/s, drifts slowly in X, Y and Z |
 | Dodecahedron Beat | snaps a fifth of a turn on each beat while the beat clock is locked |
-| (Beat Clock) | debug, never in a slideshow: a white cube stepping through the bar (with Link the leftmost is the bar line), flashing on each beat; small and dim in the centre when the clock is not locked. Use it to set the Beat offset |
+| (Beat Clock) | debug, never in a slideshow: a white cube stepping through the bar (with Link the leftmost is the bar line), flashing on each beat; small and dim in the center when the clock is not locked. Use it to set the Beat offset |
 | Sphere Bounce | bounces once per beat (about 105 BPM without a lock) |
 | Prism Flyby | swoops in from deep space, skims past the camera left to right and back right to left with barrel rolls, then dives at you and shoots past; repeats every 20 s |
 | Octahedron Mirror | `Text=1`: the frame on its faces |
 | Fifteen Glass | a 15 puzzle solved on every 8-bar line: on the line the tiles leap into a scramble, then slide back one tile per beat (31 slides), the last landing on the next 8-bar line. Clear 3D glass buttons over the visuals, which show through, bent by the buttons' shape; etched white numbers |
-| Rubik Cube | solved on every 8-bar line: scrambles itself in two beats (30 turns), then undoes one turn per beat so the last lands on the next 8-bar line. Sticker colours are picked from the current ColorMap; `ColorKey=0` keeps the whole cube opaque over the camera |
+| Rubik Cube | solved on every 8-bar line: scrambles itself in two beats (30 turns), then undoes one turn per beat so the last lands on the next 8-bar line. Sticker colors are picked from the current ColorMap; `ColorKey=0` keeps the whole cube opaque over the camera |
 
 **Starting them:** as Objects (above): the **Objects** card, `switch:object:NAME`, or the `Objects: Solids` /
 `Objects: Puzzles` themes, which start one every ~30 s.
@@ -367,6 +376,42 @@ build/reforce.app/Contents/MacOS/reforce --theme "Objects: Solids"
 Solid-only settings: `reforce.Solid.Msaa` (4 | 1), `reforce.Solid.TileSize` (512),
 `reforce.Solid.Dir` (an extra folder of solid scene files, ids `Extra/...`), `reforce.ContentDir` (reforce's own
 content root; default the source tree's `content/`; `--content DIR|none`).
+
+### 3D models (your own)
+
+A model Object draws a textured 3D model you supply, in real time, from a moving camera (docs/model-design.md). reforce
+ships no models: put a `.glb` and one or more scene files in the model folder, `~/Library/Application
+Support/reforce/Models` (`reforce.Model.Dir`). Model scenes join the Objects list and slideshow as `Model/<name>`; a
+scene whose model file is missing is left out (see the log). Keep models out of the repo: most downloadable models
+carry licenses that don't mix with the GPL.
+
+1. **From Blender**, convert once (applies modifiers, simplifies materials, caps textures at 2048 px):
+   ```sh
+   blender -b MyModel.blend -P tools/model_prep/prep.py -- ~/Library/Application\ Support/reforce/Models/my-model.glb \
+       [--map my-model.json] [--drop "Interior*"]
+   ```
+   Models with renderer-specific materials (dozens of nodes) need a small `--map` file naming each material's color,
+   normal and glow images; the script's report says what it did with every material, and prints the `Front` line for
+   the scene file. A `.glb` from elsewhere can go in the folder as is.
+2. **A scene file** next to it, e.g. `My Model Orbit.txt`:
+   ```
+   Vers=100
+   Mesh="model"  File="my-model.glb"  Front="+z"
+   Look="0"      // 0 = into the visuals (palette, trails); 1 = its own colors over them
+   Move="orbit"  MBar="16"
+   ```
+   Camera: `Move` picks a preset (`dolly`, `pass`, `orbit`, `under`, `flyby`, `cuts`; their keyframes are in
+   `content/Camera/`), or write your own path as keyframes in the scene: `K1="t  eyeX eyeY eyeZ  aimX aimY aimZ
+   [fov [roll]]"`, `K2=...`, with t from 0 to 1 over the move, plus `Ease`, or `Step="1"` for beat cuts. Copy a
+   preset's lines to start from it; put your own presets in the model folder's `Camera/`. All keys: scene-format §5.7.
+3. Start it like any Object: the **Objects** card (the **Models** group lists every model scene, whatever it is
+   called; **▶ Play Models** switches to the `Objects: Models` theme, a model every ~30 s), `switch:object:Model/My
+   Model Orbit`, or the slideshow.
+
+Models are loaded on a background thread (the ones the scenes name are preloaded at startup), so starting one never
+stalls a frame; a scene started before its model is ready waits for it. Settings: `reforce.Model.Dir` (`none` = no model folder; `--no-settings` runs use none unless `--set` gives one),
+`reforce.Model.MaxTexture` (2048), `reforce.Model.Cache` (2 models kept loaded). Cost at 1080p: about 0.7 ms GPU for a
+500k-triangle model, under 1 ms in color with bloom.
 
 **Test hook:** `--solid-test SPEC` spawns a hard-coded solid from the first frame on (repeatable, up to MaxLive).
 `SPEC = MESH[,key=value...]`; keys:
@@ -400,7 +445,7 @@ committed in `content/Packages/reforce.Organic.package/`:
 | Lightning | a strike on every bar line for 8 bars, each from a new point on the top edge: forks down in half a beat, flashes, flickers away |
 | Neurons | five cells grow dendrites into each other; on every beat one fires, a pulse running out to flash the tips on the next beat, cascading to the neuron it touches; every bar line a lead neuron starts a new wave with a stronger pulse, every phrase line they all fire together and the network rewires (a third of the side branches wither back, new ones grow elsewhere); a drop fires them all hardest. Two phrases long |
 | Kelp Forest | seven stalks rise from the sea floor and wave in the current |
-| Radial Bloom | branches out in every direction from the centre, slowly turning, shivering outwards on every beat (harder on the bar line and a drop); buds on the bar line |
+| Radial Bloom | branches out in every direction from the center, slowly turning, shivering outwards on every beat (harder on the bar line and a drop); buds on the bar line |
 | Pendulum Wave / (Side) / Ring | a pendulum wave (from above, from the side, on a ring) that lines up again on every phrase line |
 | Spiral Galaxy | phyllotaxis: a seed per 16th note at the golden angle; the galaxy sweeps its angle once per phrase |
 | Harmonograph, Harmonograph Rose | Lissajous figures in cycles per bar, closing on the bar |
@@ -420,7 +465,7 @@ Organic-only setting: `reforce.Organic.MaxNodes` (6000 per tree).
 
 ## Dancers: 3D cartoon characters (PLAN 5P)
 
-Chibi cartoon characters dance along the bottom of the frame in full colour, over the visuals and **lit by them**
+Chibi cartoon characters dance along the bottom of the frame in full color, over the visuals and **lit by them**
 (design: docs/dancers-design.md); guests can also send a message, shown for 30 s in a speech bubble over their dancer. Each dancer has a **dance style**, and the style comes first: the look
 is generated to go with it. The styles are the dance genres of real recorded dancers (AIST++, CC BY 4.0): **house**,
 **pop** (popping), **lock** (locking), **break** (breaking, upright), **disco** (waacking), **stomp** (krump),
@@ -428,7 +473,7 @@ is generated to go with it. The styles are the dance genres of real recorded dan
 basic steps and whole 16-bar routines (about half the time), on the music's phrase grid. They follow the music:
 calmer moves in a breakdown, a high-energy move on the drop. (The earlier hand-made moves are still there, unused:
 `reforce.Dancer.Mocap` 0 brings them back.) An optional **disco floor** lights up on the beat in
-the visuals' colours while anyone is dancing.
+the visuals' colors while anyone is dancing.
 
 **Starting them:** the control panel's **Dancers** card (Start next, Clear = everyone waves goodbye, the library),
 commands (`switch:dancer:NAME`, `next:dancer`, `kill:dancer`), or the **Dance Party** theme (a dancer every ~15 s).
@@ -437,7 +482,7 @@ sends the oldest off, and lowering it sends the oldest off waving. Stream guests
 holds 32 in all; past that characters make way first).
 
 **Who dances:** a `Random <Style>` entry per style makes someone new each time (no named characters since
-2026-11-21): their body (stocky, lanky, a bigger or smaller cartoon head), a colour scheme in the style's palette, the
+2026-11-21): their body (stocky, lanky, a bigger or smaller cartoon head), a color scheme in the style's palette, the
 style's wardrobe (outfits, hats, prints, shiny / sequin / velvet / neon fabrics), often sunglasses (round, aviator,
 visor, heart, star, cat-eye, square; mirrored lenses reflect the visuals), glow sticks for house dancers in rave gear,
 and a face (eye shapes, lashes, brows, mouths, lipstick, freckles, beards). Stream guests dance the style they chose. Every look key is in docs/scene-format.md §5.9.
@@ -463,7 +508,7 @@ docs/dancers-design.md). Also `Dancer.Slideshow.Interval.Duration` (0 = none),
 `Dancer.Duration` (90 s), `reforce.Dancer.MaxLive`, `reforce.Dancer.Msaa`.
 
 **Characters** are scene files in `content/Packages/reforce.Dancer.package/` (a `Random <Style>` file per style, no named characters; keys in
-docs/scene-format.md §5.9): colours, `HairStyle`, `Outfit`, `Hat`, `Build`, `Tall`, `Style`, `Moves` (favourite
+docs/scene-format.md §5.9): colors, `HairStyle`, `Outfit`, `Hat`, `Build`, `Tall`, `Style`, `Moves` (favorite
 moves), `Snap`. Test hook: `--dancer-test pop,hiphop,disco` (generated characters, the same each run, from the first frame; `pop@afro` forces a
 hairstyle, to look at one; `pop@bob@cap` a hairstyle and a hat).
 
@@ -527,12 +572,12 @@ FlowField over the quick transition. The Union timer then starts a fresh interva
 The libraries on every card (FlowField, WaveShape, ColorMap and the extra layers) start collapsed; click
 **Library** to open one.
 
-## Favourites (top-level buttons in the control panel)
+## Favorites (top-level buttons in the control panel)
 
 Click the ☆ in front of any scene in the control panel's lists (FlowFields, WaveShapes, ColorMaps, Unions,
-Particles, Sprites) to make it a favourite; it gets a button in the ★ bar at the top of the panel. A sprite button
-starts that sprite (quick fade-in), the others switch their layer to it. Click ★ again to remove it. A favourite whose
-scene is gone (removed or renamed) shows greyed out and dashed in the bar, with a ✕ that removes it. Saved in
+Particles, Sprites) to make it a favorite; it gets a button in the ★ bar at the top of the panel. A sprite button
+starts that sprite (quick fade-in), the others switch their layer to it. Click ★ again to remove it. A favorite whose
+scene is gone (removed or renamed) shows grayed out and dashed in the bar, with a ✕ that removes it. Saved in
 settings.json as `reforce.Favorites` (`layer:id; layer:id`, e.g. `sprite:External/images/  dj peter henry`).
 The Sprites list also shows the extra sprite folder (`reforce.ExternalSpritesDir`, ids `External/...`).
 
@@ -540,7 +585,7 @@ The Sprites list also shows the extra sprite folder (`reforce.ExternalSpritesDir
 
 `reforce.SpriteAlpha` (settings.json, next sprite start): `black` (default) treats a sprite image's transparent pixels
 as black, so they are not drawn; `ignore` matches G-Force, which ignores the alpha channel (probe #42) and shows
-whatever colour is stored under transparent pixels.
+whatever color is stored under transparent pixels.
 
 `reforce.Exclude` in settings.json lists scenes reforce ignores completely: not in the slideshow, the control
 panel's lists, the video picker or manual switches. The files stay where they are, so a scene sync doesn't undo it.
@@ -554,7 +599,7 @@ stem; types WaveShape, Particle, FlowField, Union, ColorMap, Sprite. Example (Pe
 The control panel's Image sprites card has **Review images…**: a grid of every image sprite, by folder. Click an
 image (or Space on it) to hide it; click again to bring it back. **Hide all** / **Show all** work per folder, and
 ▶ (or P) shows one on screen now. A hidden sprite never comes up: not in the slideshow, the Library list, the
-favourites bar or a manual start, and one on screen fades out when you hide it. Changes apply at once and are
+favorites bar or a manual start, and one on screen fades out when you hide it. Changes apply at once and are
 saved to settings.json as `reforce.Sprite.Hidden` (exact ids such as `Abstract/Rose` or
 `External/images/3-a4`, separated by `;`). Sprites in `reforce.Exclude` are not in the grid at all.
 
@@ -585,7 +630,7 @@ With a session:
 ### Beat-synced movies (dance clips)
 
 A movie whose `.reforce.txt` has `BPM` / `BeatStart` / `BeatsPerBar` plays locked to the beat, as a sprite or on the
-colour video layer. Those keys are written
+color video layer. Those keys are written
 by `tools/dance_sync` (see its README), which finds the tempo from the dancers' motion.
 
 **The beat clock:**
@@ -627,7 +672,7 @@ their own.
 
 | Setting | Default | |
 |---|---|---|
-| `reforce.Video.BeatSync` | 1 | movies with a `BPM` play beat-synced, sprites and colour layer (panel toggle, saved) |
+| `reforce.Video.BeatSync` | 1 | movies with a `BPM` play beat-synced, sprites and color layer (panel toggle, saved) |
 | `reforce.BeatClock.Source` | `auto` | `auto` (Link, else audio) / `link` / `audio` / `off` |
 | `reforce.BeatClock.AudioOffsetMs` | 0 | audio onset detection latency (+ = the audio clock's beats earlier) |
 | `reforce.BeatClock.OffsetMs` | 0 | beats this much earlier (−200..500 ms), for audio / display latency: Link sampled ahead, the audio clock's count shifted. Top bar **Beat ‹ ›** nudge (5 ms, Shift 1 ms, double-click 0), saved |
@@ -642,7 +687,7 @@ The analyzer (`src/audio/Analyzer.*`) is fitted to measurements of G-Force 5.9.7
 sample, `fft()` has 255 broad, adaptively normalized, log-spaced bins from 120 Hz to 5.5 kHz, `LEVEL` is ~1.3 × the
 mean of `fft()`, `BASS` = 4 × `LEVEL`, and `ENERGY` follows `LEVEL` slowly. The prefs `Audio.FFT.Smooth`,
 `Audio.FFT.FreqLo` / `FreqHi`, `Audio.FFT.NumBins.vis`, `Audio.PCM.NumBins`, `Audio.Response.Scale` and
-`Audio.FFT.Params` (`Envelopes`, `InitialVolume`, `PersistCoef`) are honoured. Measurements and the model:
+`Audio.FFT.Params` (`Envelopes`, `InitialVolume`, `PersistCoef`) are honored. Measurements and the model:
 [docs/audio-probe-results.md](audio-probe-results.md); G-Force vs reforce scores:
 [docs/audio-parity.md](audio-parity.md) (`python3 -I tools/parity/audio_compare.py --all`, also run by ctest as
 `reforce_audio_parity` when the local G-Force captures exist).

@@ -588,7 +588,7 @@ struct BikePt {
 };
 struct BikeDesign {
     const char* name;
-    double r, front, rear, tire;  // wheel radius, wheel centres (f), tyre half width
+    double r, front, rear, tire;  // wheel radius, wheel centers (f), tyre half width
     double hw;                    // body half width
     const BikePt* top;
     int nTop;
@@ -776,7 +776,7 @@ void ChaseView::drawCycle(OrganicCanvas& c, int i, double beat, double pen, bool
                 }
             }
             if (!B.hubless && fine) {
-                // The hub: a small ring and a hot centre.
+                // The hub: a small ring and a hot center.
                 V3 prev = at(wf + 0.22 * r, 0, cu);
                 for (int q = 1; q <= 8; ++q) {
                     const double t = 2 * kPi * q / 8.0;

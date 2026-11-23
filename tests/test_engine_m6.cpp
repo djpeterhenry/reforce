@@ -621,7 +621,7 @@ TEST_CASE("sprite layering plans (probes #40, #42)") {
     CHECK(tr.feedback[0].op == SpriteOp::Blend);
     CHECK(tr.feedback[0].blend == SpriteBlend::Selective);
     CHECK(tr.feedback[0].pen == doctest::Approx(0.35));
-    // melt: the old behaviour, EPen x0.5 into the feedback after the lines.
+    // melt: the old behavior, EPen x0.5 into the feedback after the lines.
     SpriteLayerPlan m = spriteLayerPlan(epenOnly, SpriteLayering::Melt, 0.35);
     CHECK(!m.hasDisplay);
     REQUIRE(m.feedbackCount == 1);
@@ -707,7 +707,7 @@ TEST_CASE("sprite run: X/Y keep the sprite inside the frame (probe #41)") {
     reforce::scene::Environment env;
     env.width = 1980;
     env.height = 1260;
-    // Native 600x382 at X .5, Y .3: centre at .5 x (1 - 600/1980) = .348 (G-Force: .349), y .3 x .697 = .209.
+    // Native 600x382 at X .5, Y .3: center at .5 x (1 - 600/1980) = .348 (G-Force: .349), y .3 x .697 = .209.
     auto n5 = compileText("X=\".5\" Y=\".3\" EPen=\"1\" Flag=\"0\"", SceneType::Sprite);
     SpriteRun a(n5, env, "n5", false, 0.0, 1.0, 45.0, nullptr);
     a.setImageSize(600, 382, 1980, 1260);
@@ -782,10 +782,10 @@ TEST_CASE("slideshow settings from the panel map to settings.json keys") {
     CHECK(one(slideshowSaveEntries(Command::spriteMix(false, 0.5)), "reforce.Sprite.Mix") == "0.5");
     CHECK(one(slideshowSaveEntries(Command::spriteMix(true, 1)), "reforce.MovieSprite.Mix") == "1");
     CHECK(slideshowSaveEntries(Command::spriteMix(false, 0.1, true)).entries().empty());
-    // Full-colour movie sprites toggle (videoset spritecolour, PLAN 5K).
-    CHECK(one(slideshowSaveEntries(Command::videoSet("spritecolour", "over")), "reforce.MovieSprite.Colour") == "over");
-    CHECK(one(slideshowSaveEntries(Command::videoSet("spritecolour", "off")), "reforce.MovieSprite.Colour") == "off");
-    CHECK(slideshowSaveEntries(Command::videoSet("spritecolour", "under")).entries().empty());
+    // Full-color movie sprites toggle (videoset spritecolor, PLAN 5K).
+    CHECK(one(slideshowSaveEntries(Command::videoSet("spritecolor", "over")), "reforce.MovieSprite.Color") == "over");
+    CHECK(one(slideshowSaveEntries(Command::videoSet("spritecolor", "off")), "reforce.MovieSprite.Color") == "off");
+    CHECK(slideshowSaveEntries(Command::videoSet("spritecolor", "under")).entries().empty());
     // Dancer Duration 0 = forever (∞ on the card): saved; 0 for other layers is not.
     CHECK(one(slideshowSaveEntries(Command::spawnDuration(Layer::Dancer, 0)), "Dancer.Duration") == "0");
     CHECK(slideshowSaveEntries(Command::spawnDuration(Layer::Object, 0)).entries().empty());
@@ -842,12 +842,12 @@ TEST_CASE("spritemix command: parse, describe, settings") {
     Settings st;
     CHECK(st.spriteMix == 0.0);
     CHECK(st.movieSpriteMix == 0.0);
-    CHECK(st.movieSpriteColour == "off");
+    CHECK(st.movieSpriteColor == "off");
     CHECK(st.movieSpriteGamma == 1.0);
-    t.set("reforce.MovieSprite.Colour", "over", true);
+    t.set("reforce.MovieSprite.Color", "over", true);
     t.set("reforce.MovieSprite.Gamma", "0.7", false);
     st.apply(t);
-    CHECK(st.movieSpriteColour == "over");
+    CHECK(st.movieSpriteColor == "over");
     CHECK(st.movieSpriteGamma == doctest::Approx(0.7));
     CHECK(st.spriteMix == doctest::Approx(0.4));
     CHECK(st.movieSpriteMix == doctest::Approx(1.0));

@@ -15,7 +15,7 @@
   --ff: #3cc7b4;
   --ws: #f0b04a;
   --cm: #d06ad8;
-  --beat: #e5a64b;      /* beats, favourites, the kick meter */
+  --beat: #e5a64b;      /* beats, favorites, the kick meter */
   --downbeat: #f06a5a;  /* the first beat of a bar / phrase, a drop */
   --linked: #4fb37a;    /* Ableton Link joined */
   --radius: 12px;
@@ -196,7 +196,7 @@ main { padding: 14px 16px 24px; max-width: 1500px; margin: 0 auto; }
 .fav-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
 .fav-buttons button { display: inline-flex; gap: 6px; align-items: baseline; }
 .fav-buttons button .kind { color: var(--muted); font-size: 11px; }
-/* A favourite whose scene is gone: greyed out, dashed, with a ✕ that removes it. */
+/* A favorite whose scene is gone: grayed out, dashed, with a ✕ that removes it. */
 .fav-missing { display: inline-flex; gap: 6px; align-items: center; padding: 0 4px 0 12px; min-height: 36px;
   border: 1px dashed var(--line); border-radius: 8px; color: var(--faint); white-space: nowrap; }
 .fav-missing .kind { color: var(--faint); font-size: 11px; }
@@ -273,7 +273,7 @@ details.library[open] > * + * { margin-top: 8px; }
 .vsettings.cols4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .vsettings.cols3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 @media (max-width: 560px) { .vsettings.cols3 { grid-template-columns: 1fr 1fr; } }
-/* Room lights: the panels as they hang, in the colours last sent */
+/* Room lights: the panels as they hang, in the colors last sent */
 .lt-preview { display: block; width: 100%; max-height: 180px; margin: 4px 0 10px; }
 .lt-preview polygon { stroke: var(--line); stroke-width: 3; stroke-linejoin: round; }
 @media (max-width: 760px) { .vsettings.cols4 { grid-template-columns: 1fr 1fr; } }

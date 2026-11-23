@@ -1,5 +1,8 @@
 #include "web/Api.hpp"
 
+#include "engine/ModelScenes.hpp"
+#include "engine/ObjectBeat.hpp"
+
 #include "engine/DanceClips.hpp"
 
 #include <algorithm>
@@ -154,7 +157,7 @@ std::string commandFromObject(const json::Value& o, Command& out) {
         if (wrongType) return "\"target\" must be a string";
         if (!present || target.empty()) target = "layer";
         engine::VideoTarget t;
-        if (target == "layer" || target == "colour" || target == "color") t = engine::VideoTarget::Layer;
+        if (target == "layer" || target == "color") t = engine::VideoTarget::Layer;
         else if (target == "sprite") t = engine::VideoTarget::Sprite;
         else return "\"target\" must be \"layer\" or \"sprite\"";
         if (action == "videostop") {
@@ -379,7 +382,7 @@ const LibraryLayer* Library::find(Layer l) const {
 }
 
 Library buildLibrary(const fs::path& scenesDir, const std::string& exclude, const fs::path& externalSpritesDir,
-                     const fs::path& contentDir, const fs::path& solidDir) {
+                     const fs::path& contentDir, const fs::path& solidDir, const fs::path& modelDir) {
     const auto excludeRules = engine::parseExcludeList(exclude);
     Library lib;
     if (scenesDir.empty() && contentDir.empty()) return lib;
@@ -408,6 +411,7 @@ Library buildLibrary(const fs::path& scenesDir, const std::string& exclude, cons
             if (!contentDir.empty()) add(engine::listScenes(contentDir, S), S);
             if (!scenesDir.empty()) add(engine::listScenes(scenesDir, S), S);
             if (!solidDir.empty()) add(engine::listSceneFolder(solidDir, S, "Extra/"), S);
+            if (!modelDir.empty()) add(engine::listModelScenes(modelDir), S);  // reforce.Model.Dir, "Model/..."
             if (!contentDir.empty()) add(engine::listScenes(contentDir, O), O);
             if (!scenesDir.empty()) add(engine::listScenes(scenesDir, O), O);
         } else if (ti.type == scene::SceneType::Dancer) {
@@ -460,11 +464,14 @@ Library buildLibrary(const fs::path& scenesDir, const std::string& exclude, cons
                 if (mo.bpm) le.bpm = *mo.bpm;
                 le.noColorKey = mo.colorKey == std::optional<bool>(false);
             }
-            if (objects && solidIds.count(lower(e.id)))
-                if (const auto file = scene::loadSceneFile(e.path))
-                    le.beat = scene::usesBeat(scene::compileConfig(*file, scene::SceneType::Solid));
+            // The green note: Objects that follow the beat (engine/ObjectBeat: expressions, and per kind in code).
+            if (objects)
+                if (const auto file = scene::loadSceneFile(e.path)) {
+                    const auto type = solidIds.count(lower(e.id)) ? scene::SceneType::Solid : scene::SceneType::Organic;
+                    le.beat = engine::objectFollowsBeat(type, scene::compileConfig(*file, type));
+                }
             for (std::size_t i = 0; i < cats.size(); ++i)
-                if (cats[i] && cats[i]->matches(e.name)) le.categories.push_back(ll.categories[i]);
+                if (cats[i] && cats[i]->matches(e.name, e.id)) le.categories.push_back(ll.categories[i]);
             ll.configs.push_back(std::move(le));
         }
         lib.layers.push_back(std::move(ll));
@@ -621,8 +628,8 @@ std::string liveToJson(const engine::EngineState& s) {
     }
     w.endArray();
     w.key("video").beginObject().field("crossfade", s.video.crossfade);
-    if (s.video.lightsAvailable && s.video.lightsOn)  // room lights preview: the panels' colours as last sent
-        w.key("lights").beginObject().field("colours", s.video.lightsColours).field("hz", s.video.lightsHz)
+    if (s.video.lightsAvailable && s.video.lightsOn)  // room lights preview: the panels' colors as last sent
+        w.key("lights").beginObject().field("colors", s.video.lightsColors).field("hz", s.video.lightsHz)
             .field("pulsing", s.video.lightsPulsing).endObject();
     w.endObject();
     w.key("rhythm").beginObject();
@@ -714,7 +721,7 @@ std::string stateToJson(const engine::EngineState& s, bool stable) {
         w.field("spritesHeld", v.spritesHeld);
         w.field("beatSync", v.beatSync).field("beatSource", v.beatSource).field("beatConfident", v.beatConfident);
         w.field("beatOffsetMs", v.beatOffsetMs);
-        w.field("spriteColour", v.spriteColour);
+        w.field("spriteColor", v.spriteColor);
         w.field("syphonAlpha", v.syphonAlpha).field("windowVisuals", v.windowVisuals).field("keySimilarity", v.keySimilarity);
         w.field("keySmoothness", v.keySmoothness);
         w.key("body").beginObject();
@@ -736,7 +743,7 @@ std::string stateToJson(const engine::EngineState& s, bool stable) {
         w.key("layout").beginArray();
         for (double x : v.lightsLayout) w.value(std::round(x * 10) / 10);
         w.endArray();
-        if (!stable) w.field("hz", v.lightsHz).field("pulsing", v.lightsPulsing).field("colours", v.lightsColours);
+        if (!stable) w.field("hz", v.lightsHz).field("pulsing", v.lightsPulsing).field("colors", v.lightsColors);
         w.endObject();
         w.key("backdrop").beginObject();
         w.field("on", v.backdropOn).field("spec", v.backdropSpec).field("source", v.backdropSource);
@@ -881,7 +888,7 @@ std::string validateCommand(const Command& c, const Library* lib, int* status) {
             if (auto e = engine::validateLook(c); !e.empty()) return bad(e);
             break;
         case CommandType::VideoSet: {
-            // Keys the Visualizer handles itself (not colour layer settings).
+            // Keys the Visualizer handles itself (not color layer settings).
             const std::string key = lower(c.text), val = lower(c.arg);
             const bool on = val == "1" || val == "on" || val == "true" || val == "yes";
             const bool off = val == "0" || val == "off" || val == "false" || val == "no";
@@ -896,8 +903,8 @@ std::string validateCommand(const Command& c, const Library* lib, int* status) {
                     return bad("video: beatoffset: -200..500 ms");
                 break;
             }
-            if (key == "spritecolour" || key == "spritecolor") {
-                if (!on && !off && val != "over") return bad("video: spritecolour: over | off");
+            if (key == "spritecolor") {
+                if (!on && !off && val != "over") return bad("video: spritecolor: over | off");
                 break;
             }
             if (key == "syphonalpha") {

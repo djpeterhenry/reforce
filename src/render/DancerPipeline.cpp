@@ -27,14 +27,14 @@ struct CapV { packed_float3 dir; float end; };
 struct Inst {
     float4 m0, m1, m2, m3;   // model columns (scale folded into m0 / m2)
     float4 n0, n1, n2;       // normal matrix columns
-    float4 c0;               // colour0, material
-    float4 c1;               // colour1, split (local y)
+    float4 c0;               // color0, material
+    float4 c1;               // color1, split (local y)
     float4 geo;              // len, r0, r1, outline
     float4 clip;             // local plane: discard where dot(p, xyz) > w
     float4 face;             // mouth, blink, brow, strand look (hair)
-    float4 eyes;             // eye colour, parting (hair)
+    float4 eyes;             // eye color, parting (hair)
     float4 style;            // pattern0, pattern1, fabric0, fabric1 (Lens: shape, side, fabric, -)
-    float4 ink;              // print colour, repeat
+    float4 ink;              // print color, repeat
     float4 faceA;            // eye shape, brows, mouth style, beard
     float4 faceB;            // lashes, freckles, blush, lipstick
     float4 lips;             // hair: the second clip plane
@@ -113,7 +113,7 @@ static float3 drawFace(float3 skin, float3 d, Inst I) {
     // The features are laid out in angles (u around, v up). Towards the sides of the head u changes very fast near
     // the crown and chin, so fwidth(u) (the antialiasing width) grew huge there and smeared the eyes' soft edges
     // into a dashed dark seam along the cut-off below (a vertical line from the crown past the ear to the chin).
-    // So: the derivatives first, for every pixel (fwidth compares neighbouring pixels); the width capped; and the
+    // So: the derivatives first, for every pixel (fwidth compares neighboring pixels); the width capped; and the
     // face faded out well before the cut-off (no feature reaches that far round).
     const float u = atan2(d.x, d.z), v = asin(clamp(d.y, -1.0f, 1.0f));
     const float aa = min(max(fwidth(u), fwidth(v)) * 0.9f, 0.1f) + 1e-4f;
@@ -369,9 +369,9 @@ static float lensShape(int shape, int side, float2 q) {
 // The stage pass has a second target: how much of the frame's Syphon alpha each pixel must keep opaque
 // (reforce.Syphon.Alpha): 1 on the bodies, the floor's coverage on the floor (shadows included): the dancers and the
 // disco floor are never keyed.
-// Blended with max, resolved with the colour, added to the frame's alpha by the composite.
+// Blended with max, resolved with the color, added to the frame's alpha by the composite.
 struct StageOut {
-    float4 colour [[color(0)]];
+    float4 color [[color(0)]];
     float opaque [[color(1)]];
 };
 
@@ -432,7 +432,7 @@ static StageOut shadeBody(BodyOut in, bool front, const device Inst* inst, const
     if (fabric == 4) {
         // Neon: glows by itself (bright on a black frame), a brighter core, pulsing on the beat.
         const float core = pow(saturate(dot(n, V)), 2.0f);
-        const float3 hue = albedo / max(max(albedo.r, max(albedo.g, albedo.b)), 1e-3f);  // full-strength colour
+        const float3 hue = albedo / max(max(albedo.r, max(albedo.g, albedo.b)), 1e-3f);  // full-strength color
         float3 col = hue * (0.95f + 0.35f * pulse) * (0.75f + 0.35f * core) + float3(0.12f) * core * core;
         return StageOut{float4(col, 1.0f), 1.0f};
     }
@@ -471,7 +471,7 @@ static StageOut shadeBody(BodyOut in, bool front, const device Inst* inst, const
         }
         col = base + pow(saturate(dot(n, h)), 70.0f) * 1.1f + sparkle * float3(1.6f) + fres * albedo * 0.6f;
     } else if (fabric == 3) {
-        // Velvet: darker where it faces you, a soft sheen in its own colour at the edges.
+        // Velvet: darker where it faces you, a soft sheen in its own color at the edges.
         const float sheen = pow(1.0f - saturate(dot(n, V)), 1.6f);
         col = albedo * lit * 0.62f + albedo * sheen * (0.9f + 0.9f * lighting * (lv.r + lv.g + lv.b) / 1.5f);
     } else {
@@ -479,7 +479,7 @@ static StageOut shadeBody(BodyOut in, bool front, const device Inst* inst, const
         const float3 tint = mix(float3(1.0f), 0.4f + 1.6f * lv, lighting);
         if (material == 4 && length_squared(hair.T) > 0.5f) {
             // Hair sheen (Kajiya-Kay): a bright band across the strands, broken up strand by strand, and a broad
-            // glow in the hair's own colour.
+            // glow in the hair's own color.
             const float th = dot(hair.T, h) + (hair.v - 0.5f) * 0.35f - 0.1f;
             const float sn = sqrt(saturate(1.0f - th * th));
             col += (pow(sn, 90.0f) * 0.3f + pow(sn, 14.0f) * 0.2f * (albedo + 0.05f)) * tint * (0.35f + 0.65f * toon);
@@ -527,7 +527,7 @@ fragment float4 body_reflect_fs(BodyOut in [[stage_in]], bool front [[front_faci
     if (in.world.y > 0.0f) discard_fragment();  // a foot dipping under the floor would mirror above it
     const StageOut o = shadeBody(in, !front, inst, U, light);  // mirrored: the winding flips
     const float k = U.floor2.z * exp(-2.4f * -in.world.y);
-    return float4(o.colour.rgb * 0.85f * k, k);  // premultiplied
+    return float4(o.color.rgb * 0.85f * k, k);  // premultiplied
 }
 
 fragment StageOut outline_fs(BodyOut in [[stage_in]], const device Inst* inst [[buffer(0)]]) {
@@ -580,7 +580,7 @@ fragment StageOut floor_fs(FloorOut in [[stage_in]], constant StageU& U [[buffer
     else on = hash21(cell + bi * 17.0f) > 0.62f ? 1.0f : 0.0f;
     const float lit = on * (0.3f + 0.7f * decay) + 0.08f;
     const float lighting = U.viewport.w;
-    // Tile colours from the visuals (a spot of the frame per tile), or a rainbow without them.
+    // Tile colors from the visuals (a spot of the frame per tile), or a rainbow without them.
     float3 vc = light.sample(smp, float2(hash21(cell), hash21(cell + 3.1f)), level(4.0f)).rgb;
     vc = vc / max(max(vc.r, max(vc.g, vc.b)), 0.2f);
     const float3 tc = mix(hue(hash21(cell * 1.7f + floor(bi / 4.0f))), vc, lighting);
@@ -668,7 +668,7 @@ struct Inst {
     float face[4];
     float eyes[4];
     float style[4];   // pattern0, pattern1, fabric0, fabric1 (Lens: shape, side, fabric, -)
-    float ink[4];     // print colour, repeat (world units)
+    float ink[4];     // print color, repeat (world units)
     float faceA[4];   // eye shape, brows, mouth style, beard
     float faceB[4];   // lashes, freckles, blush, lipstick
     float lips[4];
@@ -735,7 +735,7 @@ CapMesh capsuleMesh(int segments = 32, int rings = 12) {
     return m;
 }
 
-// stage: the stage pass (a second, R8 "opaque" target, blended with max). mask: the colour write mask.
+// stage: the stage pass (a second, R8 "opaque" target, blended with max). mask: the color write mask.
 MTL::RenderPipelineState* makePso(MTL::Device* dev, MTL::Library* lib, const char* vsName, const char* fsName,
                                   int samples, bool depth, bool blend, const char* label, bool stage = false,
                                   MTL::ColorWriteMask mask = MTL::ColorWriteMaskAll) {
@@ -816,7 +816,7 @@ DancerPipeline::DancerPipeline(MTL::Device* device, uint32_t width, uint32_t hei
     outlinePso_ = makePso(device_, lib, "outline_vs", "outline_fs", msaa_, true, true, "dancer outline", true);
     floorPso_ = makePso(device_, lib, "floor_vs", "floor_fs", msaa_, true, true, "dancer floor", true);
     lightPso_ = makePso(device_, lib, "quad_vs", "light_fs", 1, false, false, "dancer light");
-    // Colour only: the frame's alpha is 1, or the tracked Syphon alpha (compositeAlphaPso_).
+    // Color only: the frame's alpha is 1, or the tracked Syphon alpha (compositeAlphaPso_).
     compositePso_ = makePso(device_, lib, "quad_vs", "composite_fs", 1, false, true, "dancer composite", false,
                             MTL::ColorWriteMask(MTL::ColorWriteMaskRed | MTL::ColorWriteMaskGreen |
                                                 MTL::ColorWriteMaskBlue));
@@ -851,7 +851,7 @@ DancerPipeline::DancerPipeline(MTL::Device* device, uint32_t width, uint32_t hei
         return t;
     };
     target_ = tex(MTL::PixelFormatBGRA8Unorm, width_, height_, false, false, "dancer stage");
-    if (msaa_ > 1) msaaColour_ = tex(MTL::PixelFormatBGRA8Unorm, width_, height_, true, false, "dancer MSAA colour");
+    if (msaa_ > 1) msaaColor_ = tex(MTL::PixelFormatBGRA8Unorm, width_, height_, true, false, "dancer MSAA color");
     opaque_ = tex(MTL::PixelFormatR8Unorm, width_, height_, false, false, "dancer opaque");
     if (msaa_ > 1) msaaOpaque_ = tex(MTL::PixelFormatR8Unorm, width_, height_, true, false, "dancer MSAA opaque");
     depth_ = tex(MTL::PixelFormatDepth32Float, width_, height_, true, false, "dancer depth");
@@ -872,7 +872,7 @@ DancerPipeline::DancerPipeline(MTL::Device* device, uint32_t width, uint32_t hei
 
 DancerPipeline::~DancerPipeline() {
     for (auto* b : ring_) b->release();
-    for (auto* t : {target_, msaaColour_, opaque_, msaaOpaque_, depth_, light_, reflect_, reflectDepth_})
+    for (auto* t : {target_, msaaColor_, opaque_, msaaOpaque_, depth_, light_, reflect_, reflectDepth_})
         if (t) t->release();
     for (auto* p : {lightPso_, floorPso_, bodyPso_, reflectPso_, outlinePso_, compositePso_, compositeAlphaPso_})
         if (p) p->release();
@@ -908,7 +908,7 @@ bool DancerPipeline::encode(MTL::CommandBuffer* cmd, MTL::Texture* output, const
             if (n >= maxParts_) break;
             engine::packDancerPart(p, body, reinterpret_cast<float*>(&inst[n++]));
         }
-        const float scale = std::max(0.0f, body.headCentre.y) / 0.82f;
+        const float scale = std::max(0.0f, body.headCenter.y) / 0.82f;
         addShadow(body.rootFloor, 0.24f * std::min(1.0f, scale), 0.75f);
         for (const auto& ft : body.feet) addShadow(ft, 0.1f, 0.7f * std::clamp(1.0f - (ft.y - 0.05f) / 0.3f, 0.0f, 1.0f));
     }
@@ -991,7 +991,7 @@ bool DancerPipeline::encode(MTL::CommandBuffer* cmd, MTL::Texture* output, const
         att->setLoadAction(MTL::LoadActionClear);
         att->setClearColor(MTL::ClearColor(0, 0, 0, 0));
         if (msaa_ > 1) {
-            att->setTexture(msaaColour_);
+            att->setTexture(msaaColor_);
             att->setResolveTexture(target_);
             att->setStoreAction(MTL::StoreActionMultisampleResolve);
         } else {

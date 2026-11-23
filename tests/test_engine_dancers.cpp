@@ -36,7 +36,7 @@ MusicState grooveAt(double beat) {
 
 }  // namespace
 
-TEST_CASE("dancers: colours and names parse") {
+TEST_CASE("dancers: colors and names parse") {
     auto c = parseRgb("#ff8000");
     REQUIRE(c);
     CHECK(near(c->r, 1));
@@ -133,7 +133,7 @@ TEST_CASE("dancers: rest pose stands on the floor, about one unit tall, facing t
         CHECK(hi > 0.9f);
         CHECK(hi < 1.35f);
         CHECK(out.feet[0].x > 0);  // the left foot on the character's left (+x)
-        CHECK(out.headCentre.y > 0.7f);
+        CHECK(out.headCenter.y > 0.7f);
     }
 }
 
@@ -912,8 +912,8 @@ TEST_CASE("dancers: generated characters vary, follow their style's wardrobe, an
                     top = std::max(top, p.frame.o.y + p.r0);
                 }
                 if (beat == 0) {
-                    minH = std::min(minH, out.headCentre.y);
-                    maxH = std::max(maxH, out.headCentre.y);
+                    minH = std::min(minH, out.headCenter.y);
+                    maxH = std::max(maxH, out.headCenter.y);
                 }
                 CHECK(out.parts.size() < 90);  // the instance budget: about 40-60 parts a dancer
             }
@@ -1210,7 +1210,7 @@ TEST_CASE("dancers: random styles setting (reforce.Dancer.RandomStyles)") {
     CHECK_FALSE(randomStyleAllowed("pop", Style::HipHop));
 }
 
-TEST_CASE("dancers: hair colour: natural (platinum and silver included) for most styles, dyed only for house and pop") {
+TEST_CASE("dancers: hair color: natural (platinum and silver included) for most styles, dyed only for house and pop") {
     const char* natural[] = {"#120c0a", "#1c1210", "#2a1a12", "#4a2c1a", "#6b3f22", "#8a4a20",
                              "#b5652a", "#c9a24f", "#e2c77a", "#8a8a8a", "#c0c0c8", "#e8e8f0"};
     auto isNatural = [&](Rgb c) {
@@ -1231,7 +1231,7 @@ TEST_CASE("dancers: hair colour: natural (platinum and silver included) for most
         const bool mayDye = st == Style::House || st == Style::Pop;  // (house's rave gear, pop's robot look)
         if (mayDye) CHECK(dyed > 60);
         else CHECK(dyed == 0);
-        CHECK(platinum > 10);  // platinum and silver turn up as natural colours in every style
+        CHECK(platinum > 10);  // platinum and silver turn up as natural colors in every style
     }
 }
 
@@ -1263,13 +1263,13 @@ float hairOutsideHat(const Look& look, const BodyOut& out, float margin) {
     auto same = [](Rgb a, Rgb b) { return std::fabs(a.r - b.r) + std::fabs(a.g - b.g) + std::fabs(a.b - b.b) < 1e-4f; };
     const BodyPart *dome = nullptr, *brim = nullptr, *crown = nullptr;
     for (const auto& p : out.parts) {
-        if (same(p.colour0, look.accent) && p.clip[3] < 1e8f && (!dome || p.r0 > dome->r0)) dome = &p;
-        if (same(p.colour0, look.accent) && p.scaleX > 8) brim = &p;
-        if (p.len > 0 && same(p.colour1, look.accent) && !same(p.colour0, look.accent)) crown = &p;
+        if (same(p.color0, look.accent) && p.clip[3] < 1e8f && (!dome || p.r0 > dome->r0)) dome = &p;
+        if (same(p.color0, look.accent) && p.scaleX > 8) brim = &p;
+        if (p.len > 0 && same(p.color1, look.accent) && !same(p.color0, look.accent)) crown = &p;
     }
     float worst = 0;
     for (const auto& p : out.parts) {
-        if (!same(p.colour0, look.hair)) continue;
+        if (!same(p.color0, look.hair)) continue;
         surfacePoints(p, [&](V3 x) {
             if (look.hat == Hat::Top) {
                 REQUIRE(brim);
@@ -1298,7 +1298,7 @@ TEST_CASE("dancers: no hair pokes out of a hat, every hairstyle under every hat,
             reforce::engine::DancerSpec spec = reforce::engine::generateDancer(Style::Pop, std::uint32_t(0));
             spec.look.hairStyle = HairStyle(hsi);
             spec.look.hat = hat;
-            spec.look.hair = {0.91f, 0.12f, 0.33f};  // colours no other part has
+            spec.look.hair = {0.91f, 0.12f, 0.33f};  // colors no other part has
             spec.look.accent = {0.13f, 0.47f, 0.79f};
             const float R = makeSkeleton(spec.look).headR;
             CAPTURE(int(hat));

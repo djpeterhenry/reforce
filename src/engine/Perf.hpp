@@ -45,7 +45,7 @@ enum Tag : std::uint32_t {
     TagStress = 1u << 16,        // --stress injected commands this frame
     TagKill = 1u << 17,          // particles/sprites/solids/organics killed
     TagMorphEnd = 1u << 18,      // WaveShape/ColorMap transition finished
-    TagVideoStart = 1u << 19,    // video source opened or adopted (movie/live sprite, colour layer)
+    TagVideoStart = 1u << 19,    // video source opened or adopted (movie/live sprite, color layer)
     TagVideoStop = 1u << 20,     // video source stopped / released
     TagSolidStart = 1u << 21,    // 3D solid started (scene file compiled, PLAN 5L)
     TagOrganicStart = 1u << 22,  // organic started (scene file compiled, tree points evaluated, PLAN 5N)

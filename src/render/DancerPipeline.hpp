@@ -1,13 +1,13 @@
 #pragma once
-// reforce extension (PLAN 5P, docs/dancers-design.md): the GPU pass for the dancers, in full colour over the
+// reforce extension (PLAN 5P, docs/dancers-design.md): the GPU pass for the dancers, in full color over the
 // colorized frame.
 //
-// encode() runs inside the colorize step (app/Visualizer colorize), after the frame (and the colour video layer and
+// encode() runs inside the colorize step (app/Visualizer colorize), after the frame (and the color video layer and
 // movie sprites) is in `output`:
 //   1. light: `output` is downsampled into a small mipmapped light texture (256 px wide). The visuals light the
 //      dancers: each surface samples it near its own screen position, pushed in the direction its normal faces, at a
 //      blurry mip; a rim light comes from the frame around the silhouette; the floor reflects it.
-//   2. stage: into a frame-size BGRA8 target (premultiplied alpha), 4x MSAA with memoryless colour and depth:
+//   2. stage: into a frame-size BGRA8 target (premultiplied alpha), 4x MSAA with memoryless color and depth:
 //      the disco floor (with blob shadows and the dancers' reflection, drawn just before into its own half-size
 //      target, opaque so overlapping parts never double up), then every body part as an instance of one "capsule" mesh
 //      (engine/DancerRig.hpp BodyPart), then the outline pass (the same instances, front faces culled, pushed out
@@ -61,7 +61,7 @@ public:
 
     int msaa() const { return msaa_; }
     // Draws the stage over `output` (BGRA8, the render size). Returns false when there was nothing to draw.
-    // Colour only; with `trackAlpha` (reforce.Syphon.Alpha) the output's alpha also gains how much must stay
+    // Color only; with `trackAlpha` (reforce.Syphon.Alpha) the output's alpha also gains how much must stay
     // opaque: the bodies fully, the floor (and its shadows) by its coverage (ScenePipeline::encodeSyphonAlpha).
     bool encode(MTL::CommandBuffer* cmd, MTL::Texture* output, const DancerStage& stage, bool trackAlpha = false);
     // Parts drawn by the last encode (tests, perf).
@@ -78,7 +78,7 @@ private:
     std::vector<MTL::Buffer*> ring_;
     std::size_t ringNext_ = 0;
     MTL::Texture* target_ = nullptr;
-    MTL::Texture* msaaColour_ = nullptr;
+    MTL::Texture* msaaColor_ = nullptr;
     MTL::Texture* opaque_ = nullptr;      // R8: how much of the Syphon alpha stays opaque (resolved)
     MTL::Texture* msaaOpaque_ = nullptr;
     MTL::Texture* depth_ = nullptr;

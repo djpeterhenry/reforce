@@ -35,7 +35,7 @@ TEST_CASE("text: layout") {
     bool lit = false;
     for (std::size_t i = 3; i < a.bgra.size(); i += 4) lit |= a.bgra[i] > 200;
     CHECK(lit);
-    // Premultiplied white: colour never above alpha.
+    // Premultiplied white: color never above alpha.
     bool premul = true;
     for (std::size_t i = 0; i < a.bgra.size(); i += 4) premul &= a.bgra[i] <= a.bgra[i + 3] && a.bgra[i + 2] <= a.bgra[i + 3];
     CHECK(premul);

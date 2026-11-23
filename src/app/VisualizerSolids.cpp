@@ -19,6 +19,9 @@
 #include "audio/Analyzer.hpp"
 #include "engine/DanceClips.hpp"
 #include "engine/MediaOptions.hpp"
+#include "engine/ModelFile.hpp"
+#include "engine/ModelScenes.hpp"
+#include "engine/StickerColors.hpp"
 #include "engine/Log.hpp"
 #include "engine/Perf.hpp"
 #include "lights/LightsOutput.hpp"
@@ -34,7 +37,7 @@ using engine::Layer;
 using namespace visdetail;
 
 // The WaveShape tile (PLAN 5L.3): the morph output again, in the scene's own units. The tile shows the config's
-// square [-1, 1]^2 in authored coordinates (normalized x times X_EXTENTS), centred: with Aspc = 0 that is the whole
+// square [-1, 1]^2 in authored coordinates (normalized x times X_EXTENTS), centered: with Aspc = 0 that is the whole
 // frame (unstretched: a circle the config draws is round on the faces, as authored), with Aspc = 1 the square on
 // the short axis (the long axis beyond +-1 falls outside the tile, but faces only show the tile's inscribed circle
 // anyway). Line widths: the frame's widths scaled by the content scale tile / frame height (the tile's 2 units vs
@@ -56,6 +59,36 @@ void Visualizer::appendTileSegments(const engine::MorphFrame& frame, std::vector
     const double k = (atTile > 1e-9 ? atFrame / atTile * T / H : T / H) * kTileWidthBoost;
     const float minR = float(0.5 * kTileMinWidth);
     for (std::size_t i = first; i < out.size(); ++i) out[i].radius = std::max(float(out[i].radius * k), minR);
+}
+
+// 3D models (PLAN 5R): load the models the model scenes name, up to reforce.Model.Cache, on the worker at startup, so
+// the slideshow finds them resident.
+void Visualizer::preloadModels() {
+    if (!modelLoader_) return;
+    const auto dir = engine::modelFolder(opts_.prefs.modelDir);
+    if (dir.empty()) return;
+    std::vector<std::string> keys;
+    for (const auto& e : engine::listModelScenes(dir)) {
+        const auto file = scene::loadSceneFile(e.path);
+        if (!file) continue;
+        auto literal = [&](const char* k) {
+            const scene::SceneEntry* v = file->find(k);
+            return v ? v->value : std::string();
+        };
+        std::string mesh = literal("Mesh");
+        mesh.erase(std::remove_if(mesh.begin(), mesh.end(), [](char c) { return std::isspace(static_cast<unsigned char>(c)); }),
+                   mesh.end());
+        if (engine::parseMeshKind(mesh) != engine::MeshKind::Model) continue;
+        std::array<float, 3> front{0, 0, -1}, up{0, 1, 0};
+        if (auto a = engine::parseModelAxis(literal("Front"))) front = *a;
+        if (auto a = engine::parseModelAxis(literal("Up"))) up = *a;
+        const auto path = engine::resolveModelFile(literal("File"), e.path, dir);
+        const std::string k = ModelLoader::key(path, front, up);
+        if (std::find(keys.begin(), keys.end(), k) != keys.end()) continue;
+        if (int(keys.size()) >= opts_.prefs.modelCache) break;
+        keys.push_back(k);
+        modelLoader_->request(path, front, up);
+    }
 }
 
 int Visualizer::freeSolidSlot() const {
@@ -80,9 +113,14 @@ bool Visualizer::startSolid(std::shared_ptr<const scene::CompiledConfig> cfg, co
     const auto mesh = engine::solidMesh(*cfg, &written);
     if (!mesh) {
         rlog("[reforce] Solid \"%s\": unknown Mesh \"%s\" (tetrahedron, cube, octahedron, dodecahedron, icosahedron, "
-             "sphere, torus, prism)\n", label.c_str(), written.c_str());
+             "sphere, torus, prism, rubik, fifteen, model)\n", label.c_str(), written.c_str());
         return false;
     }
+    if (*mesh == engine::MeshKind::Model && !modelLoader_) {
+        rlog("[reforce] Solid \"%s\": 3D models are unavailable\n", label.c_str());
+        return false;
+    }
+    const auto keepCfg = cfg;
     makeRoomForObject(t, fade.fade, label);
     int slot = freeSolidSlot();
     if (slot < 0) {
@@ -105,10 +143,62 @@ bool Visualizer::startSolid(std::shared_ptr<const scene::CompiledConfig> cfg, co
                                                   fade.fn);
     run->setHold(engine::holdForBars(run->bars(), fade.fade, syncInput(), phrase_.state().bars,
                                      phrase_.state().quantum));  // PBar
-    const auto& e = run->envelope();
-    rlog("[reforce] Solid \"%s\" starts: %s, Text=%d, slot %d, fade %.2f s, hold %.2f s\n", label.c_str(),
-         engine::meshKindName(*mesh), run->text(), slot, e.fade, e.hold);
-    liveSolids_.push_back({std::move(run), slot});
+    LiveSolid live;
+    if (*mesh == engine::MeshKind::Model) {
+        // The move's length: MBar on the beat clock (whole bars at the clock's tempo), else MDur. Without PDur /
+        // PBar the run lasts one move (the fades included).
+        const engine::ModelSettings& ms = run->model();
+        const auto sync = syncInput();
+        if (std::isfinite(ms.moveBars) && ms.moveBars > 0 && sync.on > 0 && sync.bpm > 1)
+            run->setMoveSeconds(ms.moveBars * 4.0 * 60.0 / sync.bpm);
+        if (!run->hasDuration()) run->setHold(std::max(0.0, run->model().moveSeconds - 2.0 * fade.fade));
+        const auto dir = engine::modelFolder(opts_.prefs.modelDir);
+        // The camera: the scene's own keyframes, else its Move preset (your model folder's Camera/ first, then
+        // reforce's content/Camera/); an unknown preset falls back to orbit.
+        std::string presetNote;
+        if (!ms.ownPath && !ms.freeCamera) {
+            std::string perr;
+            auto preset = engine::findCameraPreset(ms.move, dir, contentDir_);
+            if (preset.empty()) {
+                rlog("[reforce] Solid \"%s\": no camera preset \"%s\" (in %s/Camera or content/Camera); using orbit\n",
+                     label.c_str(), ms.move.c_str(), dir.c_str());
+                preset = engine::findCameraPreset("orbit", dir, contentDir_);
+            }
+            if (auto path = preset.empty() ? std::nullopt : engine::loadCameraPreset(preset, &perr)) {
+                run->setCameraPath(std::move(*path));
+                presetNote = preset.filename().string();
+            }
+            if (!perr.empty()) rlog("[reforce] Solid \"%s\": camera preset: %s\n", label.c_str(), perr.c_str());
+        }
+        if (!ms.error.empty()) rlog("[reforce] Solid \"%s\": %s\n", label.c_str(), ms.error.c_str());
+        const auto path = engine::resolveModelFile(ms.file, {}, dir);
+        if (ms.file.empty()) {
+            rlog("[reforce] Solid \"%s\": no File (a .glb in %s)\n", label.c_str(), dir.c_str());
+            return false;
+        }
+        live.modelKey = ModelLoader::key(path, ms.front, ms.up);
+        modelLoader_->request(path, ms.front, ms.up);
+        std::string error;
+        const auto st = modelLoader_->find(live.modelKey, &live.model, &error);
+        if (st == ModelLoader::State::Failed) {
+            rlog("[reforce] Solid \"%s\": model %s failed: %s\n", label.c_str(), path.c_str(), error.c_str());
+            return false;
+        }
+        live.waiting = st != ModelLoader::State::Ready;
+        live.cfg = keepCfg;
+        live.fade = fade;
+        rlog("[reforce] Solid \"%s\" starts: model %s, look %s, move %s (%.1f s), slot %d%s\n", label.c_str(),
+             path.filename().c_str(), ms.look ? "B (color)" : "A (visuals)",
+             ms.ownPath ? "own keyframes" : ms.freeCamera ? "free" : presetNote.empty() ? "default view" : presetNote.c_str(),
+             ms.moveSeconds, slot, live.waiting ? ", waiting for the model to load" : "");
+    } else {
+        const auto& e = run->envelope();
+        rlog("[reforce] Solid \"%s\" starts: %s, Text=%d, slot %d, fade %.2f s, hold %.2f s\n", label.c_str(),
+             engine::meshKindName(*mesh), run->text(), slot, e.fade, e.hold);
+    }
+    live.run = std::move(run);
+    live.slot = slot;
+    liveSolids_.push_back(std::move(live));
     return true;
 }
 
@@ -172,6 +262,87 @@ void Visualizer::addSolidQuads(const render::SolidQuad& sq, const engine::Sprite
     if (plan.hasDisplay) display.push_back(quad(plan.display));
 }
 
+// A model solid for one step (PLAN 5R): waits invisibly until its model is resident (then starts afresh, so it fades
+// in from the beginning of its move), then look A into its slot (composited like any solid) or look B for the color
+// pass after colorize (plus, with an explicit Pen, a luminance copy for trails).
+void Visualizer::stepModel(MTL::CommandBuffer* cmd, LiveSolid& s, double t, const engine::SpriteAudio& a) {
+    if (!models_ || !modelLoader_) return;
+    if (s.waiting) {
+        std::string error;
+        const auto st = modelLoader_->find(s.modelKey, &s.model, &error);
+        if (st == ModelLoader::State::Failed || st == ModelLoader::State::Unknown) {
+            rlog("[reforce] Solid \"%s\": model failed: %s\n", s.run->name().c_str(), error.c_str());
+            s.run->fadeOutFrom(t, 0.0);
+            s.waiting = false;
+            return;
+        }
+        if (st != ModelLoader::State::Ready) return;
+        scene::Environment env = environment(t);
+        env.seed = opts_.seed + 0x1000 * ++loads_;
+        const engine::ModelSettings before = s.run->model();
+        auto run = std::make_unique<engine::SolidRun>(s.cfg, env, s.run->name(), engine::MeshKind::Model, t,
+                                                      s.fade.fade, s.fade.defaultHold, s.fade.fn);
+        run->setHold(engine::holdForBars(run->bars(), s.fade.fade, syncInput(), phrase_.state().bars,
+                                         phrase_.state().quantum));
+        run->setMoveSeconds(before.moveSeconds);
+        if (!before.ownPath && !before.freeCamera) run->setCameraPath(before.path);  // the preset loaded at the start
+        if (!run->hasDuration()) run->setHold(std::max(0.0, before.moveSeconds - 2.0 * s.fade.fade));
+        s.run = std::move(run);
+        s.waiting = false;
+        rlog("[reforce] Solid \"%s\": model ready, starting\n", s.run->name().c_str());
+    }
+    if (!s.model) return;
+    const engine::SolidSpec sp = s.run->evaluate(t, a);
+    if (!(sp.opacity > 0)) return;
+    render::ModelDraw d;
+    d.model = s.model;
+    d.slot = s.slot;
+    d.shot = sp.shot;
+    d.spin = sp.spin;
+    d.bank = sp.bank;
+    d.fill = float(sp.fill);
+    d.shade = float(sp.shade);
+    d.glow = float(sp.glow);
+    d.light = {float(sp.light[0]), float(sp.light[1]), float(sp.light[2])};
+    d.bloom = float(sp.bloom);
+    d.exposure = float(sp.exposure);
+    d.tint = float(sp.tint);
+    d.tintColor = engine::colorAt(palette_, lut_, 0.6f);
+    d.opacity = float(std::clamp(sp.opacity, 0.0, 1.0));
+    d.opaque = !sp.colorKey;
+    const bool color = s.run->model().look == 1;
+    const bool lum = !color || s.run->model().trails;
+    if (lum) {
+        const render::SolidQuad sq = models_->encodeLuminance(cmd, d);
+        if (sq.visible) {
+            engine::SpriteDrawSpec ds;
+            ds.hasPen = sp.hasPen;
+            ds.hasEPen = color ? false : sp.hasEPen;  // look B: the color pass is the display
+            ds.pen = sp.pen;
+            ds.epen = sp.epen;
+            ds.opacity = d.opacity;
+            ds.blend = engine::spriteBlendMode(sp.flags);
+            addSolidQuads(sq, ds, solidFeedback_, solidDisplay_, sp.over);
+            if (!color && !sp.colorKey) {
+                render::SpriteQuad o;
+                o.texture = sq.texture;
+                o.cx = sq.cx;
+                o.cy = sq.cy;
+                o.w = sq.w;
+                o.h = sq.h;
+                o.u0 = sq.u0;
+                o.v0 = sq.v0;
+                o.u1 = sq.u1;
+                o.v1 = sq.v1;
+                o.opacity = d.opacity;
+                o.opaque = true;
+                opaqueSolids_.push_back(o);
+            }
+        }
+    }
+    if (color) modelColorDraws_.push_back(std::move(d));
+}
+
 // Each live solid (scene files, then the --solid-test hook) is drawn into its target slot here (encoded on `cmd`
 // before the step's sprite pass) and composited as sprite quads after this step's sprites, with the sprite layering
 // plan of its Pen / EPen / Flag; several solids stack like sprites (gforce / trails: the oldest on top). No solid
@@ -179,8 +350,9 @@ void Visualizer::addSolidQuads(const render::SolidQuad& sq, const engine::Sprite
 void Visualizer::stepSolids(MTL::CommandBuffer* cmd, double t, const audio::AudioFrame* audio) {
     if (!solids_) return;
     opaqueSolids_.clear();
-    colourSolids_.clear();
+    colorSolids_.clear();
     glassDraws_.clear();
+    modelColorDraws_.clear();
     for (auto it = liveSolids_.begin(); it != liveSolids_.end();) {
         if (it->run->expired(t)) {
             rlog("[reforce] Solid \"%s\" ended\n", it->run->name().c_str());
@@ -201,13 +373,14 @@ void Visualizer::stepSolids(MTL::CommandBuffer* cmd, double t, const audio::Audi
         frame = frame || (!r && s.spec.draw.text == render::SolidText::Frame);
     }
     for (const auto& s : liveSolids_) {
+        if (s.run->mesh() == engine::MeshKind::Model) continue;  // models wear their own textures
         const bool r = engine::isPuzzleMesh(s.run->mesh());
         rubik = rubik || s.run->mesh() == engine::MeshKind::Rubik;
         fifteen = fifteen || s.run->mesh() == engine::MeshKind::Fifteen;
         wave = wave || (!r && s.run->text() == int(render::SolidText::Wave));
         frame = frame || (!r && s.run->text() == int(render::SolidText::Frame));
     }
-    // Puzzle colours (rubik stickers, fifteen rows): six intensities that read as six colours under the current
+    // Puzzle colors (rubik stickers, fifteen rows): six intensities that read as six colors under the current
     // ColorMap (engine/StickerColors).
     std::array<float, 6> stickers{};
     if (rubik) {
@@ -217,22 +390,22 @@ void Visualizer::stepSolids(MTL::CommandBuffer* cmd, double t, const audio::Audi
         if (sw != stickerLogged_ && stickerPicker_.score() >= 2.0f) {  // (not the blank map at startup)
             stickerLogged_ = sw;
             const auto to = stickerPicker_.levels(t + 3600.0);  // the target (past any ease)
-            rlog("[reforce] Rubik colours: %.2f %.2f %.2f %.2f %.2f %.2f (closest pair %.1f CIELAB)\n", to[0], to[1],
+            rlog("[reforce] Rubik colors: %.2f %.2f %.2f %.2f %.2f %.2f (closest pair %.1f CIELAB)\n", to[0], to[1],
                  to[2], to[3], to[4], to[5], stickerPicker_.score());
         }
     }
-    // The 15 puzzle: four row colours, light with dark numbers (or dark with light numbers on a map without good light
-    // colours), engine::TilePicker; they go into the sticker slots its rows use (render::kFifteenRowColour).
+    // The 15 puzzle: four row colors, light with dark numbers (or dark with light numbers on a map without good light
+    // colors), engine::TilePicker; they go into the sticker slots its rows use (render::kFifteenRowColor).
     std::array<float, 6> tiles = stickers;
     if (fifteen) {
         tilePicker_.update(palette_, lut_, t);
         const auto rows = tilePicker_.levels(t);
-        for (int r = 0; r < 4; ++r) tiles[std::size_t(render::kFifteenRowColour[r])] = rows[std::size_t(r)];
+        for (int r = 0; r < 4; ++r) tiles[std::size_t(render::kFifteenRowColor[r])] = rows[std::size_t(r)];
         const int sw = tilePicker_.switches();
         if (sw != tileLogged_ && tilePicker_.score() >= 2.0f) {
             tileLogged_ = sw;
             const auto to = tilePicker_.levels(t + 3600.0);
-            rlog("[reforce] Fifteen colours: %.2f %.2f %.2f %.2f, %s tiles (closest pair %.1f CIELAB)\n", to[0], to[1],
+            rlog("[reforce] Fifteen colors: %.2f %.2f %.2f %.2f, %s tiles (closest pair %.1f CIELAB)\n", to[0], to[1],
                  to[2], to[3], tilePicker_.light() ? "light" : "dark", tilePicker_.score());
         }
     }
@@ -244,8 +417,8 @@ void Visualizer::stepSolids(MTL::CommandBuffer* cmd, double t, const audio::Audi
     if (frame) solids_->encodeFrameTile(cmd);
     solidFeedback_.clear();
     solidDisplay_.clear();
-    // Puzzles (rubik, fifteen): also drawn in colour over the colorized frame (encodeColorize, solid_colour_fs).
-    auto colourQuad = [&](const render::SolidQuad& sq, double opacity, bool opaque, engine::MeshKind mesh) {
+    // Puzzles (rubik, fifteen): also drawn in color over the colorized frame (encodeColorize, solid_color_fs).
+    auto colorQuad = [&](const render::SolidQuad& sq, double opacity, bool opaque, engine::MeshKind mesh) {
         render::SpriteQuad o;
         o.texture = sq.texture;
         o.cx = sq.cx;
@@ -260,7 +433,7 @@ void Visualizer::stepSolids(MTL::CommandBuffer* cmd, double t, const audio::Audi
         o.opaque = opaque;
         o.puzzle = mesh == engine::MeshKind::Fifteen ? 1 : 0;
         o.numeral = o.puzzle == 1 ? tilePicker_.numeral(t) : 0.0f;
-        colourSolids_.push_back(o);
+        colorSolids_.push_back(o);
     };
     // A glass 15 puzzle (Glas = 1): not drawn into the visuals; colorize draws it over the frame (encodeGlass).
     auto glassDraw = [&](int slot, const engine::SolidPose& pose, bool perspective, const engine::fifteen::Frame& f,
@@ -270,9 +443,9 @@ void Visualizer::stepSolids(MTL::CommandBuffer* cmd, double t, const audio::Audi
         g.pose = pose;
         g.perspective = perspective;
         g.fifteen = f;
-        // One glass for every button: a light colour of the ColorMap (the first light row colour) halfway to white;
+        // One glass for every button: a light color of the ColorMap (the first light row color) halfway to white;
         // etched near-white numbers.
-        const auto c = engine::colourAt(palette_, lut_, tiles[std::size_t(render::kFifteenRowColour[0])]);
+        const auto c = engine::colorAt(palette_, lut_, tiles[std::size_t(render::kFifteenRowColor[0])]);
         for (int r = 0; r < 4; ++r) {
             for (int k = 0; k < 3; ++k) {
                 g.tint[std::size_t(r)][std::size_t(k)] = 0.5f * (c[std::size_t(k)] + 1.0f);
@@ -319,11 +492,15 @@ void Visualizer::stepSolids(MTL::CommandBuffer* cmd, double t, const audio::Audi
         ds.opacity = std::clamp(s.spec.opacity, 0.0, 1.0);
         ds.blend = engine::spriteBlendMode(s.spec.flags);
         addSolidQuads(sq, ds, solidFeedback_, solidDisplay_);
-        if (engine::isPuzzleMesh(d.mesh)) colourQuad(sq, ds.opacity, false, d.mesh);
+        if (engine::isPuzzleMesh(d.mesh)) colorQuad(sq, ds.opacity, false, d.mesh);
     }
     if (!liveSolids_.empty()) {
         const engine::SpriteAudio a = spriteAudio(audio);
         for (auto& s : liveSolids_) {
+            if (s.run->mesh() == engine::MeshKind::Model) {
+                stepModel(cmd, s, t, a);
+                continue;
+            }
             const engine::SolidSpec sp = s.run->evaluate(t, a);
             if (!(sp.opacity > 0)) continue;
             render::SolidDraw d;
@@ -361,7 +538,7 @@ void Visualizer::stepSolids(MTL::CommandBuffer* cmd, double t, const audio::Audi
             ds.opacity = std::clamp(sp.opacity, 0.0, 1.0);
             ds.blend = engine::spriteBlendMode(sp.flags);
             addSolidQuads(sq, ds, solidFeedback_, solidDisplay_, sp.over);
-            if (engine::isPuzzleMesh(sp.mesh)) colourQuad(sq, ds.opacity, !sp.colorKey, sp.mesh);
+            if (engine::isPuzzleMesh(sp.mesh)) colorQuad(sq, ds.opacity, !sp.colorKey, sp.mesh);
             if (!sp.colorKey) {  // opaque in the Syphon alpha / over the backdrop (encodeColorize)
                 render::SpriteQuad o;
                 o.texture = sq.texture;

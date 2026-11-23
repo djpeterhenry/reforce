@@ -66,7 +66,7 @@ public:
     int generation() const { return gen_; }  // iterations that added nodes
     const std::vector<TreeNode>& nodes() const { return nodes_; }
     int livePoints() const { return livePoints_; }
-    float maxTips() const { return maxTips_; }  // largest root's tips (pipe-model normaliser), >= 1
+    float maxTips() const { return maxTips_; }  // largest root's tips (pipe-model normalizer), >= 1
     const TreeParams& params() const { return p_; }
 
 private:

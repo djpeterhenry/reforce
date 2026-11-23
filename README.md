@@ -56,7 +56,7 @@ Everything here is optional. reforce runs without any of it, and without a camer
 |---|---|---|
 | Audio | Any macOS input device, or everything the Mac plays (no Loopback / BlackHole needed; macOS 14.2+) | Audio menu; macOS asks once for microphone access (input devices) or for system audio recording (Everything the Mac Plays) |
 | OBS and video apps | Syphon server `reforce`, with transparency | [docs/usage.md](docs/usage.md#output-window--syphon-for-obs) |
-| Cameras, movies, Syphon input | Colour video layer, movie sprites, a camera backdrop, body tracking | macOS asks for camera access the first time one is opened |
+| Cameras, movies, Syphon input | Color video layer, movie sprites, a camera backdrop, body tracking | macOS asks for camera access the first time one is opened |
 | Ableton Link | Tempo and bar sync with rekordbox, Ableton Live, Traktor | Automatic on the local network |
 | rekordbox decks | Track positions and titles from a "reforce" output module for [rkbx_link](https://github.com/grufkork/rkbx_link) (UDP port 4470; the module is not in rkbx_link yet), plus a DJ controller's faders over MIDI, mapped by a text file in [content/Controllers](content/Controllers/) (Pioneer DDJ-1000 included) | [docs/rhythm-design.md](docs/rhythm-design.md) |
 | Stream guests | Viewers check in on your own guest page and dance on stage with a name tag | Off by default; [docs/guests.md](docs/guests.md) |

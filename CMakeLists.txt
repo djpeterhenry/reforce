@@ -180,7 +180,7 @@ include(cmake/ReforceWeb.cmake)
 # Room lights (reforce_lights, reforce_lights_tests): Nanoleaf panels following the visuals.
 include(cmake/ReforceLights.cmake)
 
-# Video: movie/live sprites, colour video layer, camera + Syphon inputs (Phase 5F).
+# Video: movie/live sprites, color video layer, camera + Syphon inputs (Phase 5F).
 include(cmake/ReforceVideo.cmake)
 
 # Ableton Link session clock (reforce_sync, reforce-link-peer, reforce_sync_tests): Phase 5H.

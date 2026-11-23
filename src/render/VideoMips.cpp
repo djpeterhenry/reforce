@@ -12,7 +12,7 @@
 namespace reforce::render {
 namespace {
 
-// Half-size box filter: each target texel's centre maps to the corner shared
+// Half-size box filter: each target texel's center maps to the corner shared
 // by a 2x2 block of source texels, so one bilinear tap averages exactly that
 // block (odd sizes: the last column/row is clamped).
 constexpr const char* kShaders = R"MSL(

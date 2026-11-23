@@ -65,7 +65,7 @@ public:
     // interval are written as they are posted (engine::slideshowSaveEntries);
     // without a saver they last for this run.
     void setLookSaver(std::function<std::string(const engine::PrefsTable&)> saver);
-    // Favourites (control panel top bar, star in the lists). GET /api/favorites;
+    // Favorites (control panel top bar, star in the lists). GET /api/favorites;
     // POST /api/favorites {"layer":L,"id":ID,"on":bool} changes the list and
     // saves it through `saver` (reforce.Favorites text; returns "" or an
     // error). Without a saver changes last for this run. Set before start().

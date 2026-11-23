@@ -89,7 +89,7 @@ float deltaE(const Lab& p, const Lab& q) {
     return std::sqrt(dl * dl + da * da + db * db);
 }
 
-void effectiveColours(const Palette& pal, const MapLut& lut, LabTable& out) {
+void effectiveColors(const Palette& pal, const MapLut& lut, LabTable& out) {
     for (int k = 0; k < kPaletteSize; ++k) {
         // As colorize_at: m = lut at i (k is exact here), then the palette interpolated at m.
         const float y = std::clamp(lut[std::size_t(k)], 0.0f, 1.0f) * 255.0f;
@@ -101,7 +101,7 @@ void effectiveColours(const Palette& pal, const MapLut& lut, LabTable& out) {
     }
 }
 
-std::array<float, 3> colourAt(const Palette& pal, const MapLut& lut, float i) {
+std::array<float, 3> colorAt(const Palette& pal, const MapLut& lut, float i) {
     const float x = std::clamp(i, 0.0f, 1.0f) * 255.0f;
     const int k0 = std::min(int(x), 254);
     const float m = std::clamp(lut[std::size_t(k0)] + (lut[std::size_t(k0 + 1)] - lut[std::size_t(k0)]) * (x - float(k0)), 0.0f, 1.0f);
@@ -213,7 +213,7 @@ StickerPick pickStickers(const LabTable& lab, int body, const std::array<int, 6>
 // ---------------------------------------------------------------- 15 puzzle tiles
 
 namespace {
-// Measured over the 212 PNG maps: light tiles from L* 45 (dark numbers at .15 x the colour sit near L* 5), with dark
+// Measured over the 212 PNG maps: light tiles from L* 45 (dark numbers at .15 x the color sit near L* 5), with dark
 // tiles only when the light set scores under 8, gives light tiles on 176 maps, dark on 36; 15 maps stay under 10
 // either way. Dark tiles stay above L* 15 so they never sink into black.
 constexpr float kLightMin = 45.0f;  // light tiles (dark numbers): L* at least this
@@ -265,7 +265,7 @@ TilePick pickTiles(const LabTable& lab, bool light, const std::array<int, 4>* pr
     }
     out.score = bestScore;
     for (int i = 0; i < 4; ++i) out.level[std::size_t(i)] = best[i];
-    if (prev) {  // the 24 orders: rows keep their colours as far as possible
+    if (prev) {  // the 24 orders: rows keep their colors as far as possible
         int p[4] = {0, 1, 2, 3};
         float bestCost = 1e30f;
         do {
@@ -299,13 +299,13 @@ void TilePicker::update(const Palette& palette, const MapLut& lut, double t, dou
     lastT_ = t;
     lastPal_ = palette;
     lastLut_ = lut;
-    effectiveColours(palette, lut, lab_);
+    effectiveColors(palette, lut, lab_);
     const auto cur = levels(t);
     std::array<int, 4> now{};
     for (int i = 0; i < 4; ++i) now[std::size_t(i)] = std::clamp(int(std::lround(cur[std::size_t(i)] * 255.0f)), 0, 255);
     const TilePick lightPick = pickTiles(lab_, true, have_ ? &now : nullptr);
     const TilePick darkPick = pickTiles(lab_, false, have_ ? &now : nullptr);
-    // Light tiles with dark numbers unless the map has no good light colours; switch only on a clear difference.
+    // Light tiles with dark numbers unless the map has no good light colors; switch only on a clear difference.
     bool light;
     if (!have_ || score_ < 2.0f) light = lightPick.score >= 8.0f || lightPick.score >= darkPick.score;
     else if (light_) light = !(lightPick.score < 6.0f && darkPick.score > lightPick.score + 4.0f);
@@ -359,7 +359,7 @@ void StickerPicker::update(const Palette& palette, const MapLut& lut, double t, 
     lastT_ = t;
     lastPal_ = palette;
     lastLut_ = lut;
-    effectiveColours(palette, lut, lab_);
+    effectiveColors(palette, lut, lab_);
     // Where the faces are now (mid-ease counts as the eased value).
     std::array<int, 6> now{};
     const std::array<float, 6> cur = levels(t);

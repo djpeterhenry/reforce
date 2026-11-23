@@ -1,7 +1,7 @@
 #pragma once
 // Microphone (audio input) permission, i.e. macOS TCC "Microphone".
 //
-// Without authorisation CoreAudio input still "works" but delivers silence.
+// Without authorization CoreAudio input still "works" but delivers silence.
 // For a bundled app, TCC needs NSMicrophoneUsageDescription in Info.plist (we
 // set it). For a command-line tool, TCC attributes the request to the
 // responsible process (Terminal, VS Code, ...), so status() reports that

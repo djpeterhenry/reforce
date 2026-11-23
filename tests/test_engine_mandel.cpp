@@ -68,7 +68,7 @@ TEST_CASE("mandel: depth follows the beat clock, rushes back out at the end, res
     CHECK(v.dive == 1);
     CHECK(v.depth == doctest::Approx(0.0).epsilon(1e-9));
     CHECK(at(64 + 40).depth == doctest::Approx(linear(40)).epsilon(1e-4));
-    // Deep in, the centre is the target (to well under a pixel).
+    // Deep in, the center is the target (to well under a pixel).
     v = at(58);
     const MandelTarget& t = mandelTarget(v.target);
     CHECK(std::abs(v.cx - t.re) < v.half * 1e-3);
@@ -203,7 +203,7 @@ TEST_CASE("mandel: a dive to a mini lands on it framed and upright; a decoration
             CHECK(v.mini);
             CHECK(v.iter >= std::min(20000, int(45 * t.period * 1.5 * 0.999)));
         } else {
-            // The ring around the mini, centred on it; the mini far too small for the affine test.
+            // The ring around the mini, centered on it; the mini far too small for the affine test.
             CHECK(t.frameRe() == t.re);
             CHECK(v.turn == 0);
             CHECK_FALSE(v.mini);

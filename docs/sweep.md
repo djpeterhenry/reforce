@@ -657,7 +657,7 @@ Causes found:
    1/sin singularities.
 3. **WaveShape lines pass through the center of pixel (x+1)·W/2** (+0.5 px) (#27).
 4. **Fixed-point source rounding**: float32 error put exact-row sources 1 ulp low, which picked up 15/16 of the
-   neighbouring row ("Bits Between Bits" rows decayed into their neighbours). Sources are snapped to 1/16 px with a small bias.
+   neighboring row ("Bits Between Bits" rows decayed into their neighbors). Sources are snapped to 1/16 px with a small bias.
 5. **PNG strips are read like a linearly filtered texture** (x = k/255·N − 0.5, clamped) (#28).
 6. **A ColorMap's `t` is config-local** (0 when it starts; also in its load tiers) (#29). The time maps were never
    inherently incomparable: the sweep shoots 0.7 s after each cut, so both sides are at t = 0.7.

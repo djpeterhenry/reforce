@@ -1,7 +1,7 @@
 # ctest (Phase 5F): a generated movie (our own Card pattern, reforce-gen-videos)
-# as a movie sprite and on the colour video layer, deterministic offline
+# as a movie sprite and on the color video layer, deterministic offline
 # renders, pixel-checked (red channel). Card layout (320x180): top band = frame
-# index bits (block k white when bit 7-k is set, centres x = 20 + 40k, y = 22),
+# index bits (block k white when bit 7-k is set, centers x = 20 + 40k, y = 22),
 # red | gray 128 at y = 67, white | green at y = 135.
 # Inputs: REFORCE, GEN, PNG_PROBE, WORK_DIR.
 file(REMOVE_RECURSE "${WORK_DIR}")
@@ -89,7 +89,7 @@ expect_log(", inverted")
 probe(neg 00060 "80,135,0,6" "20,22,247,255")
 probe(neg 00018 "20,22,128,145")
 
-# 3. Colour layer over a constant .25 gray visualizer, by library name, chroma key on green,
+# 3. Color layer over a constant .25 gray visualizer, by library name, chroma key on green,
 #    1 s crossfade from nothing; at t = 2 blend screen, opacity .5, no key.
 render(layer --flowfield Void --colormap Quarter --render-frames 151 --save-frames 36,90,150
        "--command" "0=videoset:loop:on" "--command" "0=videoset:key:chroma" "--command" "0.1=video:layer:Clip"
@@ -149,7 +149,7 @@ if(NOT pos EQUAL -1)
 endif()
 probe(held 00396 "240,67,57,69")
 
-# 4. A 1280x720 movie on the colour layer at 320x180 (scale .25: sampled through the
+# 4. A 1280x720 movie on the color layer at 320x180 (scale .25: sampled through the
 #    half-size box filter + mips): same patches, same orientation, no crossfade.
 render(minified --flowfield Void --colormap Quarter --render-frames 61 --save-frames 60
        "--command" "0=videoset:crossfade:0" "--command" "0.1=video:layer:Big")

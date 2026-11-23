@@ -1,4 +1,4 @@
-// The rubik solid (docs/3d-design.md "Rubik's cube"): the puzzle (engine/Rubik), the sticker colours per ColorMap
+// The rubik solid (docs/3d-design.md "Rubik's cube"): the puzzle (engine/Rubik), the sticker colors per ColorMap
 // (engine/StickerColors) and the content scene's timing.
 #include <doctest/doctest.h>
 
@@ -47,9 +47,9 @@ TEST_CASE("rubik: solved cube, moves, inverses") {
     // A quarter turn of the +y layer about y moves the +z face's top row onto +x (right-handed: +z -> +x).
     rubik::State u = rubik::State::solved();
     u.apply({1, 1, 1});
-    CHECK(u.colourAt(1, 1, 0, 0) == 4);   // +x side of the top layer now shows the old +z colour
-    CHECK(u.colourAt(1, 1, 1, 2) == 2);   // the top stays the top colour
-    CHECK(u.colourAt(1, -1, 0, 0) == 0);  // the bottom layer did not move
+    CHECK(u.colorAt(1, 1, 0, 0) == 4);   // +x side of the top layer now shows the old +z color
+    CHECK(u.colorAt(1, 1, 1, 2) == 2);   // the top stays the top color
+    CHECK(u.colorAt(1, -1, 0, 0) == 0);  // the bottom layer did not move
 }
 
 TEST_CASE("rubik: scrambles are seeded and never repeat an axis") {
@@ -86,7 +86,7 @@ TEST_CASE("rubik: a cycle is solved at both ends and scrambled in between") {
             for (int x = -1; x <= 1; ++x)
                 for (int y = -1; y <= 1; ++y)
                     for (int z = -1; z <= 1; ++z)
-                        for (int d = 0; d < 6; ++d) eq = eq && p.colourAt(x, y, z, d) == q.colourAt(x, y, z, d);
+                        for (int d = 0; d < 6; ++d) eq = eq && p.colorAt(x, y, z, d) == q.colorAt(x, y, z, d);
             CHECK(eq);
         }
         // Mid-turn: the state before the turn and the angle so far.
@@ -136,25 +136,25 @@ Palette hsvRainbow() {
 
 }  // namespace
 
-TEST_CASE("stickers: six distinct colours per ColorMap") {
+TEST_CASE("stickers: six distinct colors per ColorMap") {
     const MapLut lut = identityLut();
     LabTable lab{};
     SUBCASE("gray: spread over the lightness, clear of the black plastic") {
-        effectiveColours(rampPalette(0, 0, 0, 1, 1, 1), lut, lab);
+        effectiveColors(rampPalette(0, 0, 0, 1, 1, 1), lut, lab);
         const StickerPick p = pickStickers(lab);
         std::set<int> levels(p.level.begin(), p.level.end());
         CHECK(levels.size() == 6);
-        CHECK(p.score > 10.0f);  // 100 L* over 7 colours, net of the wobble
+        CHECK(p.score > 10.0f);  // 100 L* over 7 colors, net of the wobble
         for (int l : p.level) CHECK(l >= 16);
     }
     SUBCASE("hue wheel: far better than evenly spaced levels") {
-        effectiveColours(hsvRainbow(), lut, lab);
+        effectiveColors(hsvRainbow(), lut, lab);
         const StickerPick p = pickStickers(lab);
         CHECK(p.score > 25.0f);
         CHECK(p.score >= stickerScore(lab, {77, 112, 148, 184, 219, 255}));
     }
     SUBCASE("the closest pair goes on opposite faces") {
-        effectiveColours(rampPalette(0, 0, 0, 1, 1, 1), lut, lab);
+        effectiveColors(rampPalette(0, 0, 0, 1, 1, 1), lut, lab);
         const StickerPick p = pickStickers(lab);
         float closest = 1e9f;
         int ci = -1, cj = -1;
@@ -168,13 +168,13 @@ TEST_CASE("stickers: six distinct colours per ColorMap") {
     SUBCASE("the MapFunction LUT is applied first") {
         MapLut inv{};
         for (int k = 0; k < kPaletteSize; ++k) inv[std::size_t(k)] = 1.0f - float(k) / 255.0f;
-        effectiveColours(rampPalette(0, 0, 0, 1, 1, 1), inv, lab);
+        effectiveColors(rampPalette(0, 0, 0, 1, 1, 1), inv, lab);
         CHECK(lab[0].l == doctest::Approx(100.0f).epsilon(0.01));
         CHECK(lab[255].l == doctest::Approx(0.0f).epsilon(0.01));
     }
 }
 
-TEST_CASE("stickers: the picker keeps its colours and eases to new ones") {
+TEST_CASE("stickers: the picker keeps its colors and eases to new ones") {
     StickerPicker pk(0.5);
     const MapLut lut = identityLut();
     const Palette gray = rampPalette(0, 0, 0, 1, 1, 1);
@@ -244,7 +244,7 @@ TEST_CASE("rubik: the content scene is solved on every 8-bar line") {
 
 TEST_CASE("stickers: cost of a pick") {
     LabTable lab{};
-    effectiveColours(hsvRainbow(), identityLut(), lab);
+    effectiveColors(hsvRainbow(), identityLut(), lab);
     const auto t0 = std::chrono::steady_clock::now();
     float s = 0;
     for (int k = 0; k < 20; ++k) s += pickStickers(lab).score;
@@ -253,10 +253,10 @@ TEST_CASE("stickers: cost of a pick") {
     CHECK(s > 0);
 }
 
-TEST_CASE("fifteen tiles: light rows with dark numbers, dark rows only on a map without light colours; no flips") {
+TEST_CASE("fifteen tiles: light rows with dark numbers, dark rows only on a map without light colors; no flips") {
     const MapLut lut = identityLut();
     LabTable lab{};
-    effectiveColours(rampPalette(0, 0, 0, 1, 1, 1), lut, lab);
+    effectiveColors(rampPalette(0, 0, 0, 1, 1, 1), lut, lab);
     const TilePick l = pickTiles(lab, true);
     for (int k : l.level) CHECK(lab[std::size_t(k)].l >= 45.0f);
     CHECK(l.score > 8.0f);
@@ -275,7 +275,7 @@ TEST_CASE("fifteen tiles: light rows with dark numbers, dark rows only on a map 
     CHECK(pk.numeral(1.25) > 0.1f);
     CHECK(pk.numeral(1.25) < 0.9f);
     CHECK(pk.numeral(2.0) == doctest::Approx(1.0f));
-    // Small changes keep the choice and the colours.
+    // Small changes keep the choice and the colors.
     const auto before = pk.levels(5.0);
     const int sw = pk.switches();
     pk.update(rampPalette(0, 0, 0, 0.31f, 0.31f, 0.31f), lut, 5.0);

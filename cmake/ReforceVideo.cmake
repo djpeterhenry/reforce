@@ -1,11 +1,11 @@
 # Phase 5F: video sources (movie files, cameras, Syphon inputs) shared by the
-# movie/live sprites and the colour video layer (architecture §5c).
+# movie/live sprites and the color video layer (architecture §5c).
 #   reforce_video        VideoSource (AVFoundation / CoreVideo / Syphon client)
 #   reforce-gen-videos   writes our own synthetic test videos (AVAssetWriter)
 #   reforce_video_tests  unit tests (spec parsing, media time, Syphon guard,
 #                        deterministic frame-exact decoding, composite math)
 #   reforce_video_render offline render ctest: a generated movie as a sprite
-#                        and on the colour layer, pixel-checked
+#                        and on the color layer, pixel-checked
 # Included from the top-level CMakeLists.txt (paths are relative to it).
 
 add_library(reforce_video STATIC
@@ -24,7 +24,7 @@ target_link_libraries(reforce_video
 
 target_link_libraries(reforce PRIVATE reforce_video)
 
-# Mipmapped / prefiltered sampling of minified video frames (sprites, colour layer).
+# Mipmapped / prefiltered sampling of minified video frames (sprites, color layer).
 target_sources(reforce_render PRIVATE src/render/VideoMips.cpp)
 
 add_executable(reforce-gen-videos tools/video/gen_videos.cpp)
@@ -51,7 +51,7 @@ if(REFORCE_BUILD_TESTS)
             -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/video_render.cmake)
     set_tests_properties(reforce_video_render PROPERTIES TIMEOUT 300)
 
-    # Sprite visibility (PLAN 5K): Mix, movie levels, full-colour movie sprites.
+    # Sprite visibility (PLAN 5K): Mix, movie levels, full-color movie sprites.
     add_test(NAME reforce_sprite_visibility_render
         COMMAND ${CMAKE_COMMAND}
             -DREFORCE=$<TARGET_FILE:reforce>

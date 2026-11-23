@@ -249,7 +249,7 @@ TEST_CASE("BeatTracker: steady tempo holds through a breakdown") {
             CHECK(lo > 124.0 * 0.98);
             CHECK(hi < 124.0 * 1.02);
         } else {
-            CHECK(lo < 124.0 * 0.9);  // the old behaviour jumps (to ~82 and ~99 here): what Peter saw
+            CHECK(lo < 124.0 * 0.9);  // the old behavior jumps (to ~82 and ~99 here): what Peter saw
         }
     }
 }
@@ -353,7 +353,7 @@ TEST_CASE("BeatClock + BeatTracker: the beat lock survives a breakdown, the drop
             CHECK(worstBreak < 0.06);
             CHECK(worstDrop < 0.06);
         } else {
-            CHECK(lostInBreakdown);  // the old behaviour
+            CHECK(lostInBreakdown);  // the old behavior
         }
     }
 }

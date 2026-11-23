@@ -100,12 +100,12 @@ struct Analyzer::Impl {
     std::vector<float> window, timeBuf, re, im, power;
     float ampScale = 1.f;  // full-scale sine -> magnitude 1
 
-    // Vis bins: centre frequencies and sparse band weights over FFT bins.
-    std::vector<double> centreHz;
+    // Vis bins: center frequencies and sparse band weights over FFT bins.
+    std::vector<double> centerHz;
     std::vector<int> wFirst, wCount;  // per vis bin: first FFT bin, number of weights
     std::vector<float> weights;       // concatenated
     std::vector<float> tiltGain;
-    // Envelope groups: per bin interpolation between group centres.
+    // Envelope groups: per bin interpolation between group centers.
     std::vector<int> groupStart, groupEnd;
     std::vector<int> binG0, binG1;
     std::vector<float> binT;
@@ -175,28 +175,28 @@ void Analyzer::rebuild() {
     m.im.assign(m.n / 2, 0.f);
     m.power.assign(m.n / 2, 0.f);
     // vDSP_fft_zrip returns 2x the DFT; Hann coherent gain is 0.5:
-    // a sine of amplitude A at a bin centre gives |X| = A * N / 2.
+    // a sine of amplitude A at a bin center gives |X| = A * N / 2.
     m.ampScale = 2.f / static_cast<float>(m.n);
 
-    // Vis bin centres.
+    // Vis bin centers.
     const double nyq = sampleRate_ * 0.5;
     double lo = cfg_.freqLoHz > 0 ? cfg_.freqLoHz : kGForceFreqLoHz;
     double hi = cfg_.freqHiHz > 0 ? cfg_.freqHiHz : kGForceFreqHiHz;
     hi = std::min(hi, nyq * 0.95);
     lo = std::clamp(lo, 1.0, hi * 0.5);
     const int nb = cfg_.fftBins;
-    m.centreHz.assign(nb, 0.0);
+    m.centerHz.assign(nb, 0.0);
     for (int i = 0; i < nb; ++i) {
         const double s = double(i) / double(nb - 1);
-        m.centreHz[i] = cfg_.linearSpacing ? lo + (hi - lo) * s : lo * std::pow(hi / lo, s);
+        m.centerHz[i] = cfg_.linearSpacing ? lo + (hi - lo) * s : lo * std::pow(hi / lo, s);
     }
     frame_.binLoHz.assign(nb, 0.f);
     frame_.binHiHz.assign(nb, 0.f);
     for (int i = 0; i < nb; ++i) {
-        const double c = m.centreHz[i];
-        const double prev = i > 0 ? m.centreHz[i - 1] : (cfg_.linearSpacing ? 2 * c - m.centreHz[1] : c * c / m.centreHz[1]);
-        const double next = i + 1 < nb ? m.centreHz[i + 1]
-                                       : (cfg_.linearSpacing ? 2 * c - m.centreHz[i - 1] : c * c / m.centreHz[i - 1]);
+        const double c = m.centerHz[i];
+        const double prev = i > 0 ? m.centerHz[i - 1] : (cfg_.linearSpacing ? 2 * c - m.centerHz[1] : c * c / m.centerHz[1]);
+        const double next = i + 1 < nb ? m.centerHz[i + 1]
+                                       : (cfg_.linearSpacing ? 2 * c - m.centerHz[i - 1] : c * c / m.centerHz[i - 1]);
         frame_.binLoHz[i] = float(cfg_.linearSpacing ? 0.5 * (prev + c) : std::sqrt(std::max(prev, 1e-9) * c));
         frame_.binHiHz[i] = float(cfg_.linearSpacing ? 0.5 * (c + next) : std::sqrt(c * next));
     }
@@ -210,7 +210,7 @@ void Analyzer::rebuild() {
     m.tiltGain.assign(nb, 1.f);
     const double bw = std::max(1e-3, cfg_.bandOctaves);
     for (int i = 0; i < nb; ++i) {
-        const double fc = m.centreHz[i];
+        const double fc = m.centerHz[i];
         int first = -1, last = -1;
         std::vector<float> w;  // rebuild() may allocate
         double wmax = 0.0;
@@ -223,7 +223,7 @@ void Analyzer::rebuild() {
             const double d = std::log2(k * df / fc) / bw;
             const double v = 1.0 / (1.0 + std::pow(std::abs(d), cfg_.bandShape)) / wmax;
             if (v < 1e-4) {
-                if (first >= 0) break;  // past the band (weights fall monotonically away from the centre)
+                if (first >= 0) break;  // past the band (weights fall monotonically away from the center)
                 continue;
             }
             if (first < 0) first = k;
@@ -240,29 +240,29 @@ void Analyzer::rebuild() {
         m.tiltGain[i] = float(std::pow(fc / 1000.0, cfg_.tilt));
     }
 
-    // Envelope groups and per-bin interpolation between group centres.
+    // Envelope groups and per-bin interpolation between group centers.
     const int ng = cfg_.envelopes;
     m.groupStart.assign(ng, 0);
     m.groupEnd.assign(ng, 0);
-    std::vector<double> centre(ng);
+    std::vector<double> center(ng);
     for (int g = 0; g < ng; ++g) {
         m.groupStart[g] = g * nb / ng;
         m.groupEnd[g] = (g + 1) * nb / ng;
-        centre[g] = 0.5 * (m.groupStart[g] + m.groupEnd[g] - 1);
+        center[g] = 0.5 * (m.groupStart[g] + m.groupEnd[g] - 1);
     }
     m.binG0.assign(nb, 0);
     m.binG1.assign(nb, 0);
     m.binT.assign(nb, 0.f);
     for (int i = 0; i < nb; ++i) {
         int g = 0;
-        while (g + 1 < ng && centre[g + 1] <= i) ++g;
-        if (g + 1 >= ng || i <= centre[0]) {
-            m.binG0[i] = m.binG1[i] = (i <= centre[0]) ? 0 : ng - 1;
+        while (g + 1 < ng && center[g + 1] <= i) ++g;
+        if (g + 1 >= ng || i <= center[0]) {
+            m.binG0[i] = m.binG1[i] = (i <= center[0]) ? 0 : ng - 1;
             m.binT[i] = 0.f;
         } else {
             m.binG0[i] = g;
             m.binG1[i] = g + 1;
-            m.binT[i] = static_cast<float>((i - centre[g]) / (centre[g + 1] - centre[g]));
+            m.binT[i] = static_cast<float>((i - center[g]) / (center[g + 1] - center[g]));
         }
     }
     m.gRef.assign(ng, 0.0);
@@ -363,8 +363,8 @@ int Analyzer::binForFrequency(double hz) const {
     return -1;
 }
 
-double Analyzer::binCentreHz(int i) const {
-    const auto& c = impl_->centreHz;
+double Analyzer::binCenterHz(int i) const {
+    const auto& c = impl_->centerHz;
     return c.empty() ? 0.0 : c[size_t(std::clamp(i, 0, int(c.size()) - 1))];
 }
 
@@ -442,8 +442,8 @@ const AudioFrame& Analyzer::analyze(double dt) {
     vDSP_zvmags(&split, 1, m.power.data(), 1, m.n / 2);
     const float pscale = m.ampScale * m.ampScale;
     vDSP_vsmul(m.power.data(), 1, &pscale, m.power.data(), 1, m.n / 2);
-    // power[k] is now (amplitude)^2 at bin centres; a Hann-windowed sine spreads
-    // 1.5x its peak power over neighbouring bins (ENBW).
+    // power[k] is now (amplitude)^2 at bin centers; a Hann-windowed sine spreads
+    // 1.5x its peak power over neighboring bins (ENBW).
     constexpr double kEnbw = 1.5;
 
     const int nbins = cfg_.fftBins;

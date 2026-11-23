@@ -104,7 +104,7 @@ void PhraseClock::pickAuto() {
     if (!cfg_.autoAlign || hist_.empty() || how_ == "deck") return;
     const int L = int(hist_.size());
     const int step = bars_ ? std::max(1, int(std::lround(quantum_))) : 1;  // Link: phrases start on bar lines
-    // Candidate score: the bin plus half its neighbours (a change smeared over two beats still counts).
+    // Candidate score: the bin plus half its neighbors (a change smeared over two beats still counts).
     auto score = [&](int i) {
         return hist_[std::size_t(i)] + 0.5 * (hist_[std::size_t((i + 1) % L)] + hist_[std::size_t((i + L - 1) % L)]);
     };

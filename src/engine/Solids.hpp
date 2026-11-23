@@ -16,7 +16,7 @@
 //   in frame half-heights, default .5), RotX RotY RotZ (radians, applied X, then Y, then Z), Fill (.15), Shad (.6),
 //   Edge (.8), Pen, EPen (no Pen and no EPen: Pen 1).
 //   ColorKey (load, default 1): 0 = the solid stays opaque in the Syphon alpha and over the camera backdrop (it is
-//   not keyed out where its colours are dark).
+//   not keyed out where its colors are dark).
 //   Over (load, default 0): 1 = Pen / EPen draw the solid opaque over the frame, its coverage as alpha (exact
 //   intensities, dark parts included), instead of the sprite blend that Flag picks.
 //   rubik / fifteen: Moves (load, 30; rubik 1..32, fifteen 1..64), Turn and Seed per frame (engine/Rubik.hpp,
@@ -28,6 +28,7 @@
 #include <optional>
 #include <string>
 
+#include "engine/CameraMoves.hpp"
 #include "engine/Meshes.hpp"
 #include "engine/Particles.hpp"
 #include "engine/Sprites.hpp"
@@ -54,6 +55,27 @@ struct SolidSpec {
     double shuffle = 1;  // fifteen: Shuf
     bool glass = false;  // fifteen: Glas = 1, drawn as glass over the colorized frame
     double frost = 12, tint = 0.35, bend = 1;
+    // mesh == Model (docs/model-design.md): the shot this frame and the look.
+    ModelShot shot;
+    double spin = 0, bank = 0;     // the model's turn about its up axis (radians, Spin x age) and roll (Bank)
+    double glow = 1, bloom = 0.6, exposure = 1;
+    std::array<double, 3> light{-0.45, 0.6, 0.65};  // towards the key light, camera space (x right, y up, z back)
+};
+
+// Load-time settings of a model solid (Mesh="model"): its File, Look, axes and camera move.
+struct ModelSettings {
+    std::string file;          // File (relative to reforce.Model.Dir, or absolute)
+    int look = 0;              // Look: 0 = into the visuals (luminance), 1 = color over them
+    std::array<float, 3> front{0, 0, -1}, up{0, 1, 0};  // Front / Up ("+x", "-z", ...; default -z / +y)
+    std::string move = "orbit";  // Move: a camera preset's name (content/Camera, <model folder>/Camera), or "free"
+    bool freeCamera = false;     // Move = free: CamX..AimZ are the camera
+    bool ownPath = false;        // the scene has its own keyframes (K1, ...): they win over the preset
+    CameraPath path;             // the keyframes played (the scene's own, or the preset's via setCameraPath)
+    double moveSeconds = 24;   // MDur, or MBar converted by the caller (setMoveSeconds)
+    double moveBars = std::nan("");  // MBar, NaN when absent
+    bool loop = true;          // Loop: 1 = repeat the move, 0 = hold its last frame
+    bool trails = false;       // look B with an explicit Pen: a luminance copy also goes into the feedback
+    std::string error;         // unknown Front / Up, bad keyframes (logged; defaults used)
 };
 
 // Mesh name of a compiled solid config: its Mesh key, default icosahedron; nullopt for an unknown name.
@@ -84,6 +106,15 @@ public:
 
     SolidSpec evaluate(double t, const SpriteAudio& audio = {});
 
+    // Model solids (mesh() == Model).
+    const ModelSettings& model() const { return model_; }
+    bool hasDuration() const { return std::isfinite(inst_->duration()) || std::isfinite(inst_->bars()); }
+    // The Move preset's keyframes (the caller finds and loads it); the scene's own Ease / Step / Rand / Push win.
+    void setCameraPath(CameraPath p);
+    void setMoveSeconds(double s) {
+        if (std::isfinite(s) && s > 0.1) model_.moveSeconds = s;
+    }
+
 private:
     std::shared_ptr<const scene::CompiledConfig> cfg_;
     std::unique_ptr<scene::SolidInstance> inst_;
@@ -91,6 +122,7 @@ private:
     MeshKind mesh_;
     double start_ = 0;
     FadeEnvelope env_;
+    ModelSettings model_;
 };
 
 }  // namespace reforce::engine

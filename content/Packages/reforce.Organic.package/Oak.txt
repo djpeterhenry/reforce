@@ -25,7 +25,7 @@ TrpY=".15"
 SwyB="8"
 Sway=".25 + .12 * BASS"
 Bud=".9 * exp(-3 * wrap(B1 / 4))"
-// leaves on the outer twigs: every node and every tip, .07 long, unfurling over 4 beats; their own colour
+// leaves on the outer twigs: every node and every tip, .07 long, unfurling over 4 beats; their own color
 Leaf=".85"
 LeafW=".07"
 LeafD="1"

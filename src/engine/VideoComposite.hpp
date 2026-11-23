@@ -1,17 +1,17 @@
 #pragma once
-// Colour video layer (Phase 5F (b)): settings, parsing, and the CPU reference
+// Color video layer (Phase 5F (b)): settings, parsing, and the CPU reference
 // of the composite the colorize shader does (render/ScenePipeline.cpp,
 // colorize_video_fs). Pure C++, unit-tested; the GPU path is checked against
 // it by the video render test.
 //
 // Per output pixel (all values 0..1, BGRA8 output, no gamma conversion):
 //   1. each source S (A = outgoing, B = incoming) is fitted to the frame
-//      (cover / contain / stretch) and sampled: colour c_S, alpha a_S =
+//      (cover / contain / stretch) and sampled: color c_S, alpha a_S =
 //      inside(frame of the video) * key(c_S)
 //   2. crossfade with weight w (A -> B; "no source" = alpha 0, so starting
 //      and stopping the layer are crossfades from / to nothing):
 //        a = mix(a_A, a_B, w),   c = mix(c_A a_A, c_B a_B, w) / a
-//   3. opacity o, visualizer colour v, blend B(base, top):
+//   3. opacity o, visualizer color v, blend B(base, top):
 //        normal B = top, add min(1, base + top), screen 1 - (1-base)(1-top),
 //        multiply base * top
 //      over  (video on top):          out = v + (B(v, c) - v) * (o a)
@@ -19,11 +19,11 @@
 //                                     normal: out = v + u (1 - max(v.rgb))
 //                                     (dark parts of the visualizer show the
 //                                     video), others: out = B(u, v)
-// Keys (on the video's colour, before the crossfade):
+// Keys (on the video's color, before the crossfade):
 //   luma    a = smoothstep(threshold, threshold + softness, Y601)
 //           (keys out dark pixels; softness 0 = hard cut)
 //   chroma  a = smoothstep(tolerance, tolerance + softness, |CbCr - CbCr_key|)
-//           (BT.601 full-range chroma distance; keys out the key colour)
+//           (BT.601 full-range chroma distance; keys out the key color)
 
 #include <array>
 #include <optional>
@@ -87,13 +87,13 @@ float lumaKeyAlpha(const Rgb& c, float threshold, float softness);
 float chromaKeyAlpha(const Rgb& c, const Rgb& key, float tolerance, float softness);
 float keyAlpha(const Rgb& c, const VideoLayerParams& p);
 
-// A sampled source (already keyed): colour and alpha.
+// A sampled source (already keyed): color and alpha.
 struct VideoSample {
     Rgb c{0, 0, 0};
     float a = 0;
 };
 VideoSample crossfadeSamples(const VideoSample& a, const VideoSample& b, float w);
-// Step 3 above: visualizer colour v, video sample s.
+// Step 3 above: visualizer color v, video sample s.
 Rgb compositeVideo(const Rgb& v, const VideoSample& s, const VideoLayerParams& p);
 
 }  // namespace reforce::engine

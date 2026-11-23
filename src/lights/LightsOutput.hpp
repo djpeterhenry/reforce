@@ -3,7 +3,7 @@
 // local network, in place of the Nanoleaf Desktop app's screen mirroring.
 //
 // The connection lives on its own thread: it reads the panels' layout, keeps what they were showing, switches them
-// to external control (Nanoleaf Open API, extControl v2: UDP colour packets), and sends a colour per panel about 20
+// to external control (Nanoleaf Open API, extControl v2: UDP color packets), and sends a color per panel about 20
 // times a second from the newest capture (submit, any thread). Turned off (setEnabled(false)) or destroyed, it puts
 // the panels back: on/off as they were, and their effect when it is a saved one. Every 10 s it checks the panels still
 // answer; when they don't, it reconnects every 5 s.
@@ -63,8 +63,8 @@ struct LightsStatus {
 struct PanelView {
     int id = 0;
     double x = 0, y = 0, o = 0;  // layout (y up), orientation in degrees
-    double u = 0, v = 0;         // centre in the frame, 0..1
-    Rgb colour;                  // as last sent
+    double u = 0, v = 0;         // center in the frame, 0..1
+    Rgb color;                  // as last sent
 };
 
 class LightsOutput {
@@ -128,7 +128,7 @@ private:
     std::optional<DeviceState> saved_;  // what to put back
     LightMapper mapper_;
     std::vector<int> ids_;
-    std::vector<Rgb> colours_, sent_;
+    std::vector<Rgb> colors_, sent_;
     std::vector<std::uint8_t> packet_;
 
     mutable std::mutex viewM_;

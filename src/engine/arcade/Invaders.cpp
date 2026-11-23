@@ -526,7 +526,7 @@ private:
 
     void draw(double beat, OrganicCanvas& c, double pen) {
         const double aln = std::clamp(frameNum(inst_, "ALN", 1.0), 0.0, 1.0) * pen;
-        // The cannon in the aliens' colour by default (Peter 2026-11-22: it was hard to see at .62).
+        // The cannon in the aliens' color by default (Peter 2026-11-22: it was hard to see at .62).
         const double can = std::clamp(frameNum(inst_, "CANN", 1.0), 0.0, 1.0) * pen;
         const double sht = std::clamp(frameNum(inst_, "SHOT", 1.0), 0.0, 1.0) * pen;
         const double deb = std::clamp(frameNum(inst_, "DEBR", 1.0), 0.0, 1.0) * pen;

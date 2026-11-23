@@ -71,14 +71,14 @@ void State::apply(const Move& m) {
 }
 
 bool State::isSolved() const {
-    // Every sticker shows the colour of the face it is on (the whole cube may not be rotated: only face turns).
+    // Every sticker shows the color of the face it is on (the whole cube may not be rotated: only face turns).
     for (const Cubie& c : cubies)
         for (int d = 0; d < 6; ++d)
             if (c.face[std::size_t(d)] >= 0 && c.face[std::size_t(d)] != d) return false;
     return true;
 }
 
-int State::colourAt(int x, int y, int z, int dir) const {
+int State::colorAt(int x, int y, int z, int dir) const {
     for (const Cubie& c : cubies)
         if (c.pos[0] == x && c.pos[1] == y && c.pos[2] == z) return dir >= 0 && dir < 6 ? c.face[std::size_t(dir)] : -1;
     return -1;

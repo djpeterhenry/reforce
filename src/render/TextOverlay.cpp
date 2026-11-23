@@ -21,7 +21,7 @@ const char* kShader = R"(
 #include <metal_stdlib>
 using namespace metal;
 // rect: NDC left, top, right, bottom; spread: shadow brightness taps apart, in output uv
-struct TextQuad { float4 rect; float opacity; float strength; float from; float spread; float4 mode; };  // mode.x 1: a colour image
+struct TextQuad { float4 rect; float opacity; float strength; float from; float spread; float4 mode; };  // mode.x 1: a color image
 struct VOut { float4 position [[position]]; float2 uv; float2 screen; };
 vertex VOut text_vs(uint vid [[vertex_id]], constant TextQuad& q [[buffer(0)]]) {
     const float2 p = float2(vid & 1, vid >> 1);
@@ -37,7 +37,7 @@ fragment float4 text_fs(VOut in [[stage_in]], texture2d<float> tex [[texture(0)]
                         constant TextQuad& q [[buffer(0)]]) {
     constexpr sampler smp(filter::linear, address::clamp_to_edge);
     const float4 t = tex.sample(smp, in.uv);
-    if (q.mode.x > 0.5f) return t * q.opacity;  // a colour image (speech bubble), premultiplied
+    if (q.mode.x > 0.5f) return t * q.opacity;  // a color image (speech bubble), premultiplied
     const float a = t.r;
     float h = 0.0f;
     if (q.strength > 0.0f) {
@@ -73,7 +73,7 @@ fragment float4 lum_fs(LumOut in [[stage_in]], texture2d<float> src [[texture(0)
 struct TextQuad {
     float rect[4];
     float opacity, strength, from, spread;
-    float mode[4];  // mode[0] 1: a colour image (speech bubble)
+    float mode[4];  // mode[0] 1: a color image (speech bubble)
 };
 
 CFStringRef cfString(const std::string& s, bool upper) {
@@ -184,7 +184,7 @@ TextImage rasterizeText(const TextBlockSpec& spec) {
             CGColorRelease(black);
         }
         for (const Laid& d : laid) {
-            // Baseline: the glyphs centred in the line box (as a browser does); CG's y runs up from the bottom.
+            // Baseline: the glyphs centered in the line box (as a browser does); CG's y runs up from the bottom.
             const double baseline = pad + d.top + (d.box - (d.ascent + d.descent)) / 2 + d.ascent;
             CGContextSetTextPosition(ctx, pad, CGFloat(img.height - baseline));
             CTLineDraw(d.line, ctx);
@@ -214,10 +214,10 @@ TextImage rasterizeBubble(const TextBlockSpec& spec) {
     if (!font) return img;
     CGColorSpaceRef rgb = CGColorSpaceCreateDeviceRGB();
     const CGFloat white[] = {1, 1, 1, 1};
-    CGColorRef textColour = CGColorCreate(rgb, white);
+    CGColorRef textColor = CGColorCreate(rgb, white);
     CFStringRef str = cfString(l.text, spec.uppercase);
     const void* keys[] = {kCTFontAttributeName, kCTForegroundColorAttributeName};
-    const void* vals[] = {font, textColour};
+    const void* vals[] = {font, textColor};
     CFDictionaryRef attrs = CFDictionaryCreate(kCFAllocatorDefault, keys, vals, 2, &kCFTypeDictionaryKeyCallBacks,
                                                &kCFTypeDictionaryValueCallBacks);
     CFAttributedStringRef as = CFAttributedStringCreate(kCFAllocatorDefault, str, attrs);
@@ -240,7 +240,7 @@ TextImage rasterizeBubble(const TextBlockSpec& spec) {
                                              uint32_t(kCGImageAlphaPremultipliedFirst) | uint32_t(kCGBitmapByteOrder32Little));
     if (ctx) {
         CGContextSetShouldAntialias(ctx, true);
-        // The bubble: a rounded box (CG's y up: the box above the tail) with the tail at the bottom centre, one path
+        // The bubble: a rounded box (CG's y up: the box above the tail) with the tail at the bottom center, one path
         // so the outline runs round both.
         const double x0 = o, x1 = img.width - o, y0 = o + tail, y1 = img.height - o, cx = img.width * 0.5;
         const double r = std::min(radius, std::min(x1 - x0, y1 - y0) * 0.5);
@@ -263,7 +263,7 @@ TextImage rasterizeBubble(const TextBlockSpec& spec) {
         CGContextSetLineJoin(ctx, kCGLineJoinRound);
         CGContextStrokePath(ctx);
         CGPathRelease(p);
-        // The text (white, emoji in colour), inside the padding.
+        // The text (white, emoji in color), inside the padding.
         CGMutablePathRef tp = CGPathCreateMutable();
         CGPathAddRect(tp, nullptr, CGRectMake(CGFloat(x0 + pad), CGFloat(y0 + pad), CGFloat(textW + 1), CGFloat(textH)));
         CTFrameRef frame = CTFramesetterCreateFrame(fs, CFRangeMake(0, 0), tp, nullptr);
@@ -278,7 +278,7 @@ TextImage rasterizeBubble(const TextBlockSpec& spec) {
     CFRelease(as);
     CFRelease(attrs);
     CFRelease(str);
-    CGColorRelease(textColour);
+    CGColorRelease(textColor);
     CGColorSpaceRelease(rgb);
     CFRelease(font);
     return img;
@@ -312,7 +312,7 @@ TextOverlay::TextOverlay(MTL::Device* device, int slots)
         throw std::runtime_error(std::string("pipeline 'text overlay' failed: ") +
                                  (err ? err->localizedDescription()->utf8String() : "?"));
     }
-    // Luminance average: new * c + old * (1 - c), c = the blend colour (set per frame from dt).
+    // Luminance average: new * c + old * (1 - c), c = the blend color (set per frame from dt).
     vs = loadFunction(lib, "lum_vs");
     fs = loadFunction(lib, "lum_fs");
     d = MTL::RenderPipelineDescriptor::alloc()->init();
@@ -475,7 +475,7 @@ void TextOverlay::encode(MTL::CommandBuffer* cmd, MTL::Texture* output, const Dr
         if (d.opacity <= 0.001 || !ok(d.slot) || !(d.scale > 0.01)) continue;
         const Slot& s = slots_[std::size_t(d.slot)];
         if (!s.tex) continue;
-        // Unscaled: whole pixels (sharp text). Scaled: around the text box's centre.
+        // Unscaled: whole pixels (sharp text). Scaled: around the text box's center.
         double x0 = std::round(d.x) - s.inset, y0 = std::round(d.y) - s.inset, w = s.w, h = s.h;
         if (std::fabs(d.scale - 1) > 1e-3) {
             const double cx = d.x + 0.5 * (s.w - 2 * s.inset), cy = d.y + 0.5 * (s.h - 2 * s.inset);

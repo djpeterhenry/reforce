@@ -4,7 +4,7 @@
 #   A. Sprite Mix (reforce.Sprite.Mix / reforce.MovieSprite.Mix, spritemix:sprite|movie:W) over a busy field
 #      (--noise on a still FlowField).
 #   B. Movie levels (reforce.MovieSprite.Gamma, per-movie Black / White / Gamma in <stem>.reforce.txt).
-#   C. Full-colour movie sprites (reforce.MovieSprite.Colour = over, videoset:spritecolour:over).
+#   C. Full-color movie sprites (reforce.MovieSprite.Color = over, videoset:spritecolor:over).
 # Movie: our own Card pattern (reforce-gen-videos, 320x180): red | gray 128 at y = 67, white | green at y = 135.
 # Inputs: REFORCE, GEN, PNG_PROBE, WORK_DIR.
 file(REMOVE_RECURSE "${WORK_DIR}")
@@ -109,7 +109,7 @@ render(levels_off ${MOVIE} "--command" "0.1=start:sprite:Clip")
 probe(levels_off 00060 "240,67,58,70" "80,67,31,44" "80,135,120,132")
 render(levels_one ${MOVIE} --set reforce.MovieSprite.Gamma=1 "--command" "0.1=start:sprite:Clip")
 same(levels_off levels_one 00060)
-# reforce.MovieSprite.Gamma 0.5 raises the grey levels: gray .502^.5 = .709 -> 90; red .299^.5 = .547 -> 70; white stays.
+# reforce.MovieSprite.Gamma 0.5 raises the gray levels: gray .502^.5 = .709 -> 90; red .299^.5 = .547 -> 70; white stays.
 render(gamma ${MOVIE} --set reforce.MovieSprite.Gamma=0.5 "--command" "0.1=start:sprite:Clip")
 expect_log("Sprite \"Clip\": levels black 0.000, white 1.000, gamma 0.500")
 probe(gamma 00060 "240,67,84,96" "80,67,64,76" "80,135,120,132")
@@ -121,21 +121,21 @@ render(blackwhite ${MOVIE} "--command" "0.1=start:sprite:Lev")
 expect_log("Sprite \"Lev\": levels black 0.250, white 0.750, gamma 1.000")
 probe(blackwhite 00060 "80,67,6,18" "240,135,80,92" "80,135,120,132" "240,67,58,70")
 
-# ---- C. Full-colour movie sprites ---------------------------------------------------------------------------------
-# Over a black visualizer (Void FlowField): the movie's own colours at alpha = envelope x (0.5 + 0.5 Mix).
+# ---- C. Full-color movie sprites ---------------------------------------------------------------------------------
+# Over a black visualizer (Void FlowField): the movie's own colors at alpha = envelope x (0.5 + 0.5 Mix).
 # Mix 0: red patch (80,67) -> R 128, G 0; green patch (240,135) -> G 128, R 0; white -> 128 in both.
-set(COLOUR --flowfield Void --colormap Gray --render-frames 61 --save-frames 60)
-render(colour ${COLOUR} --set reforce.MovieSprite.Colour=over "--command" "0.1=start:sprite:Clip")
-probe(colour 00060 "80,67,122,134" "g:80,67,0,6" "240,135,0,6" "g:240,135,122,134" "80,135,122,134" "g:80,135,122,134")
+set(COLOR --flowfield Void --colormap Gray --render-frames 61 --save-frames 60)
+render(color ${COLOR} --set reforce.MovieSprite.Color=over "--command" "0.1=start:sprite:Clip")
+probe(color 00060 "80,67,122,134" "g:80,67,0,6" "240,135,0,6" "g:240,135,122,134" "80,135,122,134" "g:80,135,122,134")
 # By command (the panel toggle), with a movie Mix of 1: the movie itself, opaque.
-render(colour_mix1 ${COLOUR} --set reforce.MovieSprite.Mix=1 "--command" "0=videoset:spritecolour:over"
+render(color_mix1 ${COLOR} --set reforce.MovieSprite.Mix=1 "--command" "0=videoset:spritecolor:over"
        "--command" "0.1=start:sprite:Clip")
-expect_log("full-colour movie sprites on (over)")
-probe(colour_mix1 00060 "80,67,248,255" "g:80,67,0,6" "b:80,67,0,6" "g:240,135,248,255" "240,135,0,6"
+expect_log("full-color movie sprites on (over)")
+probe(color_mix1 00060 "80,67,248,255" "g:80,67,0,6" "b:80,67,0,6" "g:240,135,248,255" "240,135,0,6"
       "240,67,122,134" "g:240,67,122,134")
-# Over a visualizer: the colour sprite covers the .25 gray at half alpha: red .5 x 255 + .5 x 64 = 159, green 32.
-render(colour_over ${COLOUR} --colormap Quarter --set reforce.MovieSprite.Colour=over "--command" "0.1=start:sprite:Clip")
-probe(colour_over 00060 "80,67,153,165" "g:80,67,26,38")
+# Over a visualizer: the color sprite covers the .25 gray at half alpha: red .5 x 255 + .5 x 64 = 159, green 32.
+render(color_over ${COLOR} --colormap Quarter --set reforce.MovieSprite.Color=over "--command" "0.1=start:sprite:Clip")
+probe(color_over 00060 "80,67,153,165" "g:80,67,26,38")
 # Off (the default) stays the luminance sprite: R = G at the red patch (38).
-render(colour_off ${COLOUR} --set reforce.MovieSprite.Colour=off "--command" "0.1=start:sprite:Clip")
-probe(colour_off 00060 "80,67,31,44" "g:80,67,31,44")
+render(color_off ${COLOR} --set reforce.MovieSprite.Color=off "--command" "0.1=start:sprite:Clip")
+probe(color_off 00060 "80,67,31,44" "g:80,67,31,44")

@@ -22,8 +22,8 @@ namespace {
 //     copies (the shader's affine interior test finds no false insides against numpy with 300 x period iterations)
 //     that fit the GPU budget. Approach iterations: the nearby Misiurewicz point's fit; at the landing 45 x period.
 //   Decor: the ring of Julia-like decorations a dive passes on its way to a deep mini, the dive ending about half
-//     way down in log (land), centred on the nucleus; about 10 x period iterations there.
-// Listed to double precision (the centre is a double: clean to ~2^40).
+//     way down in log (land), centered on the nucleus; about 10 x period iterations there.
+// Listed to double precision (the center is a double: clean to ~2^40).
 using K = MandelKind;
 constexpr MandelTarget kTargets[] = {
     {"seahorse double spiral M(28,2)", K::Spiral, -0.74515806380161955527, 0.11257491620541652118, 584, 11.0},

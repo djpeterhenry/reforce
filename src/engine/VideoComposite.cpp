@@ -166,7 +166,7 @@ std::string applyVideoSetting(VideoLayerParams& p, const std::string& keyIn, con
         auto k = parseVideoKey(value);
         if (!k) return "key: none | luma | chroma";
         p.key = *k;
-    } else if (key == "keycolor" || key == "keycolour") {
+    } else if (key == "keycolor" || key == "keycolor") {
         auto c = parseColor(value);
         if (!c) return "keycolor: #rrggbb or r,g,b";
         p.keyColor = *c;

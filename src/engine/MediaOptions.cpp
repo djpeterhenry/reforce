@@ -75,7 +75,7 @@ MediaOptions parseMediaOptions(std::string_view text) {
         const bool off = lv == "0" || lv == "off" || lv == "no" || lv == "false";
         if (key == "loop") {
             if (on || off) o.loop = on;
-        } else if (key == "colorkey" || key == "colourkey") {
+        } else if (key == "colorkey") {
             if (on || off) o.colorKey = on;
         } else if (key == "rate") {
             if (auto d = number(val); d && *d >= 0) o.rate = *d;

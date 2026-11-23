@@ -311,7 +311,7 @@ TEST_CASE("content: (Beat Clock) steps through the bar and flashes on each beat;
     CHECK(on.pose.scale == doctest::Approx(0.3));
     CHECK(later.fill == doctest::Approx(0.25));
     CHECK(later.pose.scale == doctest::Approx(0.16));
-    // Not locked: small, dim, centred.
+    // Not locked: small, dim, centered.
     a.sync.on = 0;
     const SolidSpec off = at(1.6, 12.0);
     CHECK(off.pose.x == doctest::Approx(0.0));

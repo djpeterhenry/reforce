@@ -10,7 +10,7 @@
 // setSampleRate() and the constructor allocate; consume()/analyze() do not.
 //
 // All time constants are in seconds and applied per call as one-pole filters
-// with coefficient 1 - exp(-dt / tau), so behaviour is frame-rate independent.
+// with coefficient 1 - exp(-dt / tau), so behavior is frame-rate independent.
 // `dt` is the caller's frame time; in deterministic mode pass N / sampleRate.
 //
 // The defaults are FITTED to G-Force 5.9.7 measurements (Phase 5C.4; numbers
@@ -25,7 +25,7 @@
 //   * LEVEL is the mean of fft() (x ~1.34), BASS = 4 x LEVEL (it is not a
 //     low-band measure in 5.9.7), ENERGY is a slow (~1.5-2 s) follower of
 //     LEVEL's recent peaks, clamped to 1.
-// Behaviour the model does not reproduce (non-stationary fft() shapes for pure
+// Behavior the model does not reproduce (non-stationary fft() shapes for pure
 // tones and sweeps) is listed in docs/audio-probe-results.md.
 
 #include "audio/BeatTracker.hpp"
@@ -80,18 +80,18 @@ struct AnalyzerConfig {
     int fftSize = 2048;             // analysis window, power of two (Hann)
     double freqLoHz = 0.0;          // Audio.FFT.FreqLo; 0 = auto (kGForceFreqLoHz)
     double freqHiHz = 0.0;          // Audio.FFT.FreqHi; 0 = auto (kGForceFreqHiHz, capped below Nyquist)
-    bool linearSpacing = false;     // bin centres linear in Hz instead of log
-    // Band amplitude of vis bin j (centre f_j, f_j = lo * (hi/lo)^(j/(bins-1))):
+    bool linearSpacing = false;     // bin centers linear in Hz instead of log
+    // Band amplitude of vis bin j (center f_j, f_j = lo * (hi/lo)^(j/(bins-1))):
     //   a_j = sqrt(sum_k w(log2(f_k / f_j) / bandOctaves) * power_k) * (f_j / 1 kHz)^tilt,
     //   w(d) = 1 / (1 + |d|^bandShape)  (peak 1; long tails make tones broad as in G-Force).
-    // power_k: Hann power spectrum scaled so a full-scale sine at a bin centre has power 1.
+    // power_k: Hann power spectrum scaled so a full-scale sine at a bin center has power 1.
     double bandOctaves = 0.428;
     double bandShape = 2.20;
     double tilt = -1.189;
     // Normalization: the bins are split into `envelopes` contiguous groups. Each
     // group's mean amplitude x drives a reference R (attack refAttackSeconds when
     // x > R, release refReleaseSeconds when x < R), R >= refMin, starting at
-    // refInitial. Per bin (R interpolated between group centres):
+    // refInitial. Per bin (R interpolated between group centers):
     //   v = fftGain * a / R,   then per-bin smoothing (instant attack, one-pole
     //   release fftReleaseSeconds * PersistCoef), v < fftLowThresh -> 0,
     //   fft = min(v, fftMax) * responseScale.
@@ -149,7 +149,7 @@ struct AnalyzerConfig {
 };
 
 // Parse a G-Force `Audio.FFT.Params` string ("Key=value Key=value ...", keys
-// case-insensitive) into cfg. Returns the keys it did not recognise, space
+// case-insensitive) into cfg. Returns the keys it did not recognize, space
 // separated (empty when all were used).
 std::string applyGForceFftParams(AnalyzerConfig& cfg, std::string_view params);
 
@@ -222,8 +222,8 @@ public:
 
     // Index of the fft bin whose [lo, hi) range contains hz, or -1.
     int binForFrequency(double hz) const;
-    // Centre frequency of fft bin i.
-    double binCentreHz(int i) const;
+    // Center frequency of fft bin i.
+    double binCenterHz(int i) const;
 
 private:
     struct Impl;

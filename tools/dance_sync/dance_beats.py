@@ -6,7 +6,7 @@
     --preview          render CLIP.beats.mp4: the clip with the beat grid drawn on it, a motion strip, and a click
                        track (accented downbeat), then open it in QuickTime (--no-open to skip)
     --write            save BPM / BeatStart / BeatsPerBar into the movie's "<stem>.reforce.txt" (for an interpolated
-                       "<stem>.rife4x.mov", the original's: analyse the smooth file, keep one options file)
+                       "<stem>.rife4x.mov", the original's: analyze the smooth file, keep one options file)
     --bpm 124          skip the tempo search; only fit the phase at about this tempo (a tempo in the file name,
                        "_128bpm", narrows the search the same way)
     --range 70-180     tempo search range (default 70-180)
@@ -15,7 +15,7 @@
     --offset-beats 0.5 shift the grid by a fraction of a beat (e.g. the beat is the top of the bounce, not the bottom)
     --signal S         auto (default: fits bounce and hits, keeps the more confident; on a silhouette, bounce
                        unless hits leads by 0.2) | bounce (70% bounce + 30% hits) | hits | bounce-only
-    --start / --end    analyse only this part of the clip (seconds or m:ss)
+    --start / --end    analyze only this part of the clip (seconds or m:ss)
 
 How it works:
   1. Frames are scaled to 256 px wide. Repeated frames are skipped (many clips are 15 fps padded to 24 by
@@ -29,7 +29,7 @@ How it works:
                body mask, others the moving region.
        hits    a directogram (flow summed in 8 direction bins; Davis & Agrawala, "Visual Rhythm and Beat", 2018)
                and its summed per-direction deceleration: a movement stopping or reversing.
-     Each is normalised by its local level (quiet passages count) and silenced around shot cuts.
+     Each is normalized by its local level (quiet passages count) and silenced around shot cuts.
   3. Tempo: a Fourier tempogram of the combined envelope (tempo + 2nd/3rd harmonics) plus the bounce
      fundamental, with a mild prior around 115 BPM. The winning frequency's phase gives a first beat grid.
   5. Seamless loops (the last frame flows into the first, like VJ loops) whose length is a whole number of bars at
@@ -269,7 +269,7 @@ def motion_features(path: Path, info: dict, start: float, end: float | None, sil
 def local_even(c: np.ndarray, cuts: np.ndarray, fps: float, win: int = 31, tol_frames: float = 0.6):
     """Content frame times c (first appearances) -> locally linear times. Segments break at cuts and at holds
     (gaps > 3 output frames); in each, a sliding window of `win` frames is fitted with a line, and frame i takes the
-    line of the window centred on it (clamped inside the segment) when that window's residual std is below
+    line of the window centered on it (clamped inside the segment) when that window's residual std is below
     tol_frames. Returns (times, per-pair spacing, per-frame ok)."""
     n = len(c)
     out = c.copy()
@@ -536,7 +536,7 @@ def loop_seam(path: Path, info: dict) -> float:
     return float(np.abs(prev - first).mean()) / typical
 
 
-def analyse(path: Path, args) -> dict:
+def analyze(path: Path, args) -> dict:
     info = probe(path)
     start = args.start or 0.0
     end = args.end if args.end else None
@@ -583,7 +583,7 @@ def analyse(path: Path, args) -> dict:
         "file": str(path),
         "fps": info["fps"],
         "duration": info["duration"],
-        "analysed": [start, start + dur],
+        "analyzed": [start, start + dur],
         "silhouette": sil[0] if sil else None,
         "duplicate_frames": m["dups"],
         "content_fps": round(m["content_fps"], 3) if m["content_fps"] else None,
@@ -692,7 +692,7 @@ def render_preview(path: Path, r: dict, out: Path) -> None:
         since = t - (down + k * period)
         num = k % bpb + 1
         is_down = num == 1
-        inside = r["analysed"][0] - 1e-6 <= t <= r["analysed"][1] + 1e-6
+        inside = r["analyzed"][0] - 1e-6 <= t <= r["analyzed"][1] + 1e-6
         if inside and since < flash_len:
             a = 1.0 - since / flash_len
             col = np.array((40, 40, 255) if is_down else (255, 220, 60), float)
@@ -786,7 +786,7 @@ def main() -> int:
         return 1
     print(f"{'clip':40} {'BPM':>8} {'conf':>5} {'hits':>5} {'jitter':>7}  alternatives")
     for m in movies:
-        r = analyse(m, args)
+        r = analyze(m, args)
         cache_json(m).write_text(json.dumps(r, separators=(",", ":")))
         alts = ", ".join(f"{c['bpm']:g}" for c in r["candidates"][1:4])
         jit = f"{r['jitter_ms']:.0f}ms" if r["jitter_ms"] is not None else "-"

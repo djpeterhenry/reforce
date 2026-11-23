@@ -418,8 +418,8 @@ engine::SpriteAudio Visualizer::spriteAudio(const audio::AudioFrame* audio) cons
 void Visualizer::stepSprites(double t, const audio::AudioFrame* audio) {
     feedbackQuads_.clear();
     displayQuads_.clear();
-    colourQuads_.clear();
-    colourFrames_.clear();
+    colorQuads_.clear();
+    colorFrames_.clear();
     adoptSprites(t);
     for (auto it = sprites_.begin(); it != sprites_.end();) {
         if (it->run->expired(t)) {
@@ -465,7 +465,7 @@ void Visualizer::stepSprites(double t, const audio::AudioFrame* audio) {
                 const double scale = std::min(d.w / f->width(), d.h / f->height());
                 videoSpriteDraws_.push_back({s.texture, s.video.get(), f, scale});
             }
-            if (f && movieColourOver_ && d.opacity > 0.0) colourFrames_.push_back(f);
+            if (f && movieColorOver_ && d.opacity > 0.0) colorFrames_.push_back(f);
             if (f) stepFrames_.push_back(std::move(f));
         }
         if (d.opacity <= 0.0) continue;
@@ -476,12 +476,12 @@ void Visualizer::stepSprites(double t, const audio::AudioFrame* audio) {
         q.w = float(d.w);
         q.h = float(d.h);
         q.opacity = float(d.opacity);
-        if (s.video && movieColourOver_) {
-            // Full colour (PLAN 5K): not in the intensity buffer; alpha-over after colorize. The Mix scales the
+        if (s.video && movieColorOver_) {
+            // Full color (PLAN 5K): not in the intensity buffer; alpha-over after colorize. The Mix scales the
             // opacity from half (Mix 0, like the half-way lighten) to the full envelope (Mix 1).
             q.opacity = float(d.opacity * (0.5 + 0.5 * movieSpriteMix_));
             q.opaque = !s.video->spec().colorKey;  // ColorKey = 0: opaque in the Syphon alpha
-            colourQuads_.push_back(q);
+            colorQuads_.push_back(q);
             continue;
         }
         const engine::SpriteLayerPlan plan =
@@ -501,7 +501,7 @@ void Visualizer::stepSprites(double t, const audio::AudioFrame* audio) {
     if (engine::spriteOldestOnTop(spriteLayering_)) {
         std::reverse(feedbackQuads_.begin(), feedbackQuads_.end());
         std::reverse(displayQuads_.begin(), displayQuads_.end());
-        std::reverse(colourQuads_.begin(), colourQuads_.end());
+        std::reverse(colorQuads_.begin(), colorQuads_.end());
     }
 }
 

@@ -5,7 +5,7 @@ Input: NAME.onsets.csv from `beat_eval.py --dump-onsets` (tuning-split songs onl
 grid (0 = on a beat), kick-ness, strength and 9 band features of the onset's hop and of the next hop
 (BeatTracker::lastOnsetBands / lastOnsetBandsNext). Label: on the beat =
 phase within 0.1 beat of a whole beat. Logistic regression (Newton / IRLS, numpy), checked on 20 % of the songs held
-out by name. Prints the C++ initialisers for BeatConfig::beatnessW / beatnessWNext / beatnessBias.
+out by name. Prints the C++ initializers for BeatConfig::beatnessW / beatnessWNext / beatnessBias.
 
   python3.11 -I tools/beat_eval/train_beatness.py build/beat-eval/train1500.onsets.csv
 """

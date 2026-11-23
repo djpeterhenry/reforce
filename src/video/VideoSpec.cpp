@@ -148,7 +148,7 @@ int decodeCardIndex(const std::uint8_t* bgra, int width, int height, std::size_t
     int v = 0;
     const int y = height / 8;  // middle of the top band
     for (int k = 0; k < 8; ++k) {
-        const int x = (2 * k + 1) * width / 16;  // block centre
+        const int x = (2 * k + 1) * width / 16;  // block center
         const std::uint8_t* p = bgra + std::size_t(y) * bpr + std::size_t(x) * 4;
         const int lum = (int(p[0]) + int(p[1]) + int(p[2])) / 3;
         if (lum >= 128) v |= 1 << (7 - k);

@@ -21,7 +21,7 @@ struct Rekordbox {
     struct Deck {
         bool playing = false;
         double pos = 0;   // true position, s
-        double shown = 0; // position as read (buffer-quantised)
+        double shown = 0; // position as read (buffer-quantized)
         double bpm = 128, origBpm = 128;
     };
     Deck decks[4];

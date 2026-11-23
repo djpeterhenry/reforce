@@ -40,7 +40,7 @@ struct Stats {
     long samples = 0, black = 0, transparent = 0, dips = 0, spikes = 0;
     double sumMean = 0;
     std::vector<double> blackTimes, dipTimes, spikeTimes, recent;  // recent: the last few means (dip detection)
-    // Spike detection: a single sample unlike both neighbours (which agree), in brightness or alpha, either way.
+    // Spike detection: a single sample unlike both neighbors (which agree), in brightness or alpha, either way.
     double prevRgb = -1, prevA = -1, prev2Rgb = -1, prev2A = -1, prevT = 0;
 };
 
@@ -177,7 +177,7 @@ void record(Stats& s, double rgb, double a, double t) {
     s.recent.push_back(rgb);
     if (s.recent.size() > 8) s.recent.erase(s.recent.begin());
     // A spike (a one-sample flash, brighter or darker, or a jump in alpha): the previous sample differs from both
-    // its neighbours by more than the threshold, in the same direction, while those two agree.
+    // its neighbors by more than the threshold, in the same direction, while those two agree.
     if (s.prev2Rgb >= 0) {
         auto spike = [](double before, double mid, double after, double thr) {
             const double d1 = mid - before, d2 = mid - after;

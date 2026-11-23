@@ -21,7 +21,7 @@
 //                Movie / live sprites (Phase 5F) sample a BGRA video frame
 //                (luminance computed in the shader) set each step.
 //   3. colorize  RGB = palette(lut(displayed)) -> BGRA8 output texture
-//                (+ the colour video layer, Phase 5F: fitted, keyed, crossfaded
+//                (+ the color video layer, Phase 5F: fitted, keyed, crossfaded
 //                and blended over/under in the same pass; VideoLayerDraw)
 //
 // Steps 1+2 run once per simulation tick (encodeStep); colorize runs once per
@@ -135,7 +135,7 @@ bool parseLineAa(const std::string& s, LineAa& out);
 //           for x-major segments and dots, horizontal for y-major), clipped to
 //           the pixel. A thin horizontal line is one row at 255 x width; a dot is
 //           a column-span disc (a 1-px-wide box of height = width below 1 px).
-// Only the per-path method honours it (analytic / MSAA / no-AA keep their own).
+// Only the per-path method honors it (analytic / MSAA / no-AA keep their own).
 enum class ThinLines { Smooth, GForce };
 
 // How the flow pass resamples and quantizes intensity in the 8-bit ("gforce") buffer. G-Force behaves like
@@ -151,6 +151,9 @@ struct ScenePipelineOptions {
     bool antialias = true;                // WaveShape.AntiAlias
     LineAa lineAa = LineAa::PerPath;      // method when antialias is on
     ThinLines thinLines = ThinLines::Smooth;  // settings reforce.ThinLines (per-path AA only)
+    // reforce.LineEdges = color: antialiased line edges blend the line's and the background's ColorMap colors in
+    // the displayed frame (no multi-colored fringes); the feedback keeps G-Force's intensity edges.
+    bool colorEdges = false;
 };
 
 struct FlowBlend {
@@ -181,15 +184,15 @@ struct SpriteQuad {
     // Texture sub-rectangle the quad samples (u0, v0 = top-left; 3D solids, PLAN 5L.2: the solid's box in its
     // frame-sized target). Default: the whole texture.
     float u0 = 0, v0 = 0, u1 = 1, v1 = 1;
-    // Full-colour movie sprites: opaque in the Syphon alpha (the movie's ColorKey = 0) while it is tracked.
+    // Full-color movie sprites: opaque in the Syphon alpha (the movie's ColorKey = 0) while it is tracked.
     bool opaque = false;
-    // Puzzle solids drawn in colour (encodeColorize's colourSolids): 0 rubik (stickers and plastic), 1 fifteen (tiles
+    // Puzzle solids drawn in color (encodeColorize's colorSolids): 0 rubik (stickers and plastic), 1 fifteen (tiles
     // with numbers in a contrasting shade).
     int puzzle = 0;
     float numeral = 0;  // fifteen: the numbers 0 = dark .. 1 = light (engine::TilePicker::numeral)
 };
 
-// Colour video layer for one colorize pass (Phase 5F): outgoing source A and
+// Color video layer for one colorize pass (Phase 5F): outgoing source A and
 // incoming B (either may be null; "none" fades from / to nothing), crossfade
 // weight A -> B, per-source fit transforms. Textures are BGRA8 frames owned
 // by the caller until the GPU is done.
@@ -230,6 +233,7 @@ public:
     void setThinLines(ThinLines m) { opts_.thinLines = m; }
     void setFlowRounding(FlowRounding r) { opts_.flowRounding = r; }
     void setAntialias(bool on) { opts_.antialias = on; }
+    void setColorEdges(bool on) { opts_.colorEdges = on; }
     IntensityFormat format() const { return opts_.format; }
     // Switches the trail buffer format: new intensity ping-pong + displayed-frame
     // textures (allocated here, once per switch); the next encode first copies the
@@ -270,7 +274,7 @@ public:
     // or clears it.
     void encodeNoise(MTL::CommandBuffer* cmd, uint32_t seed);
     // Kick zoom (PLAN 5O.3) for the next flow passes: every source coordinate is scaled by (1 - zoom) and turned by
-    // `rotate` radians about the centre (aspect-correct), so the trail pushes out (and turns) for a moment. 0, 0 =
+    // `rotate` radians about the center (aspect-correct), so the trail pushes out (and turns) for a moment. 0, 0 =
     // the plain flow, bit for bit.
     void setKick(float zoom, float rotate) {
         kickZoom_ = zoom;
@@ -321,21 +325,21 @@ public:
     int addVideoSpriteTexture(bool invert, const VideoLevels& levels = {});
     void setSpriteFrame(int handle, MTL::Texture* frame);
     // Colorize the latest intensity frame into `output` (BGRA8, width x height),
-    // with the colour video layer composited when `video` has a source, then the
-    // full-colour movie sprites (PLAN 5K, reforce.MovieSprite.Colour = over): each
+    // with the color video layer composited when `video` has a source, then the
+    // full-color movie sprites (PLAN 5K, reforce.MovieSprite.Color = over): each
     // quad's video sprite texture (addVideoSpriteTexture: its levels and '~' invert,
     // per channel) alpha-over at the quad's rectangle with alpha = quad.opacity, in
     // order. The output's alpha stays 1; with `trackAlpha` (reforce.Syphon.Alpha) it is 0 instead, raised by
     // the opaque quads (SpriteQuad::opaque) and later the dancers: how much encodeSyphonAlpha keeps opaque.
     // `opaqueSolids` (with trackAlpha only): 3D solid quads with ColorKey = 0; their coverage x opacity raises the
-    // alpha (max), so the whole solid stays opaque even where its colours are dark.
-    // `colourSolids`: rubik solids drawn over the frame in colour from their targets (solid_colour_fs: sticker and
-    // plastic colours mixed by their shares, so borders anti-alias in colour); SpriteQuad::opaque = ColorKey 0.
+    // alpha (max), so the whole solid stays opaque even where its colors are dark.
+    // `colorSolids`: rubik solids drawn over the frame in color from their targets (solid_color_fs: sticker and
+    // plastic colors mixed by their shares, so borders anti-alias in color); SpriteQuad::opaque = ColorKey 0.
     void encodeColorize(MTL::CommandBuffer* cmd, const engine::Palette& palette, const engine::MapLut& lut,
                         MTL::Texture* output, const VideoLayerDraw* video = nullptr,
-                        const SpriteQuad* colourQuads = nullptr, std::size_t colourCount = 0, bool trackAlpha = false,
+                        const SpriteQuad* colorQuads = nullptr, std::size_t colorCount = 0, bool trackAlpha = false,
                         const SpriteQuad* opaqueSolids = nullptr, std::size_t opaqueCount = 0,
-                        const SpriteQuad* colourSolids = nullptr, std::size_t colourSolidCount = 0);
+                        const SpriteQuad* colorSolids = nullptr, std::size_t colorSolidCount = 0);
     // The Syphon output (docs/syphon-alpha.md): `frame` (colorized with trackAlpha) into `output` with its alpha
     // = opaque + (1 - opaque) * key, key = OBS's Color Key on black (similarity / smoothness 0..1 = OBS's / 1000).
     void encodeSyphonAlpha(MTL::CommandBuffer* cmd, MTL::Texture* frame, MTL::Texture* output, float similarity,
@@ -409,11 +413,11 @@ private:
     void flushConverts(MTL::CommandBuffer* cmd);
     MTL::RenderPipelineState* colorizePso_ = nullptr;
     MTL::RenderPipelineState* colorizeVideoPso_ = nullptr;
-    MTL::RenderPipelineState* colourSpritePso_ = nullptr;  // full-colour movie sprites over the colorized frame
-    MTL::RenderPipelineState* colourSpriteOpaquePso_ = nullptr;
+    MTL::RenderPipelineState* colorSpritePso_ = nullptr;  // full-color movie sprites over the colorized frame
+    MTL::RenderPipelineState* colorSpriteOpaquePso_ = nullptr;
     MTL::RenderPipelineState* solidOpaquePso_ = nullptr;
-    MTL::RenderPipelineState* solidColourPso_ = nullptr;        // rubik in colour over the colorized frame
-    MTL::RenderPipelineState* solidColourOpaquePso_ = nullptr;  // ... also raising the tracked alpha  // ColorKey = 0 solids raising the tracked alpha  // ... raising the tracked Syphon alpha
+    MTL::RenderPipelineState* solidColorPso_ = nullptr;        // rubik in color over the colorized frame
+    MTL::RenderPipelineState* solidColorOpaquePso_ = nullptr;  // ... also raising the tracked alpha  // ColorKey = 0 solids raising the tracked alpha  // ... raising the tracked Syphon alpha
     MTL::RenderPipelineState* syphonAlphaPso_ = nullptr;
     MTL::RenderPipelineState* backdropPso_ = nullptr;
     MTL::RenderPipelineState* bodyBurnPso_ = nullptr;  // in the active FormatSet
@@ -443,6 +447,9 @@ private:
     std::map<int, SpriteTex> spriteTex_;
     int nextSpriteHandle_ = 0;
     MTL::Texture* display_ = nullptr;  // displayed frame while sprites draw (pre-EPen + Pen pass)
+    MTL::Texture* edge_ = nullptr;     // color edges: this step's line coverage (pen x cov, cov), made on first use
+    bool edgeValid_ = false;
+    MTL::RenderPipelineState* lineCoverPso_ = nullptr;
     bool displayValid_ = false;
     MTL::RenderPipelineState* spritePso_[5] = {nullptr, nullptr, nullptr, nullptr, nullptr};  // over, add, max, premul, fetch
     void encodeSprites(MTL::CommandBuffer* cmd, MTL::Texture* target, const SpriteQuad* quads, std::size_t count,

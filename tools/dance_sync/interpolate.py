@@ -163,7 +163,7 @@ def interpolate(path: Path, factor: int, out_dir: Path | None, keep: bool, compa
             # the mapping: output 2k is real frame k (RIFE re-renders it at timestep 0: near, not exact)
             for k in (1, n_content // 3, n_content // 2, n_content - 2):
                 d = {j: same(half / f"{2 * k + 1:08d}.png", content_dir / f"{j + 1:08d}.png") for j in (k - 1, k, k + 1)}
-                if d[k] > min(d.values()) + 0.5 or d[k] > 4.0:  # (near-still frames: neighbours tie)
+                if d[k] > min(d.values()) + 0.5 or d[k] > 4.0:  # (near-still frames: neighbors tie)
                     raise RuntimeError(f"unexpected RIFE frame mapping at real frame {k}: {d}")
             base_dir = tmp / "base"
             base_dir.mkdir()
@@ -213,7 +213,7 @@ def interpolate(path: Path, factor: int, out_dir: Path | None, keep: bool, compa
 
 
 def side_by_side(orig: Path, new: Path, out: Path, speed: float = 0.5, seconds: float = 30.0) -> None:
-    """Original | interpolated at half speed, labelled, 60 fps."""
+    """Original | interpolated at half speed, labeled, 60 fps."""
     f = (f"[0:v]setpts=PTS/{speed},fps=60,scale=640:-2,drawtext=text='original (half speed)':x=10:y=10:"
          f"fontcolor=white:fontsize=20:box=1:boxcolor=black@0.5[a];"
          f"[1:v]setpts=PTS/{speed},fps=60,scale=640:-2,drawtext=text='restored + RIFE (half speed)':x=10:y=10:"

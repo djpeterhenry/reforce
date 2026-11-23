@@ -62,7 +62,7 @@ foreach(want
 endforeach()
 
 # Probe points (320x180): particle path 0 at (160,45), path 1 (Pen = FADER) at (160,135);
-# Card (native 64x32 at X = .5: centre .5 x (1 - 64/320) = .4 -> x 224, probe #41) white half (208,90), black half
+# Card (native 64x32 at X = .5: center .5 x (1 - 64/320) = .4 -> x 224, probe #41) white half (208,90), black half
 # (240,90); inverted card (X = -.5 -> x 96): (80,90) was white, (112,90) was black.
 function(probe frame)
     execute_process(COMMAND "${PNG_PROBE}" "${WORK_DIR}/out/frame_${frame}.png" ${ARGN}

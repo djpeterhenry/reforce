@@ -1,13 +1,13 @@
 # Arcade organics: game-inspired visuals on the beat (PLAN 5Q)
 
 Peter (2026-11-22): video-game inspired visuals (an invader march, a pyramid hopper, light cycles; then vector rocks and a brick wall) as inputs to the
-flow field, taking beat-synchronised actions. Settled the same day:
+flow field, taking beat-synchronized actions. Settled the same day:
 
 - **Drawn into the feedback.** Each game is an Organic kind (`Kind="invaders"`, `"hopper"`, `"cycles"`): line art
   through the OrganicCanvas into the intensity buffer, like Game of Life. So it trails in the FlowField and takes the
   ColorMap, and every frame draws the game crisp over its own smear. (Later, maybe: the game stirring the warp
   itself.)
-- **Beat-synchronised.** Moves land on beat / bar / phrase lines of the beat clock (`OrganicStep::beat`, `bar`:
+- **Beat-synchronized.** Moves land on beat / bar / phrase lines of the beat clock (`OrganicStep::beat`, `bar`:
   the phrase-aligned clock when confident, else 120 BPM from the start). Breakdowns (`SYNC_BUILD`) and drops
   (`SYNC_DROP`) get their own moments.
 - **Nobody loses.** The invaders never shoot back; the player never dies. Rounds end on musical lines, not on
@@ -56,7 +56,7 @@ Chase Normal's speed, walls and turns, a higher camera cutting every bar); Chase
     silhouette's highlight, a glowing seam along each side, the bottom line dimmer, a bright tail-light bar across
     the back;
   - the **wheels over the body**, always: dark discs, thick bright rims on both edges of the tyre, a hub ring and hot
-    centre, and tread marks (short arcs just inside the rim) **rolling with the distance ridden** (the angle is the
+    center, and tread marks (short arcs just inside the rim) **rolling with the distance ridden** (the angle is the
     cells ridden, `Spd` per beat, over the wheel's radius: about 1.5 turns a second at 120 BPM, smooth, with four
     marks it never strobes; a drop's boost is not counted, so they never jump). From the side they are near-circles.
   - Glow: a wide faint bloom under the brightest lines (the rim edge nearer the camera, the top line, the tail light,
@@ -153,7 +153,7 @@ Beat use (the game runs on a grid of 48 ticks per beat, so it is the same at any
 - **Catch-up**: a step that jumps ahead advances at most 4 beats of ticks; a longer jump (or a jump back) drops the
   shots in flight and carries on from the new beat.
 
-Intensities (× `Pen`), apart so the ColorMap colours the parts differently: rocks .6 (a chipped rock flashes to .86),
+Intensities (× `Pen`), apart so the ColorMap colors the parts differently: rocks .6 (a chipped rock flashes to .86),
 ship .92, flame .74, shots 1, edge debris .5, sparks .8, shockwave .7; debris fades to 0.
 
 | Key | Tier | Meaning |
@@ -208,7 +208,7 @@ gently).
   flashes, and nothing breaks), and when there is nothing to aim at, the ball goes up through a gap in the wall to the
   ceiling and back to the paddle (the ceiling bounce off the beat, like the side walls). Only when the wall has more
   bricks than the time has hits at the quickest pace does a dithered share of the hits break two (the target and its
-  nearest free neighbour), spread evenly over the cycle; three or more only for walls far too big for their cycle.
+  nearest free neighbor), spread evenly over the cycle; three or more only for walls far too big for their cycle.
   The volleys just before the line look ahead (on a copy of the plan) so the final one reaches the last brick at
   the base speed, knocking instead of breaking if that keeps a brick more to aim at. Hits steer away from a seeded
   "finale" brick high in the wall, so the last one stands there. At the content configs (12 seeds x 2 cycles each):
@@ -216,7 +216,7 @@ gently).
   (two otherwise); before this change it was 6 % (Brick Wall), 0 % (Brick Storm) and 88 % (Brick Drift), with four or
   more bricks on every line.
 - **The paddle** glides between ball 0's hits (smoothstep over the middle 60 % of the interval, so it waits under
-  the ball) and meets it off-centre, on the side that sends it towards the next target; it glows for a moment on
+  the ball) and meets it off-center, on the side that sends it towards the next target; it glows for a moment on
   each hit.
 - **Drop (SYNC_DROP rising past .6): multiball.** The plan is redone from each ball's next bounce: `Mult` extra balls
   split off ball 0 there, each hitting on the tick lines at the same speed and taking its share of the bricks, one per
@@ -228,7 +228,7 @@ gently).
 - **Pieces.** A broken brick bursts into `Frag` spinning pieces (from a 3 x 2 grid over it) that fly up and out,
   fall and fade over `FLif` beats, shrinking: a pure function of the break time, so they survive into the next
   cycle and trail well in the FlowField. Rows take different intensities (a seeded scheme per wall: brighter up,
-  down, alternating, waved), so the ColorMap colours them apart; a fresh wall lands bright.
+  down, alternating, waved), so the ColorMap colors them apart; a fresh wall lands bright.
 - **Walls** (seeded per cycle unless `Lay`): 0 full, 1 narrowing downwards, 2 chequer of double bricks, 3 diamond,
   4 pillars under a beam, 5 a wave of column heights, 6 two blocks under a beam, 7 worn (a fifth missing).
 - **Budget:** at the defaults at most ~1800 segments at 1920 x 1080 (filled rects are strokes ~2 px apart), mean
@@ -275,7 +275,7 @@ things (shots, debris, the saucer, the cannon's slide) are drawn from closed-for
 picture is the same at any frame rate.
 
 - *March*: one step per beat × `Rate`. A sweep is 15 sideways steps plus the step down, 16 steps: 4 bars at Rate 1,
-  so the steps down land on bar lines. Through a breakdown the march hurries, quantised: `SYNC_BUILD` ≥ 1/3 doubles
+  so the steps down land on bar lines. Through a breakdown the march hurries, quantized: `SYNC_BUILD` ≥ 1/3 doubles
   it (8ths), ≥ 2/3 doubles it again (16ths). The last eighth of a formation hurries one notch too, like the classic.
   Each step toggles the animation frame.
 - *Cannon*: `Fire` shots per beat (2: the 8ths; 4: the 16ths). After a shot it lingers for half the gap, then slides
@@ -297,7 +297,7 @@ picture is the same at any frame rate.
 
 **Intensities**: every species at `Aln` (all rows alike, so none fades into the background; `RShd` darkens each species below the top one by that much, e.g. .12), the cannon at `Cann`, shots and flashes at `Shot`,
 debris starting at its alien's level × `Debr` and fading, the saucer at Pen; so the ColorMap gives them different
-colours (in palettes made for full-intensity lines, levels near 1 read best).
+colors (in palettes made for full-intensity lines, levels near 1 read best).
 
 **Cost**: at 1920 x 1080 the default (11 x 5) draws at most ~3500 segments per frame (bursts and a drop included),
 a 16 x 6 swarm at most ~5800; a step costs ~0.03 ms. Debris is capped at 2400 dots, shots at 32.
@@ -307,14 +307,14 @@ The run's log line (start and end) carries a tally: waves, hits, saucers, beam-u
 | Key | Tier | Default | Meaning |
 |---|---|---|---|
 | `Cols`, `Rows` | load | 11, 5 | The formation (1..24, 1..8). Rows: gazers on top, then moths, then boxbots. |
-| `Rate` | load | 1 | March steps per beat (.25..4), before the build speed-up; quantised to the 16th grid. |
+| `Rate` | load | 1 | March steps per beat (.25..4), before the build speed-up; quantized to the 16th grid. |
 | `Fire` | load | 2 | Shots per beat (0..4; 0 = no regular shots, the saucer is still shot down), on the 16th grid. |
 | `Aim` | load | .7 | Share of shots aimed at an alien (0..1); the others go through gaps. |
 | `Wave` | load | 16 | Bars per wave (0 = only when cleared; else at least 1). |
 | `Pix` | load | .0115 | Alien pixel size in tree units (.002 to .05); shrunk so the formation fits (≤ 2.6 wide, ≤ .9 tall). |
 | `Sauc` | load | 1 | 1 = the saucer each phrase, 0 = none. |
 | `RShd` | load | 0 | Row shading: each species below the top one this much dimmer (0 = all rows alike; .12 = the first look). |
-| `Aln`, `Cann`, `Shot`, `Debr` | frame | 1, 1, 1, 1 | Intensities (× Pen) of the aliens, cannon (the aliens' colour by default), shots / flashes, debris. Shots are bold bolts: 2 pixels wide, 7 long, a bigger head and a fading tail. |
+| `Aln`, `Cann`, `Shot`, `Debr` | frame | 1, 1, 1, 1 | Intensities (× Pen) of the aliens, cannon (the aliens' color by default), shots / flashes, debris. Shots are bold bolts: 2 pixels wide, 7 long, a bigger head and a fading tail. |
 | `X`, `Y`, `Scal`, `Rot`, `Pen` | frame | | As for every organic. |
 
 (The pixel size is `Pix`, not `Px`: `PX` is the trees' per-point key.)
@@ -331,7 +331,7 @@ dark again for the next cycle. Nobody loses: balls bounce down past the player, 
 (9 rows, 16 bars, off-beat balls; Pyramid Hop and Pyramid Mini were removed 2026-11-22).
 
 - **The board** (engine/arcade/Hopper.hpp: the model, apart from the drawing so tests check the rules). `Rows` rows,
-  cube (r, c) with c = 0..r; a hop goes to a diagonal neighbour one row up or down. Flat line art: per cube a top
+  cube (r, c) with c = 0..r; a hop goes to a diagonal neighbor one row up or down. Flat line art: per cube a top
   diamond in its state's intensity and two side faces at fixed darker intensities, all inset a little over the
   pyramid's dark silhouette (one path, max-combined), so dark seams separate the faces. Fitted to the frame.
 - **Beat use.** The hop clock is the beat clock's beats, shifted by whole beats onto the phrase-aligned bars, so
@@ -342,13 +342,13 @@ dark again for the next cycle. Nobody loses: balls bounce down past the player, 
   sides light up on the 16ths), then the tops go dark in a quick cascade down the rows (apex at half a beat, the
   bottom row at .85), before the first landing.
 - **The route** (once per cycle: ~0.05 ms for 7 rows, under ~2.5 ms for any size and `Levels`). The pyramid's graph
-  is two-coloured by row parity and every hop changes colour, so each colour gets a fixed share of the 4 x `Cyc`
+  is two-colored by row parity and every hop changes color, so each color gets a fixed share of the 4 x `Cyc`
   landings; `Cyc` doubles until both shares cover their cubes `Levels` - 1 times (7 rows fit 8 bars exactly with 2
   levels: the 16 even-row cubes take every even-row landing, the 12 odd-row cubes share 16; 8 rows need 16 bars; 3
   levels double that: 7 rows 16 bars, 4 rows 8). A seeded depth-first search with Warnsdorff ordering finds a walk
   from where the last cycle ended that lands on every cube `Levels` - 1 times, the last of those steps exactly on the
   line (cuts: reach, parity shares of the steps left, a step left for the last landing, bottom corners reachable only
-  through a neighbour whose last step then cannot be the cycle's last; short searches restarted with fresh seeded
+  through a neighbor whose last step then cannot be the cycle's last; short searches restarted with fresh seeded
   orders, as the backtracking is heavy-tailed). Every cycle has its own route. Landings beyond a cube's steps (on a
   bright top) change nothing.
 - **Balls** drop onto the apex on bar lines (`Ball` per bar; not on the cycle line, and only while they can bounce
@@ -391,12 +391,12 @@ Racers on a grid seen from above, each leaving a wall behind it (engine/arcade/C
 game from above: 4 on 40 x 24) and (Chase Swarm Top) (Chase Swarm's: 8 on 64 x 36); the Trail configs were removed
 2026-11-22.
 
-- **The arena.** `Cols` x `Rows` cells (48 x 27: square cells in 16:9), centred, at most 3.36 x 1.88 tree units at
+- **The arena.** `Cols` x `Rows` cells (48 x 27: square cells in 16:9), centered, at most 3.36 x 1.88 tree units at
   16:9 (the width follows the frame's aspect), a border around it and optional faint grid lines that pulse on every
   beat.
-- **Riding on the beat.** A cycle moves one cell per tick, `Spd` ticks per beat, gliding between cell centres, so
-  every head is exactly on a cell centre on every beat line. It turns 90 degrees only on turn lines: beats (`Turn` 1),
-  8ths (2) or 16ths (4), where they fall on a cell centre. Every cell it rides through is wall until `Tail` bars
+- **Riding on the beat.** A cycle moves one cell per tick, `Spd` ticks per beat, gliding between cell centers, so
+  every head is exactly on a cell center on every beat line. It turns 90 degrees only on turn lines: beats (`Turn` 1),
+  8ths (2) or 16ths (4), where they fall on a cell center. Every cell it rides through is wall until `Tail` bars
   later; the oldest end of the wall shrinks away smoothly, so the arena never fills.
 - **Drawing.** Each cycle at its own intensity (spread over .62 .. 1, so the ColorMap tells them apart): the wall a
   little dimmer than the head and fading towards its retracting tail, drawn as a few long lines (straight runs
@@ -407,7 +407,7 @@ game from above: 4 on 40 x 24) and (Chase Swarm Top) (Chase Swarm's: 8 on 64 x 3
   over the next six turn lines (walls counted where they will still stand) and the room behind (a flood fill over
   the points it can turn at). Turns by choice are seeded: likeliest on a bar line (about half the time), now and then
   on a beat, rarely in between, earlier rather than later when a wall is coming up, towards open ground. Pairs start
-  as mirror images (left-right, up-down or about the centre, with the formation) and the partner copies its leader's
+  as mirror images (left-right, up-down or about the center, with the formation) and the partner copies its leader's
   moves mirrored while it safely can (`Mirr`: how often a pair does), which gives the choreographed look.
 - **Crashes** (Peter 2026-11-22: some may crash, and explode). The AI keeps trying to survive, so a cycle crashes
   only when it is truly boxed in (no safe way at its last turn line: it then rides the way that keeps it going
@@ -423,9 +423,9 @@ game from above: 4 on 40 x 24) and (Chase Swarm Top) (Chase Swarm's: 8 on 64 x 3
   grid or shorter walls.
 - **Rounds.** Every `Rsd` bars (16: on the phrase lines with the phrase clock) the round ends: every wall bursts into
   a spray of sparks (dots flying out and fading over 1.5 to 3.5 beats, up to 2400) and the cycles start again from a
-  formation (racers facing in from the sides, a pinwheel from the corners, a burst from the centre, or columns from
+  formation (racers facing in from the sides, a pinwheel from the corners, a burst from the center, or columns from
   the bottom), each marked by a shrinking diamond for a beat.
-- **Drop** (`SYNC_DROP` rising past .5): from the next beat line, twice the speed for a bar (still on cell centres
+- **Drop** (`SYNC_DROP` rising past .5): from the next beat line, twice the speed for a bar (still on cell centers
   at every beat line); the walls and border flash, fading over the bar.
 - **Breakdown** (`SYNC_BUILD` at least .5, from the beat line on): twice the speed, and turns on twice as many lines
   (beats become 8ths).

@@ -53,10 +53,14 @@ public:
     double number(std::string_view key, double fallback) const;
     bool flag(std::string_view key, bool fallback) const { return number(key, fallback ? 1.0 : 0.0) != 0.0; }
     std::size_t size() const { return values_.size(); }
+    // Keys never looked up (entry / get / string / number / flag) since the table was made, in their original
+    // spelling, sorted: what Settings::apply did not use (unknown or misspelled settings).
+    std::vector<std::string> unread() const;
     const std::map<std::string, Entry>& entries() const { return values_; }  // lower-case key -> entry
 
 private:
     std::map<std::string, Entry> values_;
+    mutable std::set<std::string> read_;  // lower-case keys looked up
 };
 
 // Per-layer slideshow/transition settings (stored now, used by the M5 scheduler).
@@ -116,7 +120,7 @@ struct Settings {
     double spriteTrails = 0.35;            // reforce.SpriteTrails: feed strength of `trails` (0..1)
     std::string spriteAlpha = "black";     // reforce.SpriteAlpha: black (transparent image pixels count as black)
                                            // | ignore (G-Force, probe #42: the alpha channel is ignored, the
-                                           // colour under transparent pixels shows)
+                                           // color under transparent pixels shows)
 
     // Graphics
     double targetFrameRate = 60.0;      // Graphics.TargetFrameRate
@@ -151,7 +155,7 @@ struct Settings {
     std::string externalSpritesDir;           // reforce.ExternalSpritesDir: extra sprite folder (images and
                                               //   movies; like G-Force's ExternalSprites.Path), joins the slideshow
     std::string videoDir;                     // reforce.VideoDir: movie folder for the video source picker
-    std::string videoStartupSource;           // reforce.Video.Layer.Source: played on the colour layer at startup
+    std::string videoStartupSource;           // reforce.Video.Layer.Source: played on the color layer at startup
     std::string spriteReplace = "own";        // reforce.SpriteReplace: which running EPen-only sprites a new EPen-only
                                               //   sprite fades out: own = only its own kind (images replace images,
                                               //   movies/live video replace movies/live video); any = G-Force (#44)
@@ -161,8 +165,8 @@ struct Settings {
     double spriteMix = 0.0;                   // reforce.Sprite.Mix: image sprites' Mix, 0..1 (0 = G-Force; 1 = the
                                               //   sprite takes over its rectangle; engine::spriteLayerPlan)
     double movieSpriteMix = 0.0;              // reforce.MovieSprite.Mix: the same for movie and live video sprites
-    std::string movieSpriteColour = "off";    // reforce.MovieSprite.Colour: off (G-Force: movie sprites are luminance in
-                                              //   the intensity buffer) | over (their full-colour frames are drawn
+    std::string movieSpriteColor = "off";    // reforce.MovieSprite.Color: off (G-Force: movie sprites are luminance in
+                                              //   the intensity buffer) | over (their full-color frames are drawn
                                               //   over the colorized frame, alpha = envelope x (0.5 + 0.5 Mix))
     int movieSpriteMaxLive = 1;               // reforce.MovieSprite.MaxLive: movie / live video sprites at full strength at
                                               // once (0 = no limit); like Object.MaxLive
@@ -170,7 +174,7 @@ struct Settings {
                                               //   (> 0, below 1 brightens; times a movie's own Gamma in .reforce.txt)
     bool videoSpriteLoop = false;             // reforce.Video.Sprite.Loop: movie sprites loop for their lifetime
     bool movieBeatSync = true;                // reforce.Video.BeatSync: movies with a BPM (.reforce.txt) play
-                                              //   locked to the beat clock, as sprites and on the colour layer
+                                              //   locked to the beat clock, as sprites and on the color layer
                                               //   (engine/MovieBeatSync.hpp)
     std::string beatClockSource = "auto";     // reforce.BeatClock.Source: auto (Link, else audio) | link | audio | off
     double beatClockAudioOffsetMs = 10.0;     // reforce.BeatClock.AudioOffsetMs: the onset detector's own delay (+ =
@@ -182,7 +186,7 @@ struct Settings {
                                               //   steady tempo (house; breakdowns hold it). 0 = react quickly.
                                               //   Read at startup (audio/BeatTracker.hpp, sync/BeatClock.hpp)
                                               //   (off: play once; the sprite fades out as the movie ends)
-    std::string videoLoopList;                // reforce.Video.Loop: movies that always loop, sprite or colour layer
+    std::string videoLoopList;                // reforce.Video.Loop: movies that always loop, sprite or color layer
                                               //   ("name; name", matched like reforce.Exclude)
     bool syphonAllowFeedback = false;         // reforce.Syphon.AllowFeedback: allow our own Syphon server as input
     bool syphonAlpha = true;                  // reforce.Syphon.Alpha: send transparency in the Syphon output's alpha
@@ -193,7 +197,7 @@ struct Settings {
                                               //   screen-mirrored room lights; Syphon still gets everything
     double syphonKeySimilarity = 80;          // reforce.Syphon.KeySimilarity: OBS Color Key similarity, 1..1000
     double syphonKeySmoothness = 50;          // reforce.Syphon.KeySmoothness: OBS Color Key smoothness, 1..1000
-    bool syphonAlphaPremultiplied = false;    // reforce.Syphon.AlphaPremultiplied: colour multiplied by the alpha
+    bool syphonAlphaPremultiplied = false;    // reforce.Syphon.AlphaPremultiplied: color multiplied by the alpha
                                               //   (for a client that expects premultiplied alpha; OBS: 0)
     // Camera backdrop (docs/backdrop.md): a camera / Syphon / movie under everything, seen where the Syphon alpha would
     // be transparent (same key); while it is on, the Syphon output is opaque.
@@ -210,6 +214,15 @@ struct Settings {
     int solidMsaa = 4;                        // reforce.Solid.Msaa: 4 (4x MSAA edges) | 1
     int solidTileSize = 512;                  // reforce.Solid.TileSize: face texture tiles (WaveShape / frame), px
     std::string solidDir;                     // reforce.Solid.Dir: extra folder of solid scene files (any layout)
+    // 3D model Objects (docs/model-design.md): the folder of the user's own models (.glb) and their scene files
+    // ("" = ~/Library/Application Support/reforce/Models), the texture size cap, how many models stay resident.
+    // Anti-aliasing (Peter 2026-11-22): line edges in color (gforce | color) and supersampling (1x | 2x: the whole
+    // frame rendered at twice the size and averaged down; applies at the next start).
+    std::string lineEdges = "gforce";         // reforce.LineEdges
+    std::string supersample = "1x";           // reforce.Supersample
+    std::string modelDir;                     // reforce.Model.Dir
+    int modelMaxTexture = 2048;               // reforce.Model.MaxTexture: px per side
+    int modelCache = 2;                       // reforce.Model.Cache: uploaded models kept resident
     // reforce-only: Organics (PLAN 5N, docs/organics-design.md).
     int organicMaxNodes = 6000;               // reforce.Organic.MaxNodes: a tree stops growing here
     // reforce-only: Dancers (PLAN 5P, docs/dancers-design.md). The panel's Dancers card saves Floor .. Height.
@@ -275,12 +288,13 @@ struct Settings {
                                               //   to their next configs
     double linkTransitionBeats = 0.0;         // reforce.Link.TransitionBeats: >0 = slideshow transitions last this
                                               //   many beats with a session (not quick ones; 0 = seconds)
-    std::string favorites;                    // reforce.Favorites: control panel favourites, "layer:id; ..." (web/Api.hpp)
+    std::string favorites;                    // reforce.Favorites: control panel favorites, "layer:id; ..." (web/Api.hpp)
     std::string exclude;                      // reforce.Exclude: skip list, "Type:name; ..." (SceneLibrary.hpp)
     std::string spriteHidden;                 // reforce.Sprite.Hidden: sprites hidden from the control panel's
                                               //   Review images: never started, by the slideshow or by hand.
                                               //   "id; id" (SceneLibrary.hpp parseIdList); changed live
-    std::vector<std::string> settingErrors;   // values that were ignored (bad video settings)
+    std::vector<std::string> settingErrors;   // values that were ignored (bad video settings, Look values)
+    std::vector<std::string> unknownKeys;     // keys in the settings file that reforce does not read (loadSettings)
 
     // Applies every known key present in `table` over the current values.
     void apply(const PrefsTable& table);

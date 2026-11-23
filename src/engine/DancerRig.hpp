@@ -68,8 +68,8 @@ enum class HairStyle {
     Quiff, Coils, Waves, Layers, HalfUp, Anime, Shaved
 };
 inline constexpr int kHairStyleCount = int(HairStyle::Shaved) + 1;
-// Skirt: a top over a short skirt (the bottom colour); CropTop: a short top over the bottom, a bare midriff;
-// Jumpsuit: top and trousers in one (the top colour) with a belt (accent); LongDress: a dress to the ankles.
+// Skirt: a top over a short skirt (the bottom color); CropTop: a short top over the bottom, a bare midriff;
+// Jumpsuit: top and trousers in one (the top color) with a belt (accent); LongDress: a dress to the ankles.
 enum class Outfit { Tee, Tank, Hoodie, Dress, Suit, Skirt, CropTop, Jumpsuit, LongDress };
 inline constexpr int kOutfitCount = int(Outfit::LongDress) + 1;
 enum class Hat { None, Cap, Beanie, Top, Headphones };
@@ -87,7 +87,7 @@ enum class Glasses : std::uint8_t { None, Round, Aviator, Visor, Heart, Star, Ca
 enum class EyeShape : std::uint8_t { Oval, Round, Sleepy, Happy, Big, Dot, Count };
 enum class Brows : std::uint8_t { Normal, Thick, Thin, Arched, Count };
 enum class Mouth : std::uint8_t { Smile, Grin, Small, Smirk, Count };
-// Stubble is drawn on the face; the others are 3D (2026-11-21), in the hair colour, drawn with strands.
+// Stubble is drawn on the face; the others are 3D (2026-11-21), in the hair color, drawn with strands.
 // (Short took chinstrap's place 2026-11-21; "chinstrap" reads as short.)
 enum class Beard : std::uint8_t { None, Stubble, Moustache, Goatee, Full, Handlebar, Circle, Short, Long, Count };
 // Whether a beard has a moustache (the face then draws the mouth a little lower, clear of it).
@@ -130,7 +130,7 @@ struct Look {
     Pattern topPattern = Pattern::None, bottomPattern = Pattern::None;
     Fabric topFabric = Fabric::Matte, bottomFabric = Fabric::Matte;
     Rgb ink{1.0f, 1.0f, 1.0f};
-    // Glasses (lens and frame colours; a Shiny lens is mirrored; a clear lens is just the frame, the eyes showing
+    // Glasses (lens and frame colors; a Shiny lens is mirrored; a clear lens is just the frame, the eyes showing
     // through) and glow sticks (one in each hand).
     Glasses glasses = Glasses::None;
     Rgb lens{0.08f, 0.08f, 0.1f};
@@ -219,10 +219,10 @@ IkResult solveTwoBone(V3 root, V3 target, float a, float b, V3 pole);
 
 // ---- body parts
 enum class Material : std::uint8_t {
-    Plain = 0,  // toon-shaded colour (colour0 below `split`, colour1 above)
+    Plain = 0,  // toon-shaded color (color0 below `split`, color1 above)
     Head = 1,   // skin with the drawn face (DancePose mouth / blink / brow, Look eyes)
     Hair = 2,   // drawn on both sides (shells cut open at the face show their inside, shaded as solid hair)
-    Lens = 3,   // a sunglasses lens: a flat disc cut to `shape` (pattern), colour0 lens, colour1 frame rim
+    Lens = 3,   // a sunglasses lens: a flat disc cut to `shape` (pattern), color0 lens, color1 frame rim
     Strands = 4,  // hair: as Hair, plus strands, a sheen band and a parting drawn in the shader (`strands`), and
                   // a second clip plane (`clip2`)
 };
@@ -242,12 +242,12 @@ struct BodyPart {
     float len = 0;             // distance between the two ends
     float r0 = 0.05f, r1 = 0.05f;
     float scaleX = 1, scaleZ = 1;  // across the axis (ellipsoids, flattened torso)
-    Rgb colour0, colour1;      // colour1 above `split` (local y, before scale), colour0 below
+    Rgb color0, color1;      // color1 above `split` (local y, before scale), color0 below
     float split = 1e9f;
     std::array<float, 4> clip{0, 0, 0, 1e9f};  // local plane: discard where dot(p, xyz) > w (p before scale)
     Material material = Material::Plain;
     bool outline = true;       // drawn in the outline pass
-    // Cloth: print and fabric of the colour0 region [0] and the colour1 region [1]; the print in `ink`, `period`
+    // Cloth: print and fabric of the color0 region [0] and the color1 region [1]; the print in `ink`, `period`
     // its repeat (world units). For a Lens, pattern[0] is the Glasses shape.
     std::uint8_t pattern[2] = {0, 0}, fabric[2] = {0, 0};
     Rgb ink;
@@ -269,7 +269,7 @@ struct FaceState {
     Beard beard = Beard::None;
     bool lashes = false, freckles = false;
     float blush = 0.35f;
-    Rgb hair;                  // beard colour
+    Rgb hair;                  // beard color
     Rgb lips{0.3f, 0.07f, 0.09f};
     bool lipstick = false;
 };
@@ -277,7 +277,7 @@ struct FaceState {
 struct BodyOut {
     std::vector<BodyPart> parts;
     FaceState face;
-    V3 headCentre;  // world
+    V3 headCenter;  // world
     float headTop = 0;  // world height of the highest point of the head, hair and hat (name tags)
     V3 feet[2];     // world ankle positions (L, R), for shadows
     V3 rootFloor;   // world floor point under the pelvis
@@ -287,7 +287,7 @@ struct BodyOut {
     V3 hands[2], handsPosed[2];  // wrists (L, R) as built / as posed (before keeping out of the head); tests
 };
 
-// The head frame (character space, before placement): origin at the head centre, y up, z out of the face.
+// The head frame (character space, before placement): origin at the head center, y up, z out of the face.
 Frame headFrame(const Skeleton& sk, const DancePose& pose);
 
 // Places a posed character: `placement` is its spot on the stage (origin on the floor, y up, z towards the

@@ -507,7 +507,7 @@ void WaveShapeInstance::analyzeParallel() {
     for (int k : stepKeys_) {
         const CompiledKey& ck = cfg.keys[std::size_t(k)];
         if (impure(ck.prog)) return;
-        // Output keys that also write a user-var slot: not modelled, stay serial.
+        // Output keys that also write a user-var slot: not modeled, stay serial.
         if (ck.family >= 0 && ck.family != expr::FamC) return;
         for (int r : ck.prog.keyRefs) {
             const int rp = r >= 0 && std::size_t(r) < firstPos.size() ? firstPos[std::size_t(r)] : -1;
@@ -1041,6 +1041,20 @@ SolidFrame SolidInstance::evaluateFrame(const SolidFrameInput& in) {
     f.tint = evalScalar(tint_, 0.35);
     f.bend = evalScalar(bend_, 1.0);
     return f;
+}
+
+std::string SolidInstance::literal(const char* key) const {
+    const CompiledKey* k = cfg_->find(key);
+    if (!k) return {};
+    const auto b = k->text.find_first_not_of(" \t\r\n");
+    const auto e = k->text.find_last_not_of(" \t\r\n");
+    return b == std::string::npos ? std::string() : k->text.substr(b, e - b + 1);
+}
+
+double SolidInstance::loaded(const char* key, double fallback) const {
+    const int i = cfg_->indexOf(key);
+    if (i < 0 || !cfg_->keys[std::size_t(i)].prog.defined) return fallback;
+    return ctx_.keys[std::size_t(i)].scalar();
 }
 
 // ----------------------------------------------------------------- Organic

@@ -3,7 +3,7 @@ Meta="reforce solid: the 15 puzzle as clear glass buttons (Glas 1), drawn over t
 Mesh="fifteen"
 Text="2"
 Glas="1"
-// the glass: blur in pixels at 1080p, how much each row's colour tints it, how strongly the rims bend the view
+// the glass: blur in pixels at 1080p, how much each row's color tints it, how strongly the rims bend the view
 Fros="8"
 Tint=".15"
 Bend="1"

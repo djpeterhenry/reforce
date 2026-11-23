@@ -20,7 +20,7 @@ A **Solid** is a reforce-only spawnable layer, a little like a sprite:
    (Peter: keep both).
    Built (phase 3):
    - **Mapping:** the tile shows the config's own square, [-1, 1]^2 in authored units (normalized x times
-     `X_EXTENTS`, y times `Y_EXTENTS`; blended during a morph), centred. With `Aspc=0` that is the whole frame,
+     `X_EXTENTS`, y times `Y_EXTENTS`; blended during a morph), centered. With `Aspc=0` that is the whole frame,
      unstretched, so a circle the config draws is round on the faces. With `Aspc=1` it is the square on the short
      axis; the long axis beyond ±1 falls outside the tile, but faces show only the tile's inscribed circle anyway.
    - **Lines:** `ScenePipeline::encodeTileLines` draws with `line_vs` / `line_fs` in the analytic AA mode (one
@@ -33,14 +33,14 @@ A **Solid** is a reforce-only spawnable layer, a little like a sprite:
      tile draws once per step besides the frame) are made at startup, so there are no render-thread allocations.
    - **Cost:** the tile pass is encoded only when a live solid uses `Text=0`.
 1b. **Frame tile (`Text=1`, phase 3).** The previous intensity frame (`intensity_[current_]`, the frame this
-   step's flow pass reads; `ScenePipeline::previousIntensity`) is copied as its **centred square crop** (the short
+   step's flow pass reads; `ScenePipeline::previousIntensity`) is copied as its **centered square crop** (the short
    side of the frame fills it, aspect kept) into a second 512x512 R8 tile with a 4-tap filter, then mipmapped. The
-   crop was chosen over the full frame: it keeps the aspect, and the centre is where the action and usually the
+   crop was chosen over the full frame: it keeps the aspect, and the center is where the action and usually the
    solid are, so the recursion shows. Encoded only when a live solid uses `Text=1`.
 2. **Solid pass.** Each live solid is drawn into its own RG8 (luminance, alpha) target:
    - perspective projection (40° vertical FOV, camera at z = 4; X/Y +-1 = the frame edges at z = 0, like sprite
      coordinates; `Pers=0` gives orthographic)
-   - 4x MSAA with memoryless colour and depth, resolved into the target, so the anti-aliased edges land in alpha
+   - 4x MSAA with memoryless color and depth, resolved into the target, so the anti-aliased edges land in alpha
    - back-face culling, and a depth buffer for non-convex meshes.
 3. **Composite.** The target is registered as a sprite texture and drawn by the **existing sprite pass**. So each
    solid has its own blend flags, Pen/EPen layering, fades, lifetime and oldest-on-top order (Peter: own blend per
@@ -65,7 +65,7 @@ recursive, Droste-like look), `2` = flat shading. Per-solid WaveShape configs ar
 ## Meshes (`engine/Meshes.{hpp,cpp}`, pure C++)
 
 - The Platonic solids are at circumradius 1. Vertices are duplicated per face for flat normals. Each face's UVs place
-  its polygon on the tile's inscribed circle, so a centred WaveShape sits centred on every face. Pentagons are
+  its polygon on the tile's inscribed circle, so a centered WaveShape sits centered on every face. Pentagons are
   triangulated as fans.
   Phase 3: the tile is unmirrored seen from outside, and one edge lies flat at the bottom (squares upright,
   triangles and pentagons point up). The bottom edge is the one facing world down (-y projected into the face; -z /
@@ -114,7 +114,7 @@ the feedback, so the solid trails); `Flag` 0.
 A Rubik's cube solved on every 8-bar line: it scrambles itself in two beats (30 turns), then undoes those turns one
 per beat, the last landing on the next 8-bar line (content's Rubik Cube). Keys: scene-format §5.7.
 
-- **Puzzle** (`engine/Rubik`): 26 cubies with a sticker colour per direction. A scramble is `Moves` random face
+- **Puzzle** (`engine/Rubik`): 26 cubies with a sticker color per direction. A scramble is `Moves` random face
   turns from `Seed` (quarter turns both ways and half turns; never the same axis twice in a row). The cycle is the
   scramble followed by its inverse, so `Turn = 2 * Moves` is solved; the state is a pure function of
   (Seed, Moves, Turn), recomputed every frame (at most 64 moves of 26 cubies; no allocations).
@@ -122,32 +122,32 @@ per beat, the last landing on the next 8-bar line (content's Rubik Cube). Keys: 
   pass draws it 26 times with the cube's model x the turning layer's rotation x the cubie's position, and the
   sticker intensities per direction as fragment bytes (`< 0` = plastic). The screen box comes from the cube's
   corners and the turning slab's corners.
-- **Colours** (`engine/StickerColors`): solids are intensity, so a sticker's colour is the ColorMap at its intensity.
+- **Colors** (`engine/StickerColors`): solids are intensity, so a sticker's color is the ColorMap at its intensity.
   Measured over the 212 PNG maps (closest pair of stickers or sticker vs background, CIELAB): evenly spaced fixed
   levels give a median of ~9-10 and 100-123 maps under 10 (hard to tell apart); the best single fixed set is no
   better. Picked per map, the median is 31 and only 3 maps stay under 10 ((Black), Cloudscape, Black on White).
   So the Visualizer's StickerPicker picks six intensities from the effective palette (MapFunction LUT, then the
-  palette), net of each level's "wobble" (colour change within +-3 levels, so anti-aliasing and trails don't fringe
-  into other colours), clear of the plastic (intensity 0); the closest pairs go on opposite faces (never adjacent
-  on a solved cube, like white / yellow on a real one), and faces keep their colours as far as possible when the
+  palette), net of each level's "wobble" (color change within +-3 levels, so anti-aliasing and trails don't fringe
+  into other colors), clear of the plastic (intensity 0); the closest pairs go on opposite faces (never adjacent
+  on a solved cube, like white / yellow on a real one), and faces keep their colors as far as possible when the
   map changes. Hysteresis (a new set must score 10% + 1.5 better), eased over 0.5 s; 0.09 ms per pick, at most
-  every 0.1 s and only while the palette changes. Log: `Rubik colours: ...`.
-- **Drawing over the frame** (`Over = 1`): the sticker colours only hold if the intensities land exactly. The keyed
+  every 0.1 s and only while the palette changes. Log: `Rubik colors: ...`.
+- **Drawing over the frame** (`Over = 1`): the sticker colors only hold if the intensities land exactly. The keyed
   copy (Flag 0) drops the dark plastic, and AlphaBlend (16384) is G-Force's screen blend F + x (1 - F), which pushes
   a cube redrawn over its own trail towards white. Over = 1 uses the sprite pass's premultiplied over with the
   solid's coverage as alpha for Pen (feedback) and EPen (display).
-- **Anti-aliasing in colour** (Peter saw dotted lines at the sticker borders, 2026-11-22): a border pixel resolves to
-  an intensity between the sticker's and the plastic's, and the ColorMap gives that its own colour (China: pink dots
-  along a blue sticker). So the rubik is also drawn in colour over the colorized frame (`solid_colour_fs` in
+- **Anti-aliasing in color** (Peter saw dotted lines at the sticker borders, 2026-11-22): a border pixel resolves to
+  an intensity between the sticker's and the plastic's, and the ColorMap gives that its own color (China: pink dots
+  along a blue sticker). So the rubik is also drawn in color over the colorized frame (`solid_color_fs` in
   encodeColorize): rubik_fs writes the sticker share to the target's blue channel (targets are RGBA8 since), and
-  each pixel mixes the ColorMap colours of its sticker (intensity = r / b) and of the plastic by their shares,
+  each pixel mixes the ColorMap colors of its sticker (intensity = r / b) and of the plastic by their shares,
   alpha = coverage. The intensity copy still goes into the feedback for the trails. Test: a palette black / green /
   red shows no green on the cube.
-- **Colour key** (`ColorKey = 0`): the camera backdrop and Syphon alpha key out dark colours, which would punch
+- **Color key** (`ColorKey = 0`): the camera backdrop and Syphon alpha key out dark colors, which would punch
   holes in the dark stickers and the plastic. A ColorKey = 0 solid's coverage x opacity raises the tracked alpha in
   encodeColorize (alpha-only max blend from the solid target's alpha), so the whole cube stays solid over the camera.
   The cube's trails in the feedback are still visuals and keyed. The same path could serve luminance movie sprites
-  (Colour = off), which are always keyed today.
+  (Color = off), which are always keyed today.
 
 ## 15 puzzle (`Mesh="fifteen"`, Peter 2026-11-22)
 
@@ -160,21 +160,21 @@ slide back one tile per beat, 31 slides landing on beats 2..32. Keys: scene-form
   solve is that walk backwards. `Turn` 0 = scrambled .. `Moves` = solved; `Shuf` 0..1 = the leap (tiles from their
   solved places to the scramble). A pure function of (Seed, Moves, Turn, Shuf).
 - **Drawing** (`fifteen_fs`): MeshKind::Fifteen is one box with uv on its top face; the solid pass draws the 15
-  tiles as .4-thick cuboids in their colour, top and sides (no tray: Peter, the gaps and the blank show the visuals).
-  Each solved-board row has its own colour (the puzzle colours' 0, 2, 4, 1: one of each opposite pair first, the
-  farthest apart). The numbers are analytic seven-segment digits (anti-aliased with fwidth), centred on the tile by
+  tiles as .4-thick cuboids in their color, top and sides (no tray: Peter, the gaps and the blank show the visuals).
+  Each solved-board row has its own color (the puzzle colors' 0, 2, 4, 1: one of each opposite pair first, the
+  farthest apart). The numbers are analytic seven-segment digits (anti-aliased with fwidth), centered on the tile by
   their lit strokes; a right-hand "1" is spaced as half a digit wide ("11" looked cramped).
 - **Numbers that always read, without flipping** (Peter: per-tile dark / light numbers flipped and mixed, which was
-  distracting): r holds the tile's intensity under the strokes too and b the share outside them, so the colour pass
-  knows the tile colour in every pixel and draws the strokes in it pushed far darker (x .15). The row colours come
-  from their own picker (engine::TilePicker, not the rubik's): four colours, all light (L* >= 45), so dark numbers
-  always read. Only on a map without good light colours (the light set scoring under 8 and the dark one better) the
+  distracting): r holds the tile's intensity under the strokes too and b the share outside them, so the color pass
+  knows the tile color in every pixel and draws the strokes in it pushed far darker (x .15). The row colors come
+  from their own picker (engine::TilePicker, not the rubik's): four colors, all light (L* >= 45), so dark numbers
+  always read. Only on a map without good light colors (the light set scoring under 8 and the dark one better) the
   whole board takes four dark rows (L* 15..40) with light numbers (80% towards white). Decided only when the
-  ColorMap changes, with hysteresis; colours and numbers fade over 0.5 s. Over the 212 PNG maps: light 176, dark
-  36. Log: `Fifteen colours: ...`.
-- **Shading in colour** (both puzzles): shading an intensity changes its colour, so rubik_fs / fifteen_fs write the
-  shading factor (Shad) to the target's alpha channel and leave the intensity alone; the colour pass multiplies the
-  colour by it (a / coverage). Tops and sides then differ in brightness, not hue. The intensity copy for the trails
+  ColorMap changes, with hysteresis; colors and numbers fade over 0.5 s. Over the 212 PNG maps: light 176, dark
+  36. Log: `Fifteen colors: ...`.
+- **Shading in color** (both puzzles): shading an intensity changes its color, so rubik_fs / fifteen_fs write the
+  shading factor (Shad) to the target's alpha channel and leave the intensity alone; the color pass multiplies the
+  color by it (a / coverage). Tops and sides then differ in brightness, not hue. The intensity copy for the trails
   is unshaded.
 
 ## Glass (`Glas = 1`, 15 puzzle; exploration, Peter 2026-11-22)
@@ -191,8 +191,8 @@ pass (before the backdrop, dancers and text):
    radius .13, flat cap), drawn with depth and 4x MSAA into the puzzle's solid slot target (cleared, resolved
    premultiplied), then laid over the frame (`glass_composite_fs`). `glass_fs` uses the real surface normal: its
    tilt across the view moves the sample (Bend; the rounded edge and the walls show what lies beside the button,
-   like a lens edge); half sharp, half frosted (Fros); one light tint for every button (Peter: all the same colour,
-   mostly letting the visuals through), a light colour of the ColorMap halfway to white (Tint, a little more through
+   like a lens edge); half sharp, half frosted (Fros); one light tint for every button (Peter: all the same color,
+   mostly letting the visuals through), a light color of the ColorMap halfway to white (Tint, a little more through
    the walls); glass at a grazing angle darkens slightly and catches a Fresnel sheen; a broad soft highlight from
    the upper left; the number on the cap.
 3. **Readable numbers on any background**: etched near-white numbers, the same on every button, on a soft dark halo
@@ -232,7 +232,7 @@ values. G-Force scenes don't reference them, so nothing changes for them (scene-
 | MSAA solid covering ~30% of the frame | ~0.1–0.2 ms |
 | Bounding-box composite | < 0.05 ms |
 | CPU | a few expressions per solid |
-| Memory | 3 frame-size RGBA8 targets (8 MB each at 1080p, 32 MB at 4K; RG8 until the rubik's colour pass) + a 256 KB tile |
+| Memory | 3 frame-size RGBA8 targets (8 MB each at 1080p, 32 MB at 4K; RG8 until the rubik's color pass) + a 256 KB tile |
 | Measured (phase 2, 1080p, M-series) | solid pass 0.03 ms, with the composite 0.10 ms GPU per solid |
 | Measured (phase 3, 1080p, tile 512) | WaveShape tile (4096 segments + mips) 0.055 ms, frame tile 0.058 ms; tile + a Text=0 icosahedron composited 0.13 ms GPU |
 
@@ -246,7 +246,7 @@ values. G-Force scenes don't reference them, so nothing changes for them (scene-
 - `tests/solid_render.cmake`: a Void FlowField, the Gray ColorMap and a cube with `Text=2` at a fixed rotation.
   It checks pixel probes and the silhouette area within a tolerance; MSAA can differ across GPUs, so no hashes.
 - Unit tests for the meshes, plus a CPU projection reference for the bounding box.
-- Phase 3, in `tests/solid_render.cmake`: a cube left of centre and a WaveShape of vertical bars in the frame's right
+- Phase 3, in `tests/solid_render.cmake`: a cube left of center and a WaveShape of vertical bars in the frame's right
   half. With `Text=0`, the face's left part is flat at the Fill floor (.15 -> 38, .4 -> 102) and its right part
   carries the bars. With `Text=1`, the left part shows the frame (the cube itself). In `reforce_render_tests`: the
   tile's lines and mip chain, the Fill floor before any tile is drawn, the cost at 1080p, and 0 render
@@ -261,7 +261,7 @@ values. G-Force scenes don't reference them, so nothing changes for them (scene-
 | 3 (built) | WaveShape tile (`Text=0`) and frame texture (`Text=1`) | Peter looked (2026-11-15): good; prefers Text=0; 0.5 rad/s spin |
 | 4 (built) | Scene files, `SolidRun`, the `SYNC_*` variables, package, settings, Themes | every content solid compiles without a diagnostic and stays finite; a scene file renders bit-identical to the test hook at the same pose; a moving Text=0 solid renders the same twice; a theme starts solids; Dodecahedron Beat lands on whole beats (tests/test_engine_solids.cpp, solid_render.cmake) |
 | 5 | Control panel Solids card, `--stress` spawns, perf report at 1080p and 4K | perf numbers |
-| later | A full-colour 3D layer after colorize; depth or normals feeding the FlowField warp | — |
+| later | A full-color 3D layer after colorize; depth or normals feeding the FlowField warp | — |
 
 ## Risks
 

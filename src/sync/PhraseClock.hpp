@@ -34,7 +34,7 @@ struct PhraseConfig {
     double memoryPhrases = 4.0;  // histogram time constant, phrases
     double minScore = 0.25;      // |log loudness ratio| below this is not a change
     double minPeak = 1.0;        // histogram peak needed before auto trusts it
-    double peakRatio = 1.5;      // ... and this many times the next best (not its neighbours)
+    double peakRatio = 1.5;      // ... and this many times the next best (not its neighbors)
     double switchRatio = 1.25;   // auto moves an existing origin only when the new peak beats it by this much
     double manualVote = 3.0;     // startNow() adds this at the new origin
 };

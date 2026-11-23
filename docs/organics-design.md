@@ -45,7 +45,7 @@ gives roots or lightning, several roots in a field give neurons or coral.
 reached so far, so growth is continuous rather than stepping a segment at a time.
 
 **Sway** (`Sway`, radians at the thinnest tips; a per-frame expression, e.g. bass-driven): each node turns about its
-parent by a small angle that grows with thinness, travelling up the branches as a slow wave. Trunks barely move,
+parent by a small angle that grows with thinness, traveling up the branches as a slow wave. Trunks barely move,
 tips move most.
 
 **Buds** (`Bud`, `BudW`): a dot on every tip at `Pen * Bud`, e.g. blossoms that open on the bar line.
@@ -108,13 +108,13 @@ else 120 BPM from the start), each off by default so the other trees are unchang
   leaves?"): a leaf on every `LeafD`-th node of the outer twigs (nodes feeding at most 4 tips, once the crown feeds 8,
   so never on a bare trunk) and on every tip, chosen by a hash of the node and the seed (deterministic). Each is a
   pointed oval `LeafW` long (±20% per leaf): two hard-edged capsules, a body (radius .2 L) and a narrower tip (.075 L).
-  Hard edges because a fat anti-aliased rim takes unrelated ColorMap colours (a speckled fringe in steep maps such as
+  Hard edges because a fat anti-aliased rim takes unrelated ColorMap colors (a speckled fringe in steep maps such as
   Metal Blood). A leaf sits on its twig's displayed position and direction, so it rustles with the sway, turned
   `LeafA` radians off it on alternating sides (tips almost straight on), plus a flutter of `LFlt` radians (per frame,
   e.g. `.25 exp(-6 wrap(beat))`: a shiver on the beat), each leaf out of step. It unfurls over `LeafU` beats from the
   moment its node qualifies (growing from nothing and opening from along the twig), so the crown leafs out as it
   grows, and stays once started even if its twig branches on. Leaves are drawn as a path of their own over the
-  branches, at `Pen × Leaf`, so the ColorMap gives them their own colour. While the tree withers (`Wthr=1`) they come
+  branches, at `Pen × Leaf`, so the ColorMap gives them their own color. While the tree withers (`Wthr=1`) they come
   loose, staggered over the first half of the fade-out, and fall about .9 units turning and shrinking; with `Wthr=0`
   they dim with the rest. At most 1,500 leaves (3,000 segments); Oak has about 400 (1,698 segments in all at most,
   0.024 ms per step on average).
@@ -143,7 +143,7 @@ circles stay round. `X`, `Y`, `Scal`, `Rot` move, scale and turn the whole tree 
 | `PDur` | Pre | Object.Duration | Seconds at full strength. |
 | `PBar` | Pre | | Bars at full strength instead (wins over `PDur`): see scene-format §5.8. |
 | `Pts` | Pre | 300 | Attraction points (10..4000). |
-| `PX`, `PY` | per point | an ellipse | Each point's position, evaluated once per point at the start with `s` = k / (Pts - 1) and `rnd`. Default: an ellipse .9 x .55 centred at (0, .3), evenly filled. |
+| `PX`, `PY` | per point | an ellipse | Each point's position, evaluated once per point at the start with `s` = k / (Pts - 1) and `rnd`. Default: an ellipse .9 x .55 centered at (0, .3), evenly filled. |
 | `Rts` | Pre | 1 | Roots (1..64). |
 | `RtX`, `RtY`, `RtA` | per root | 0, -1, PI/2 | Each root's position and initial direction (radians, PI/2 = up), with `s` = k / (Rts - 1) and `rnd`. |
 | `Seg` | Pre | .02 | Segment length. |

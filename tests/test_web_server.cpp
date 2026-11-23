@@ -357,7 +357,7 @@ TEST_CASE("web server: Look save without a saver answers 501") {
     CHECK(queue.drain().size() == 1);
 }
 
-TEST_CASE("web server: favourites (GET/POST /api/favorites, saved through the saver)") {
+TEST_CASE("web server: favorites (GET/POST /api/favorites, saved through the saver)") {
     FakeEngine eng;
     engine::CommandQueue queue;
     web::WebServer server(testOptions(), queue, [&] { return eng.snapshot(); }, fakeLibrary());
@@ -397,7 +397,7 @@ TEST_CASE("web server: favourites (GET/POST /api/favorites, saved through the sa
     REQUIRE(res);
     CHECK(res->status == 400);
     CHECK(saved.size() == 2);
-    CHECK(queue.drain().empty());  // favourites never queue engine commands
+    CHECK(queue.drain().empty());  // favorites never queue engine commands
     server.stop();
 }
 

@@ -353,7 +353,7 @@ std::optional<Command> parseCommand(const std::string& text, std::string* error)
         std::string target;
         for (char c : parts[1]) target.push_back(char(std::tolower(static_cast<unsigned char>(c))));
         VideoTarget t;
-        if (target == "layer" || target == "colour" || target == "color") t = VideoTarget::Layer;
+        if (target == "layer" || target == "color") t = VideoTarget::Layer;
         else if (target == "sprite") t = VideoTarget::Sprite;
         else return fail(action + ": target must be layer or sprite, not \"" + parts[1] + "\"");
         if (action == "videostop") return Command::videoStop(t);
@@ -547,9 +547,9 @@ PrefsTable slideshowSaveEntries(const Command& c) {
                 t.set("reforce.Backdrop.Opacity", b, false);
             }
         }
-        if (key == "spritecolour" || key == "spritecolor") {
-            if (val == "over" || on) t.set("reforce.MovieSprite.Colour", "over", true);
-            else if (off) t.set("reforce.MovieSprite.Colour", "off", true);
+        if (key == "spritecolor") {
+            if (val == "over" || on) t.set("reforce.MovieSprite.Color", "over", true);
+            else if (off) t.set("reforce.MovieSprite.Color", "off", true);
         }
         return t;
     }

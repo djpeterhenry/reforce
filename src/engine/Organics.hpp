@@ -71,11 +71,11 @@ struct OrganicField {
     bool reflect = false;          // Edge = 1: the frame's edges reflect; 0: they absorb
     // julia
     double cre = -0.8, cim = 0.156;
-    double x = 0, y = 0, scale = 1, rot = 0;  // tree units (y = +-1 at the bottom / top): centre, size, turn
+    double x = 0, y = 0, scale = 1, rot = 0;  // tree units (y = +-1 at the bottom / top): center, size, turn
     int iter = 120;
     double bands = 0, phase = 0;   // Band > 0: bands of the escape count, Band per Iter, moved by Phas (radians)
     // mandel (also x, y, scale, rot, iter, gain, phase; bands = escape-count iterations per band, 0 = none)
-    double cx = kMandelHomeRe, cy = 0;  // view centre (the plane)
+    double cx = kMandelHomeRe, cy = 0;  // view center (the plane)
     double half = kMandelHomeHalf;      // half the frame height in plane units at Scal 1
     double depth = 0;                   // log2 magnification
     long long dive = 0;

@@ -1,7 +1,7 @@
 #pragma once
 // Light cycles (PLAN 5Q.3, docs/arcade-design.md "Light cycles"): the game itself, separate from its drawing so the
 // tests can check the rules move by move. Cycles ride a Cols x Rows grid, one cell per tick, `Spd` ticks per beat, so
-// every head sits exactly on a cell centre on every beat line; they turn 90 degrees only on turn lines (beats, or
+// every head sits exactly on a cell center on every beat line; they turn 90 degrees only on turn lines (beats, or
 // 8ths / 16ths with `Turn`), and every cell they ride through becomes wall until `Tail` bars later. The AI looks
 // ahead and reserves its path, so a cycle crashes only when it is truly boxed in (or rammed by one that is): it
 // explodes, its wall dissolves, and it rezzes in at the border on a bar line `Out` bars later (or with the next
@@ -39,7 +39,7 @@ public:
     // dir: 0 = +x (right), 1 = +y (up), 2 = -x, 3 = -y; a left turn is dir + 1. Row 0 is the bottom.
     struct Point {
         int x, y;
-        double t;  // beat at which the head is on this cell's centre
+        double t;  // beat at which the head is on this cell's center
     };
     struct Cycle {
         std::deque<Point> trail;  // oldest first; back() = the cell the head is riding into (or sitting on); empty
@@ -52,7 +52,7 @@ public:
         double level = 1;         // intensity: each cycle its own, so the ColorMap tells them apart
         int partner = -1;         // a leader's mirror partner (the partner has leader set instead)
         int leader = -1;
-        int mirror = 0;           // the pair's symmetry: 0 left-right, 1 up-down, 2 about the centre
+        int mirror = 0;           // the pair's symmetry: 0 left-right, 1 up-down, 2 about the center
         bool turned = false;      // turned on the last tick
         int lastRel = 0;          // its last turn (1 left, -1 right) and when
         double lastTurn = -1e300;

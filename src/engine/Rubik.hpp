@@ -3,9 +3,9 @@
 // allocations (fixed arrays), so it can run on the render thread every frame.
 //
 // The cube is 26 cubies at integer positions -1..1 on each axis. Each cubie carries six sticker slots, one per
-// direction (kDir: +x, -x, +y, -y, +z, -z); a slot holds the colour of the sticker facing that way, or -1 (no
-// sticker: plastic). Colour c is the face the sticker sits on when solved, numbered like the directions, so the
-// opposite faces are the colour pairs (0, 1), (2, 3), (4, 5).
+// direction (kDir: +x, -x, +y, -y, +z, -z); a slot holds the color of the sticker facing that way, or -1 (no
+// sticker: plastic). Color c is the face the sticker sits on when solved, numbered like the directions, so the
+// opposite faces are the color pairs (0, 1), (2, 3), (4, 5).
 //
 // A move turns one outer layer (axis 0..2 = x, y, z; layer -1 or +1) by `turns` quarter turns, right-handed about
 // the axis (the same sense as engine::solidModel's rotations: +1 takes +y to +z about x).
@@ -32,7 +32,7 @@ inline Move inverse(Move m) { return {m.axis, m.layer, int8_t(-m.turns)}; }
 
 struct Cubie {
     std::array<int8_t, 3> pos{};   // -1..1
-    std::array<int8_t, 6> face{};  // colour per direction (kDir order), -1 = none
+    std::array<int8_t, 6> face{};  // color per direction (kDir order), -1 = none
 };
 
 struct State {
@@ -40,8 +40,8 @@ struct State {
     static State solved();
     void apply(const Move& m);
     bool isSolved() const;
-    // Colour of the sticker at (cubie position, direction); -1 when none (inside) or no cubie there.
-    int colourAt(int x, int y, int z, int dir) const;
+    // Color of the sticker at (cubie position, direction); -1 when none (inside) or no cubie there.
+    int colorAt(int x, int y, int z, int dir) const;
 };
 
 // `count` (clamped 0..kMaxMoves) random moves from `seed` into `out`; returns the count. Two moves in a row never

@@ -188,7 +188,7 @@ DancerSpec dancerSpec(const scene::CompiledConfig& cfg, const std::string& name)
 // web preview (web/dancer-preview) reads a guest's keys with this.
 DancerSpec dancerSpecFromKeys(const std::function<std::string(const char*)>& lookup, const std::string& name);
 // A new character dressed for `style` (Peter, 2026-11-19: "a bunch more variety"): a first name, body proportions,
-// a matched colour scheme, the style's wardrobe (outfits, hats, prints, fabrics), sunglasses, glow sticks and a
+// a matched color scheme, the style's wardrobe (outfits, hats, prints, fabrics), sunglasses, glow sticks and a
 // face. The same seed gives the same character.
 DancerSpec generateDancer(dance::Style style, std::uint32_t seed);
 // reforce.Dancer.RandomStyles: which styles the generated ("Random STYLE") characters may be picked from when the

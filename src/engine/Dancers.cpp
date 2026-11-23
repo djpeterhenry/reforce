@@ -255,10 +255,10 @@ std::vector<StageSpot> planStage(int n, const StageCamera& cam, SocialMode mode,
     }
     if (groups.back().size() == 1) groups[groups.size() - 2].push_back(groups.back()[0]), groups.pop_back();
     // Groups mill around too (scattered, far enough apart that pairs read as pairs), each at its own tilt.
-    const auto centres = scatterSpots(int(groups.size()), cam, bar, seed ^ 0xabcdu, 1.25f, n);
+    const auto centers = scatterSpots(int(groups.size()), cam, bar, seed ^ 0xabcdu, 1.25f, n);
     for (std::size_t gi = 0; gi < groups.size(); ++gi) {
         const auto& g = groups[gi];
-        const float cx = centres[gi].first, cz = centres[gi].second;
+        const float cx = centers[gi].first, cz = centers[gi].second;
         const float half = 0.25f;
         // Places: a pair side by side; a trio adds one at the back. Turned by the group's tilt (every 4 bars).
         std::vector<std::pair<float, float>> local = {{-half, 0.0f}, {half, 0.0f}};
@@ -425,7 +425,7 @@ void Mingle::leaveGroup(Agent& a, double beat) {
 }
 
 // Places round the group: a pair side by side (tilted as they met), 3-4 in a horseshoe open to the audience.
-// Members keep their order round the centre, so nobody crosses through the middle.
+// Members keep their order round the center, so nobody crosses through the middle.
 void Mingle::layout(Group& g) {
     std::vector<std::pair<float, std::uint64_t>> order;
     for (const auto id : g.members) {
@@ -936,11 +936,11 @@ DancerSpec dancerSpecFromKeys(const std::function<std::string(const char*)>& loo
     DancerSpec s;
     s.name = name;
     auto text = [&](const char* key) -> std::string { return trimmed(lookup(key)); };
-    auto colour = [&](const char* key, Rgb& out) {
+    auto color = [&](const char* key, Rgb& out) {
         const std::string v = text(key);
         if (v.empty()) return;
         if (auto c = parseRgb(v)) out = *c;
-        else s.warnings.push_back(std::string(key) + ": not a colour: " + v);
+        else s.warnings.push_back(std::string(key) + ": not a color: " + v);
     };
     auto number = [&](const char* key, float lo, float hi, float& out) {
         const std::string v = text(key);
@@ -953,13 +953,13 @@ DancerSpec dancerSpecFromKeys(const std::function<std::string(const char*)>& loo
         }
         out = std::clamp(float(d), lo, hi);
     };
-    colour("SKIN", s.look.skin);
-    colour("HAIR", s.look.hair);
-    colour("TOP", s.look.top);
-    colour("BOTTOM", s.look.bottom);
-    colour("SHOES", s.look.shoes);
-    colour("EYES", s.look.eyes);
-    colour("ACCENT", s.look.accent);
+    color("SKIN", s.look.skin);
+    color("HAIR", s.look.hair);
+    color("TOP", s.look.top);
+    color("BOTTOM", s.look.bottom);
+    color("SHOES", s.look.shoes);
+    color("EYES", s.look.eyes);
+    color("ACCENT", s.look.accent);
     if (auto v = text("HAIRSTYLE"); !v.empty()) {
         if (auto h = parseHairStyle(v)) s.look.hairStyle = *h;
         else s.warnings.push_back("HairStyle: unknown: " + v);
@@ -997,10 +997,10 @@ DancerSpec dancerSpecFromKeys(const std::function<std::string(const char*)>& loo
     named("BROWS", parseBrows, s.look.brows);
     named("MOUTH", parseMouth, s.look.mouth);
     named("BEARD", parseBeard, s.look.beard);
-    colour("INK", s.look.ink);
+    color("INK", s.look.ink);
     if (auto v = text("LENS"); v == "clear" || v == "none") s.look.clearLens = true;  // ordinary glasses
-    else colour("LENS", s.look.lens);
-    colour("FRAME", s.look.frame);
+    else color("LENS", s.look.lens);
+    color("FRAME", s.look.frame);
     auto flag = [&](const char* key, bool& out) {
         const std::string v = text(key);
         if (v.empty()) return;
@@ -1012,17 +1012,17 @@ DancerSpec dancerSpecFromKeys(const std::function<std::string(const char*)>& loo
     flag("LASHES", s.look.lashes);
     flag("FRECKLES", s.look.freckles);
     flag("RANDOM", s.random);
-    if (auto v = text("GLOWSTICKS"); !v.empty()) {  // a colour, or none
+    if (auto v = text("GLOWSTICKS"); !v.empty()) {  // a color, or none
         if (v == "none" || v == "0" || v == "off") s.look.glowSticks = false;
         else if (auto g = parseRgb(v)) {
             s.look.glowSticks = true;
             s.look.glow = *g;
-        } else s.warnings.push_back("GlowSticks: not a colour: " + v);
+        } else s.warnings.push_back("GlowSticks: not a color: " + v);
     }
     if (auto v = text("LIPS"); !v.empty()) {
         if (v == "none") s.look.lips.reset();
         else if (auto l = parseRgb(v)) s.look.lips = *l;
-        else s.warnings.push_back("Lips: not a colour: " + v);
+        else s.warnings.push_back("Lips: not a color: " + v);
     }
     s.guestId = text("GUEST");  // a saved stream guest (web/GuestBook): their id
     s.tag = text("NAME");
@@ -1206,7 +1206,7 @@ DancerSpec generateDancer(Style dance, std::uint32_t seed) {
     // The wardrobes were written for the styles before 2026-11-21; each dance style dresses from the closest one
     // (Peter: the dance style comes first, the look goes with it): house from house (now and then rave gear), pop
     // (popping) from robot, lock from retro (70s funk), break and hip-hop from hip-hop, stomp (krump) from hip-hop in
-    // darker colours, disco (waack) from disco, jazz (street jazz) from pop, ballet (ballet jazz) from chill or pop.
+    // darker colors, disco (waack) from disco, jazz (street jazz) from pop, ballet (ballet jazz) from chill or pop.
     enum class St { Disco, HipHop, House, Pop, Robot, Rave, Retro, Chill };
     const St style = [&] {
         switch (dance) {
@@ -1254,8 +1254,8 @@ DancerSpec generateDancer(Style dance, std::uint32_t seed) {
                                        : 6 + std::size_t((x - 0.8f) / 0.2f * 4);
         L.skin = hex(kSkins[std::min<std::size_t>(i, 9)]);
     }
-    // Dyed (a bright colour of any hue) only for rave, robot and house (Peter, 2026-11-20); everyone else natural.
-    // Platinum and silver count as natural colours.
+    // Dyed (a bright color of any hue) only for rave, robot and house (Peter, 2026-11-20); everyone else natural.
+    // Platinum and silver count as natural colors.
     const float dyed = style == St::Rave ? 0.5f : style == St::Robot ? 0.3f : style == St::House ? 0.2f : 0.0f;
     const bool dyedHair = dyed > 0 && d.chance(dyed);
     if (dyedHair) {
@@ -1267,7 +1267,7 @@ DancerSpec generateDancer(Style dance, std::uint32_t seed) {
     L.eyes = hex(d.any({"#2b1a10", "#3a2618", "#4a3520", "#3d5a2e", "#2f5d8c", "#4b5a66"}));
     if (style == St::Rave && d.chance(0.2f)) L.eyes = hsv(d.u(), 0.7f, 0.7f);
 
-    // ---- colour scheme: a base hue and a harmony, with the style's saturation and brightness
+    // ---- color scheme: a base hue and a harmony, with the style's saturation and brightness
     float sat0 = 0.65f, sat1 = 0.9f, val0 = 0.65f, val1 = 0.95f;
     float hue = d.u();
     switch (style) {
@@ -1283,13 +1283,13 @@ DancerSpec generateDancer(Style dance, std::uint32_t seed) {
         default: break;
     }
     const float harmony = d.pick<float>({{0.5f, 3}, {0.08f, 2}, {-0.08f, 2}, {0.33f, 2}, {0.0f, 1}});
-    if (dance == Style::Stomp) {  // krump: hard and dark, a strong colour on black and grey
+    if (dance == Style::Stomp) {  // krump: hard and dark, a strong color on black and gray
         sat0 = 0.7f; sat1 = 1.0f; val0 = 0.35f; val1 = 0.7f;
     }
     const Rgb main = hsv(hue, d.in(sat0, sat1), d.in(val0, val1));
     Rgb second = hsv(hue + harmony, d.in(sat0, sat1), d.in(val0, val1));
     const Rgb neutral = hex(d.any({"#1b1b22", "#26262e", "#f2f0ea", "#2f3d66", "#3b4a7a", "#7a6a50", "#5a5a62"}));
-    if (style == St::Robot) second = hsv(d.u(), 0.9f, 1.0f);  // greys and one bright accent
+    if (style == St::Robot) second = hsv(d.u(), 0.9f, 1.0f);  // grays and one bright accent
     L.top = main;
     L.bottom = d.chance(style == St::Rave || style == St::Pop ? 0.45f : 0.6f) ? neutral : second;
     L.accent = second;
@@ -1360,7 +1360,7 @@ DancerSpec generateDancer(Style dance, std::uint32_t seed) {
         case St::Disco: case St::Retro: L.hat = d.pick<Hat>({{Hat::None, 9}, {Hat::Top, 1}}); break;
         default: L.hat = d.pick<Hat>({{Hat::None, 9}, {Hat::Cap, 0.7f}, {Hat::Beanie, 0.7f}}); break;
     }
-    // Hair (2026-11-21): every style draws from the same everyday hair, plus its own flavour on top; each
+    // Hair (2026-11-21): every style draws from the same everyday hair, plus its own flavor on top; each
     // character from their own lean and either's (the other's now and then, never a masculine-only style on a
     // feminine character: hairLean); under a hat (not headphones) never tall hair.
     using H = HairStyle;
@@ -1376,7 +1376,7 @@ DancerSpec generateDancer(Style dance, std::uint32_t seed) {
          {H::Mullet, 0.2f}, {H::Bowl, 0.2f}});
     add({{H::Curly, 1.2f}, {H::Coils, 0.8f}, {H::Afro, 0.8f}, {H::Curtains, 0.6f}, {H::Shag, 0.6f}, {H::Anime, 0.5f},
          {H::Spiky, 0.3f}, {H::Mohawk, 0.2f}});
-    // Each style's flavour.
+    // Each style's flavor.
     switch (style) {
         case St::Disco: add({{H::Afro, 3}, {H::Curly, 2}, {H::Shag, 1.5f}, {H::Long, 1}, {H::Layers, 0.5f}, {H::TopKnot, 0.5f}, {H::Pompadour, 0.5f}}); break;
         case St::HipHop: add({{H::Coils, 2}, {H::Waves, 2}, {H::Afro, 1.5f}, {H::Braid, 1.5f}, {H::Buzz, 1}, {H::Bald, 1}, {H::SpaceBuns, 0.8f}, {H::Pigtails, 0.5f}, {H::Undercut, 0.5f}}); break;
@@ -1547,7 +1547,7 @@ void DancerRun::humanize(float* p, double beat, double t) const {
     const float arms = (1 + (pers_.armGain - 1) * a) * effort;
     for (int i = 15; i <= 17; ++i) gain(i, arms * (1 + pers_.asym * a));
     for (int i = 18; i <= 20; ++i) gain(i, arms * (1 - pers_.asym * a));
-    // Hands never hit the same spot twice: a slow wander of a centimetre or two.
+    // Hands never hit the same spot twice: a slow wander of a centimeter or two.
     for (int i = 15; i <= 20; ++i)
         if (i % 3 != 2) p[i] += 0.012f * a * vnoise(seed_ + 10 + std::uint32_t(i), beat / 2.0);
     const float hips = (1 + (pers_.hipGain - 1) * a) * effort;
@@ -1864,7 +1864,7 @@ void DancerRun::stepFeet(double beat, double dt, float moving) {
     };
     V3* foot[2] = {&pose_.footL, &pose_.footR};
     std::pair<float, float> home[2] = {toFloor(*foot[0]), toFloor(*foot[1])};
-    // Walking when travelling (not while popping in or out); eased in and out.
+    // Walking when traveling (not while popping in or out); eased in and out.
     const float want = (moving > 0.12f && scale_ > 0.6f) ? 1.0f : 0.0f;
     walk_ += (want - walk_) * float(std::min(1.0, dt * 4.0));
     const bool anySwing = feet_[0].swinging || feet_[1].swinging;

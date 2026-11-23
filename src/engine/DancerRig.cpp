@@ -372,8 +372,8 @@ struct Builder {
         p.len = len * scale;
         p.r0 = r0 * scale;
         p.r1 = r1 * scale;
-        p.colour0 = c0;
-        p.colour1 = c1.r < 0 ? c0 : c1;
+        p.color0 = c0;
+        p.color1 = c1.r < 0 ? c0 : c1;
         p.split = split >= 1e8f ? split : split * scale;
         parts.push_back(p);
         return parts.back();
@@ -402,10 +402,10 @@ namespace {
 struct HatShape {
     V3 up;            // the band plane's normal, pointing up into the hat
     float line;       // dot(up, p) > line: above the band
-    // Cap and beanie: an ellipsoid (centre, radii). Top hat: the crown (a cylinder of radius crownR about the head's
+    // Cap and beanie: an ellipsoid (center, radii). Top hat: the crown (a cylinder of radius crownR about the head's
     // y axis) and the brim (radii brimX, brimZ) along the band.
     bool topHat = false;
-    V3 centre;
+    V3 center;
     V3 radii;
     float crownR = 0, brimX = 0, brimZ = 0;
 };
@@ -417,13 +417,13 @@ HatShape hatShape(Hat hat, float R, float hs) {
         h.line = -(dot(n, c) + w);
     };
     if (hat == Hat::Cap) {
-        h.centre = V3{0, 0.02f, -0.005f} * hs;
+        h.center = V3{0, 0.02f, -0.005f} * hs;
         h.radii = {R * 1.09f * 1.05f, R * 1.09f, R * 1.09f};
-        band({0, -1, 0.15f}, h.centre, -0.18f * R);
+        band({0, -1, 0.15f}, h.center, -0.18f * R);
     } else if (hat == Hat::Beanie) {
-        h.centre = V3{0, 0.03f, -0.005f} * hs;
+        h.center = V3{0, 0.03f, -0.005f} * hs;
         h.radii = {R * 1.12f * 1.05f, R * 1.12f, R * 1.12f};
-        band({0, -1, 0.35f}, h.centre, -0.12f * R);
+        band({0, -1, 0.35f}, h.center, -0.12f * R);
     } else {  // top hat: the brim's plane
         h.topHat = true;
         h.up = {0, 1, 0};
@@ -442,7 +442,7 @@ bool underHat(const HatShape& h, V3 p, float R) {
         const float ex = p.x / h.brimX, ez = p.z / h.brimZ;
         return ex * ex + ez * ez <= 0.97f;
     }
-    const V3 d = p - h.centre;
+    const V3 d = p - h.center;
     const float ex = d.x / h.radii.x, ey = d.y / h.radii.y, ez = d.z / h.radii.z;
     return ex * ex + ey * ey + ez * ez <= 0.985f * 0.985f;
 }
@@ -468,7 +468,7 @@ void forSurface(const BodyPart& p, Fn&& fn) {
 // Hair under a hat: every hair part (from `begin` on) that has no clip plane of its own is cut at the hat's band
 // (nothing of it shows above the band: spikes, buns and the tops of big hair disappear under the hat), and any part
 // whose surface at or above the band would still poke out of the hat (the cut of a big mass, a shell standing off
-// the head) shrinks until it fits (a shell towards the head centre, a mass or a lock towards its lowest point, so
+// the head) shrinks until it fits (a shell towards the head center, a mass or a lock towards its lowest point, so
 // it still hangs below the hat); one mostly above the band, or that would have to shrink by over 55 %, is dropped.
 // Stateless and allocation-free: it runs every frame, after the hair has swung.
 void fitHairUnderHat(std::vector<BodyPart>& parts, std::size_t begin, const HatShape& hat, const Frame& head,
@@ -514,7 +514,7 @@ void fitHairUnderHat(std::vector<BodyPart>& parts, std::size_t begin, const HatS
             clipAtBand(p);
         }
         if (!fits(p)) {
-            // Shrink (the largest size, to 2 %, that fits): a shell towards the head centre; anything else towards
+            // Shrink (the largest size, to 2 %, that fits): a shell towards the head center; anything else towards
             // its own lowest point, so hair hanging below the hat keeps its length and only loses height.
             const BodyPart full = p;
             V3 anchor = head.o;
@@ -606,12 +606,12 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
 
     const Rgb sole = scaled(look.shoes, 0.55f);
     const Outfit of = look.outfit;
-    // Bare legs under a dress or a skirt (the skirt in the bottom colour, a dress in the top colour); a jumpsuit's
-    // trousers in the top colour.
+    // Bare legs under a dress or a skirt (the skirt in the bottom color, a dress in the top color); a jumpsuit's
+    // trousers in the top color.
     const bool skirt = of == Outfit::Dress || of == Outfit::Skirt || of == Outfit::LongDress;
-    const Rgb legColour = skirt ? look.skin : of == Outfit::Jumpsuit ? look.top : look.bottom;
+    const Rgb legColor = skirt ? look.skin : of == Outfit::Jumpsuit ? look.top : look.bottom;
 
-    // Cloth regions of a part (colour0 / colour1): skin, the top or the bottom (their print and fabric).
+    // Cloth regions of a part (color0 / color1): skin, the top or the bottom (their print and fabric).
     enum Region { Skin, Top, Bottom };
     auto dress = [&](BodyPart& part, Region r0, Region r1) {
         const Region rs[2] = {r0, r1};
@@ -643,11 +643,11 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
         ankles[side] = ik.end;
         const Region legR = skirt ? Skin : of == Outfit::Jumpsuit ? Top : Bottom;
         if (!skirt)  // a skirt hides the thighs
-            dress(B.segment(hipJ, ik.mid, pelvis.x, 0.062f * build * limb, 0.05f * limb, legColour), legR, legR);
-        dress(B.segment(ik.mid, ik.end, pelvis.x, 0.05f * limb, 0.043f * limb, legColour), legR, legR);
+            dress(B.segment(hipJ, ik.mid, pelvis.x, 0.062f * build * limb, 0.05f * limb, legColor), legR, legR);
+        dress(B.segment(ik.mid, ik.end, pelvis.x, 0.05f * limb, 0.043f * limb, legColor), legR, legR);
         const Frame ff = Frame{}.translated(ik.end).rotatedY(yaw).rotatedX(-pitch);
         BodyPart& shoe = B.ball(ff.translated({0, -0.012f, 0.032f}), 0.046f, 1.2f, 2.0f, sole);
-        shoe.colour1 = look.shoes;
+        shoe.color1 = look.shoes;
         shoe.split = -0.018f * scale;
         out.feet[side] = B.world(ik.end);
     }
@@ -656,7 +656,7 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
     {
         const V3 a = pelvis.point({0, 0.0f, 0}), b = chest.point({0, 0.035f, 0});
         const V3 xh = normalize(pelvis.x + chest.x, chest.x);
-        // The torso's lower part: the dress / jumpsuit (top colour), the skirt or trousers (bottom), or a bare
+        // The torso's lower part: the dress / jumpsuit (top color), the skirt or trousers (bottom), or a bare
         // midriff under a crop top.
         const bool topBelow = of == Outfit::Dress || of == Outfit::LongDress || of == Outfit::Jumpsuit;
         const Rgb low = topBelow ? look.top : of == Outfit::CropTop ? look.skin : look.bottom;
@@ -733,7 +733,7 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
         const float t = clampf(dot(p - a, ab) / std::max(dot(ab, ab), 1e-8f), 0.0f, 1.0f);
         return a + ab * t;
     };
-    auto rotateAbout = [](V3 v, V3 axis, float ang) {  // Rodrigues, axis normalised
+    auto rotateAbout = [](V3 v, V3 axis, float ang) {  // Rodrigues, axis normalized
         const float c = std::cos(ang), s = std::sin(ang);
         return v * c + cross(axis, v) * s + axis * (dot(axis, v) * (1 - c));
     };
@@ -758,7 +758,7 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
         const float posed = depth(ik.mid, ik.end);
         out.armInHeadPosed = std::max(out.armInHeadPosed, std::max(0.0f, posed));
         if (posed > 0) {
-            // Swing away from the head: the arm's middle moves away from the head's centre (across the arm), with a
+            // Swing away from the head: the arm's middle moves away from the head's center (across the arm), with a
             // gentle preference for out to its own side and forward, so the direction stays steady where "away" is
             // ambiguous (an arm reaching straight over the head). The smallest clearing angle by bisection (up to
             // 100 degrees).
@@ -810,7 +810,7 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
         BodyPart& fore = B.segment(ik.mid, ik.end, chest.x, 0.041f * limb, 0.036f * limb, lower);
         dress(fore, lo, Skin);
         if (lower.r != look.skin.r || lower.g != look.skin.g || lower.b != look.skin.b) {
-            fore.colour1 = look.skin;  // cuff -> wrist
+            fore.color1 = look.skin;  // cuff -> wrist
             fore.split = 0.92f * sk.forearm * scale;
         }
         const V3 along = normalize(ik.end - ik.mid);
@@ -832,7 +832,7 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
     {
         BodyPart& h = B.ball(head, R, 1.05f, 0.97f, look.skin);
         h.material = Material::Head;
-        out.headCentre = B.world(head.o);
+        out.headCenter = B.world(head.o);
         for (int side = 0; side < 2; ++side) {
             const float sx = side == 0 ? 1.0f : -1.0f;
             B.ball(head.translated({sx * R * 1.0f, -0.02f * hs, -0.005f * hs}), 0.034f * hs, 0.6f, 1.0f, look.skin);
@@ -854,7 +854,7 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
             l.scaleZ = 0.22f;
             l.scaleX = sx;
             l.material = Material::Lens;
-            l.colour1 = look.frame;
+            l.color1 = look.frame;
             l.pattern[0] = std::uint8_t(look.glasses);
             l.pattern[1] = std::uint8_t(sideFlag);
             // Lens kind for the shader: 0 dark glass, 1 mirrored, 2 clear (just the frame, the eyes show through).
@@ -909,7 +909,7 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
         B.clip(s, n, w * R * k);
         return s;
     };
-    // A plane cut given in the head's frame: cut away where dot(p - head centre, n) > w R (`second`: as clip2, so a
+    // A plane cut given in the head's frame: cut away where dot(p - head center, n) > w R (`second`: as clip2, so a
     // part can have two). Works for any part (its own frame and scale).
     auto cut = [&](BodyPart& p, V3 n, float w, bool second = false) {
         n = normalize(n);
@@ -919,8 +919,8 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
                                      dot(dW, pW - p.frame.o)};
         (second ? p.clip2 : p.clip) = c;
     };
-    // A layer of hair: a ball like the head's (centre `off`, radius k, in head radii) that stands off the head where
-    // it is off-centre (a lift at the front, volume on top) and sinks into the hair under it elsewhere. Cut at the
+    // A layer of hair: a ball like the head's (center `off`, radius k, in head radii) that stands off the head where
+    // it is off-center (a lift at the front, volume on top) and sinks into the hair under it elsewhere. Cut at the
     // usual hairline (`hairline`: its offset).
     auto layer = [&](V3 off, float k, float hairline) -> BodyPart& {
         BodyPart& s = B.ball(head.translated(off * R), R * k, 1.05f, 0.98f, hairC);
@@ -929,7 +929,7 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
         return s;
     };
     // A solid mass (never cut open) set up and back so the face pokes out in front of it: where they meet is the
-    // hairline (the afro). A mass must cross the head steeply (well off-centre) or the hairline steps.
+    // hairline (the afro). A mass must cross the head steeply (well off-center) or the hairline steps.
     auto mass = [&](V3 c, float r, float sx = 1.0f, float sz = 1.0f) -> BodyPart& {
         BodyPart& m = B.ball(head.translated(c * R), R * r, sx, sz, hairC);
         m.material = Material::Hair;
@@ -949,7 +949,7 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
     };
     const V3 swingL = pose.hairSwing[0], swingR = pose.hairSwing[1];
     const V3 swingMid = (swingL + swingR) * 0.5f;
-    // A direction from the head centre: u around (+ towards the character's left), v up from the eye line.
+    // A direction from the head center: u around (+ towards the character's left), v up from the eye line.
     auto sphereDir = [](float u, float v) {
         return V3{std::sin(u) * std::cos(v), std::sin(v), std::cos(u) * std::cos(v)};
     };
@@ -959,7 +959,7 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
     auto hash = [](int i) { return std::fabs(std::sin(float(i) * 12.9898f) * 43758.5453f) - std::floor(std::fabs(std::sin(float(i) * 12.9898f) * 43758.5453f)); };
     // Long hair (2026-11-21): close on top (a shell cut at the hairline, the strands parted at `part`, x R; > 5: no
     // parting) over a curtain hanging from under it: a tube round the head, open in front of the cheeks (its inside
-    // shows as the hair behind the neck), cut level at the hem `drop` head radii below the head's centre, swinging
+    // shows as the hair behind the neck), cut level at the hem `drop` head radii below the head's center, swinging
     // with the dance. Straight sides past the face, never a ball round it. Returns where the hem's middle moved to
     // (swing) from where it hangs at rest, for pieces that hang on the curtain.
     struct Curtain {
@@ -1027,7 +1027,7 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
         }
     };
     // A tail (ponytail, pigtail, side pony) from `a` towards `b` (standard-head units), swinging, tied with the
-    // accent colour.
+    // accent color.
     auto tail = [&](V3 a0, V3 b0, V3 swing, float amount, V3 inward, float r0, float r1) {
         const V3 a = hp(a0), b = swung(a, hp(b0), swing, amount, inward);
         BodyPart& t = B.segment(a, b, head.x, r0 * hs, r1 * hs, hairC);
@@ -1174,9 +1174,9 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
             break;
         }
         case HairStyle::Undercut: {
-            // Clipped sides and back (a fade: the hair colour over the skin) under a long top combed back.
+            // Clipped sides and back (a fade: the hair color over the skin) under a long top combed back.
             BodyPart& sides = shell(1.02f, {0, -0.62f, 0.78f}, 0.0f);
-            sides.colour0 = mixRgb(look.skin, hairC, 0.32f);
+            sides.color0 = mixRgb(look.skin, hairC, 0.32f);
             BodyPart& top = layer({0, 0.22f, 0.08f}, 0.98f, 0.05f);  // thick on top, sunk into the head at the sides
             top.strands = kStrandsBack;
             cut(top, {0, -1, 0.3f}, -0.42f);
@@ -1267,14 +1267,14 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
         case HairStyle::Shaved: {
             // Shaved to a shadow: barely darker than the skin, closer than a buzz cut.
             BodyPart& sh = shell(1.012f, {0, -0.62f, 0.78f}, 0.08f);
-            sh.colour0 = sh.colour1 = mixRgb(look.skin, hairC, 0.28f);
+            sh.color0 = sh.color1 = mixRgb(look.skin, hairC, 0.28f);
             sh.strands = kStrandsNone;  // a smooth shadow (lines or a texture read as a cap)
             break;
         }
         case HairStyle::Buzz: {
-            // Clipped very short all over: the hair colour over the skin.
+            // Clipped very short all over: the hair color over the skin.
             BodyPart& s = shell(1.025f, {0, -0.62f, 0.78f}, 0.08f);
-            s.colour0 = s.colour1 = mixRgb(look.skin, hairC, 0.6f);
+            s.color0 = s.color1 = mixRgb(look.skin, hairC, 0.6f);
             break;
         }
         case HairStyle::SlickBack: {
@@ -1310,7 +1310,7 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
         case HairStyle::Coils: {
             // Short coils / twists close over the top, faded at the sides.
             BodyPart& sides = shell(1.03f, {0, -0.62f, 0.78f}, 0.06f);
-            sides.colour0 = sides.colour1 = mixRgb(look.skin, hairC, 0.8f);
+            sides.color0 = sides.color1 = mixRgb(look.skin, hairC, 0.8f);
             sides.strands = kStrandsCoils;
             const int n = 70;
             for (int i = 0; i < n; ++i) {
@@ -1402,9 +1402,9 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
     // Every hair part (not the accent ties) is drawn with strands.
     for (std::size_t i = hairBegin; i < out.parts.size(); ++i) {
         BodyPart& p = out.parts[i];
-        const bool hairColour = std::fabs(p.colour0.r - hairC.r) + std::fabs(p.colour0.g - hairC.g) +
-                                    std::fabs(p.colour0.b - hairC.b) < 1e-5f;
-        if (p.material == Material::Hair || hairColour) p.material = Material::Strands;
+        const bool hairColor = std::fabs(p.color0.r - hairC.r) + std::fabs(p.color0.g - hairC.g) +
+                                    std::fabs(p.color0.b - hairC.b) < 1e-5f;
+        if (p.material == Material::Hair || hairColor) p.material = Material::Strands;
     }
 
     // Hair under a hat (Peter, 2026-11-20: "big hair poking out beyond hats"): fitted so none of it shows above
@@ -1436,8 +1436,8 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
             BodyPart& crown = B.segment(head.point({0, R * 0.8f, 0}), head.point({0, R * 0.8f + 0.17f * hs, 0}),
                                         head.x, 0.11f * hs, 0.115f * hs, look.accent, scaled(look.accent, 1.6f),
                                         0.035f * hs);
-            crown.colour0 = scaled(look.top, 1.0f);  // the band
-            crown.colour1 = look.accent;
+            crown.color0 = scaled(look.top, 1.0f);  // the band
+            crown.color1 = look.accent;
             crown.split = 0.035f * hs * scale;
             break;
         }
@@ -1497,7 +1497,7 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
             s.material = Material::Hair;
             cut(s, {0, 0, -1}, -0.12f);  // in front of the ears
         };
-        // A moustache: full under the nose, tapering and drooping to the mouth's corners (a centre piece and two
+        // A moustache: full under the nose, tapering and drooping to the mouth's corners (a center piece and two
         // sides, thick enough to read as hair, not a bar); a handlebar is slimmer, its ends waxed and curled up.
         auto moustache = [&](float thick, bool handlebar) {
             BodyPart& c = B.ball(head.translated(faceLocal(0, -0.25f, 0.98f)), R * thick, 1.6f, 0.75f, hairC);
@@ -1561,7 +1561,7 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
     if (look.lips) out.face.lips = *look.lips;
     out.rootFloor = B.world(body.point({pose.hip.x, 0, pose.hip.z}));
     // The top of the head, hair and hat: each part's highest point (its ends' spheres, stretched across the axis).
-    out.headTop = out.headCentre.y;
+    out.headTop = out.headCenter.y;
     for (std::size_t i = headBegin; i < out.parts.size(); ++i) {
         const BodyPart& p = out.parts[i];
         const Frame& f = p.frame;

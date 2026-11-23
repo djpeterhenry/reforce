@@ -16,7 +16,7 @@ void LightMapper::setLayout(const Layout& layout) {
         x0 = std::min(x0, p.x), x1 = std::max(x1, p.x);
         y0 = std::min(y0, p.y), y1 = std::max(y1, p.y);
     }
-    // The panels' extent, not just their centres: half a side across, about a third of the height up and down.
+    // The panels' extent, not just their centers: half a side across, about a third of the height up and down.
     const double side = layout.sideLength > 0 ? layout.sideLength : 150;
     x0 -= side * 0.5, x1 += side * 0.5;
     y0 -= side * 0.3, y1 += side * 0.3;
@@ -50,12 +50,12 @@ void LightMapper::shade(double r, double g, double b, double meanLevel, const Ma
     // The level: sparse bright lines still light the panel (square root of the area's mean level).
     double level = std::clamp(s.brightness * std::sqrt(std::max(0.0, meanLevel)), 0.0, 1.0);
     level = std::max(level, std::clamp(s.floor, 0.0, 1.0));
-    // The colour: the bright pixels' colour at full strength, its saturation scaled around its own grey.
+    // The color: the bright pixels' color at full strength, its saturation scaled around its own gray.
     const double m = std::max({r, g, b});
     double c[3] = {1, 1, 1};
     if (m > 1e-4) c[0] = r / m, c[1] = g / m, c[2] = b / m;
-    const double grey = (c[0] + c[1] + c[2]) / 3.0;
-    for (double& k : c) k = std::clamp(grey + (k - grey) * s.saturation, 0.0, 1.0);
+    const double gray = (c[0] + c[1] + c[2]) / 3.0;
+    for (double& k : c) k = std::clamp(gray + (k - gray) * s.saturation, 0.0, 1.0);
     const double m2 = std::max({c[0], c[1], c[2]});
     for (int i = 0; i < 3; ++i) out[i] = (m2 > 1e-4 ? c[i] / m2 : 1.0) * level;
 }
@@ -75,7 +75,7 @@ void LightMapper::update(const std::uint8_t* bgra, int w, int h, int rowBytes, d
             const std::uint8_t* p = bgra + std::size_t(idx / std::uint32_t(w)) * std::size_t(rowBytes) + (idx % std::uint32_t(w)) * 4;
             const double b = p[0] / 255.0, g = p[1] / 255.0, r = p[2] / 255.0;
             const double l = std::max({r, g, b});
-            const double wt = 0.002 + l * l;  // bright pixels decide the colour
+            const double wt = 0.002 + l * l;  // bright pixels decide the color
             ar += wt * r, ag += wt * g, ab += wt * b, wsum += wt;
             lsum += l;
         }
@@ -100,9 +100,9 @@ double pulseFactor(double frac, double pulse) {
     return (1.0 - p) + p * std::exp(-4.5 * f);  // a fifth of the beat later about 40 % of the flash is left
 }
 
-void encodeStreamV2(const std::vector<int>& ids, const std::vector<Rgb>& colours, int transition,
+void encodeStreamV2(const std::vector<int>& ids, const std::vector<Rgb>& colors, int transition,
                     std::vector<std::uint8_t>& out) {
-    const std::size_t n = std::min(ids.size(), colours.size());
+    const std::size_t n = std::min(ids.size(), colors.size());
     out.clear();
     out.push_back(std::uint8_t(n >> 8));
     out.push_back(std::uint8_t(n & 0xff));
@@ -110,9 +110,9 @@ void encodeStreamV2(const std::vector<int>& ids, const std::vector<Rgb>& colours
     for (std::size_t i = 0; i < n; ++i) {
         out.push_back(std::uint8_t((ids[i] >> 8) & 0xff));
         out.push_back(std::uint8_t(ids[i] & 0xff));
-        out.push_back(colours[i].r);
-        out.push_back(colours[i].g);
-        out.push_back(colours[i].b);
+        out.push_back(colors[i].r);
+        out.push_back(colors[i].g);
+        out.push_back(colors[i].b);
         out.push_back(0);  // W: unused by Light Panels
         out.push_back(std::uint8_t(t >> 8));
         out.push_back(std::uint8_t(t & 0xff));

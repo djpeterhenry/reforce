@@ -4,19 +4,19 @@
 # and a gray ColorMap with MapFunction "i" makes pixel = intensity x 255, so the PNG shows solid_fs directly.
 # MSAA edges can differ slightly across GPUs: probes and tolerances only, no hashes.
 # The log carries the CPU reference (render::solidReference): the projected vertex extent, the projected hull's
-# area and each front face's centre and expected luminance. Checks, at 4x MSAA and at reforce.Solid.Msaa = 1:
+# area and each front face's center and expected luminance. Checks, at 4x MSAA and at reforce.Solid.Msaa = 1:
 #   - the bright region's extent matches the projected extent within 2 px, and its pixel count the hull area
 #     within 3 %
-#   - every front face's centre is within 16 levels of its expected luminance, and the faces differ (shading)
+#   - every front face's center is within 16 levels of its expected luminance, and the faces differ (shading)
 #   - outside the solid stays black.
 #
-# Phase 3 (PLAN 5L.3), face textures: a cube left of centre (x = -.45, its front face around x 47..245) with Pen 1
+# Phase 3 (PLAN 5L.3), face textures: a cube left of center (x = -.45, its front face around x 47..245) with Pen 1
 # (keyed copy into the feedback buffer), shade 0, edge 0, so face pixels = (fill + (1 - fill) * tex) x 255.
 # 'Bars' draws 8 vertical lines at x = .15 .. .85 (Aspc 0), i.e. only in the frame's right half, away from the
 # cube, and in the right part of the WaveShape tile (u >= .575).
 #   - Text=0: the face's left part (no tile lines) is flat at the Fill floor (fill .15 -> 38, .4 -> 102); its right
 #     part carries the bars (bright maximum, high spread) and never drops below the floor.
-#   - Text=1: the face shows the previous frame's centred square crop, which holds the cube itself (Droste): the
+#   - Text=1: the face shows the previous frame's centered square crop, which holds the cube itself (Droste): the
 #     left part, flat under Text=0, now varies; the floor still holds.
 # Inputs: REFORCE, PNG_PROBE, WORK_DIR.
 file(REMOVE_RECURSE "${WORK_DIR}")
@@ -80,7 +80,7 @@ function(check_run name)
         message(FATAL_ERROR "${name}: ${count} bright pixels, hull area ${area} (want ${lo}..${hi})")
     endif()
 
-    # Front faces: centre luminance; shading must differ between faces.
+    # Front faces: center luminance; shading must differ between faces.
     string(REGEX MATCHALL "solid test face: [0-9]+\\.[0-9],[0-9]+\\.[0-9] lum [0-9]\\.[0-9]+" faces "${err}")
     list(LENGTH faces nf)
     if(nf LESS 2)

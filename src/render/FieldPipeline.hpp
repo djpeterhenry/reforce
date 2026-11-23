@@ -13,11 +13,11 @@
 //   - Julia: one pass, z -> z^2 + c from each pixel's point (tree units through X / Y / Scal / Rot, the set's +-1.6
 //     filling the frame height at Scal 1), a smooth escape count mu (n + 1 - log2(log |z|)), luminance
 //     (mu / Iter)^0.4 x Gain, optionally banded by cos(2 pi Band mu / Iter + Phas); the set itself is dark.
-//   - Mandel: one pass, c = the view centre (double) + the pixel's offset (float); z -> z^2 + c in one of
+//   - Mandel: one pass, c = the view center (double) + the pixel's offset (float); z -> z^2 + c in one of
 //     (engine::OrganicField::precision): float32 (shallow: clean to ~2^12); double-float (float2 hi + lo, ~48 bits;
 //     its own library compiled without fast math; ~5x float's cost); perturbation (the default when deep: the view
-//     centre's orbit in double on the CPU, each pixel iterating only its float difference from it, with
-//     rebasing: about float's cost, clean as far as the double centre carries, ~2^40). Shading from the distance
+//     center's orbit in double on the CPU, each pixel iterating only its float difference from it, with
+//     rebasing: about float's cost, clean as far as the double center carries, ~2^40). Shading from the distance
 //     estimate in pixels (the same at every depth) and bands of the escape count (Band iterations wide, faded
 //     where they would alias); the set is dark. `res` < 1 renders only that corner of the target (the quad samples
 //     it), for a quarter of the cost at .5.

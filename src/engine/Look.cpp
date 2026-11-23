@@ -26,6 +26,9 @@ const std::array<LookKeyInfo, kLookKeys>& lookKeys() {
         {LookKey::LineScale, "linescale", "reforce.LineScale", {"gforce", "frame"}, "gforce", "frame", true, false},
         {LookKey::SpriteLayering, "sprites", "reforce.SpriteLayering", {"gforce", "melt", "trails"}, "gforce", "gforce",
          true, false},
+        // Anti-aliasing in color (Peter 2026-11-22). Both presets keep G-Force's: these are for trying out.
+        {LookKey::LineEdges, "edges", "reforce.LineEdges", {"gforce", "color"}, "gforce", "gforce", true, false},
+        {LookKey::Supersample, "supersample", "reforce.Supersample", {"1x", "2x"}, "1x", "1x", false, false},
     }};
     return keys;
 }
@@ -38,11 +41,13 @@ std::optional<LookKey> parseLookKey(const std::string& s) {
         if (l == k.id || l == lowered(k.settingsKey)) return k.key;
     if (l == "antialias" || l == "lineaa") return LookKey::Antialias;
     if (l == "spritelayering" || l == "sprite") return LookKey::SpriteLayering;
+    if (l == "lineedges" || l == "coloredges") return LookKey::LineEdges;
     return std::nullopt;
 }
 
 std::optional<std::string> normalizeLookValue(LookKey k, const std::string& v) {
     std::string l = lowered(v);
+    if (k == LookKey::Supersample && (l == "1" || l == "2")) l += "x";
     if (k == LookKey::Antialias) {
         if (l == "1" || l == "true" || l == "yes") l = "on";
         else if (l == "0" || l == "false" || l == "no") l = "off";
@@ -73,6 +78,28 @@ LookValues lookFromSettings(const Settings& s) {
     out[LookKey::Antialias] = s.antiAlias ? "on" : "off";
     put(LookKey::LineScale, s.lineScale, "gforce");
     put(LookKey::SpriteLayering, s.spriteLayering, "gforce");
+    put(LookKey::LineEdges, s.lineEdges, "gforce");
+    put(LookKey::Supersample, s.supersample, "1x");
+    return out;
+}
+
+std::vector<std::string> lookSettingProblems(const Settings& s) {
+    std::vector<std::string> out;
+    const LookValues used = lookFromSettings(s);
+    auto check = [&](LookKey k, const std::string& v) {
+        if (v.empty() || normalizeLookValue(k, v)) return;
+        std::string allowed;
+        for (const char* x : lookInfo(k).values) allowed += (allowed.empty() ? "" : " | ") + std::string(x);
+        out.push_back(std::string(lookInfo(k).settingsKey) + ": \"" + v + "\" is not " + allowed + " (using " + used[k] + ")");
+    };
+    check(LookKey::ThinLines, s.thinLines);
+    check(LookKey::Intensity, s.intensity);
+    check(LookKey::FlowRounding, s.flowRounding);
+    check(LookKey::FlowPrecision, s.flowPrecision);
+    check(LookKey::LineScale, s.lineScale);
+    check(LookKey::SpriteLayering, s.spriteLayering);
+    check(LookKey::LineEdges, s.lineEdges);
+    check(LookKey::Supersample, s.supersample);
     return out;
 }
 

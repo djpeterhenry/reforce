@@ -236,8 +236,17 @@ std::string PrefsTable::toJson() const {
 }
 
 const PrefsTable::Entry* PrefsTable::entry(std::string_view key) const {
-    auto it = values_.find(lower(key));
+    std::string lk = lower(key);
+    auto it = values_.find(lk);
+    read_.insert(std::move(lk));
     return it == values_.end() ? nullptr : &it->second;
+}
+
+std::vector<std::string> PrefsTable::unread() const {
+    std::vector<std::string> out;
+    for (const auto& [lk, e] : values_)
+        if (!read_.count(lk)) out.push_back(e.key);
+    return out;  // values_ is ordered by lower-case key
 }
 
 std::optional<std::string> PrefsTable::get(std::string_view key) const {
@@ -330,7 +339,7 @@ void Settings::apply(const PrefsTable& t) {
     movieSpriteInterval = t.number("reforce.MovieSprite.Slideshow.Interval.Duration", movieSpriteInterval);
     spriteMix = t.number("reforce.Sprite.Mix", spriteMix);
     movieSpriteMix = t.number("reforce.MovieSprite.Mix", movieSpriteMix);
-    movieSpriteColour = t.string("reforce.MovieSprite.Colour", movieSpriteColour);
+    movieSpriteColor = t.string("reforce.MovieSprite.Color", movieSpriteColor);
     movieSpriteGamma = t.number("reforce.MovieSprite.Gamma", movieSpriteGamma);
     movieSpriteMaxLive = std::clamp(int(t.number("reforce.MovieSprite.MaxLive", movieSpriteMaxLive)), 0, 64);
     syphonAllowFeedback = t.flag("reforce.Syphon.AllowFeedback", syphonAllowFeedback);
@@ -347,6 +356,11 @@ void Settings::apply(const PrefsTable& t) {
     solidMsaa = int(t.number("reforce.Solid.Msaa", solidMsaa));
     solidTileSize = int(t.number("reforce.Solid.TileSize", solidTileSize));
     solidDir = t.string("reforce.Solid.Dir", solidDir);
+    modelDir = t.string("reforce.Model.Dir", modelDir);
+    lineEdges = t.string("reforce.LineEdges", lineEdges);
+    supersample = t.string("reforce.Supersample", supersample);
+    modelMaxTexture = std::clamp(int(t.number("reforce.Model.MaxTexture", modelMaxTexture)), 64, 16384);
+    modelCache = std::clamp(int(t.number("reforce.Model.Cache", modelCache)), 1, 8);
     organicMaxNodes = std::clamp(int(t.number("reforce.Organic.MaxNodes", organicMaxNodes)), 100, 50000);
     dancerMaxLive = std::clamp(int(t.number("reforce.Dancer.MaxLive", dancerMaxLive)), 1, 32);
     dancerFloor = t.flag("reforce.Dancer.Floor", dancerFloor);
@@ -481,6 +495,7 @@ Settings loadSettings(const std::string& path, std::string* error) {
         return s;
     }
     s.apply(*table);
+    s.unknownKeys = table->unread();
     s.loaded = true;
     return s;
 }

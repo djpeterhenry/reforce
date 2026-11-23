@@ -36,19 +36,19 @@ public:
     }
     void dot(double x, double y, double width, double pen);
     // A dot `diameter` tree units across (cells of a grid), at least 1 px. `hard`: no anti-aliased rim (its in-between
-    // intensities take unrelated ColorMap colours, a speckled fringe on big dots).
+    // intensities take unrelated ColorMap colors, a speckled fringe on big dots).
     void dotUnits(double x, double y, double diameter, double pen, bool hard = false);
 
     // Filled shapes (PLAN 5Q, arcade kinds), made of horizontal strokes on the frame's pixel grid, one per pair of
     // pixel rows (kFillSpacingPx), so they stay solid at any Scal / Rot. Hard-edged (no anti-aliased rim, whose
-    // in-between intensities the ColorMap paints in unrelated colours: a speckled fringe), with square corners. Strokes of one path
+    // in-between intensities the ColorMap paints in unrelated colors: a speckled fringe), with square corners. Strokes of one path
     // max-combine, so overlapping fills do not add up. The polygon is in tree units (even-odd rule, any shape).
     static constexpr float kFillSpacingPx = 2.0f;
     void fillPolygon(const double* xs, const double* ys, int n, double pen);
-    // An axis-aligned rectangle (in tree units, before Rot) centred at (cx, cy), w x h.
+    // An axis-aligned rectangle (in tree units, before Rot) centered at (cx, cy), w x h.
     void rect(double cx, double cy, double w, double h, double pen);
     // Pixel art: `rows` top to bottom, one char per pixel ('.' or ' ' = empty, anything else = lit), each pixel
-    // `px` tree units square, the whole picture centred at (cx, cy). Runs of lit pixels in a row are one rectangle.
+    // `px` tree units square, the whole picture centered at (cx, cy). Runs of lit pixels in a row are one rectangle.
     // `mirror` flips it left-right.
     void bitmap(const char* const* rows, int nRows, double cx, double cy, double px, double pen, bool mirror = false);
 

@@ -22,7 +22,7 @@ inline constexpr int kTiles = kCells - 1;
 inline constexpr int kMaxMoves = 64;
 inline constexpr int kCandidates = 24;
 
-// Cell centre in board units: x = col - 1.5 (left to right), y = 1.5 - row (top to bottom).
+// Cell center in board units: x = col - 1.5 (left to right), y = 1.5 - row (top to bottom).
 inline float cellX(int cell) { return float(cell % kSize) - 1.5f; }
 inline float cellY(int cell) { return 1.5f - float(cell / kSize); }
 

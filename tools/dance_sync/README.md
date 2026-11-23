@@ -4,7 +4,7 @@ Tools for playing dance clips in time with the music (PLAN.md 5J). The clips are
 the dancers' motion.
 
 ```sh
-tools/dance_sync/run dance_beats.py "~/reforce/movies/ dance_luma_1.mov" --preview   # analyse, render, open
+tools/dance_sync/run dance_beats.py "~/reforce/movies/ dance_luma_1.mov" --preview   # analyze, render, open
 tools/dance_sync/run dance_beats.py ~/reforce/movies                                 # table for a folder
 tools/dance_sync/run dance_beats.py CLIP --bpm 100 --downbeat 2 --preview            # fix octave / bar
 tools/dance_sync/run dance_beats.py CLIP --write                                     # save to <stem>.reforce.txt
@@ -29,7 +29,7 @@ tools/dance_sync/run selftest.py                                                
   - Smooth, swaying dancers (luma) go to bounce.
   - Sharp, hit-driven ones (silhouette, static) go to hits.
 
-**Frame timing is cleaned up first, because cadence artefacts look like rhythm.**
+**Frame timing is cleaned up first, because cadence artifacts look like rhythm.**
 - Repeated frames are skipped. The luma clips are 15 fps padded to 23.976; shadow_dance is 25 fps converted to 29.97.
 - Real frames are evenly re-spaced locally: a sliding window that never crosses a cut or a long hold.
   - Timing that slips between stretches is kept.
@@ -40,7 +40,7 @@ tools/dance_sync/run selftest.py                                                
   - Motion that happens to repeat every few frames doesn't count.
 - The JSON records `duplicate_frames`, `content_fps` and `cadence`.
 
-**Clips with several tempos:** a medley, or speed ramps, won't fit one BPM. Analyse one stretch with
+**Clips with several tempos:** a medley, or speed ramps, won't fit one BPM. Analyze one stretch with
 `--start` / `--end` to check, then set Start/End to play that stretch.
 
 **The preview** (`~/Library/Caches/reforce/dance_sync/<stem>.beats.mp4`, opened in QuickTime):
@@ -92,7 +92,7 @@ Clips whose last frame flows into the first get special treatment:
 - **Tempo from the length:** when the clip lasts a whole number of bars at the detected tempo, the tempo is set from
   the length exactly (N beats in the clip's frame time), so the loop stays in sync forever. The JSON records this in
   `loop`.
-  - Checked against Beeple's labelled loops: harvest_128bpm came out at 128.1 and popbottles_110bpm at 110.3.
+  - Checked against Beeple's labeled loops: harvest_128bpm came out at 128.1 and popbottles_110bpm at 110.3.
   - Others landed on round numbers: ignite_running_man 96.000, space_crystals 150.000, spinning_red_earth 120.000.
 - **Tempo in the file name:** `_128bpm` narrows the search.
 - **Interpolation across the seam:** interpolate.py also fills the jump from the last frame back to the first, so the

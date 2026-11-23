@@ -53,7 +53,7 @@
 //   --command T=CMD       (offline) push an engine command at sim time T, e.g. 2.5=next:flowfield,
 //                         3=switch:waveshape:NAME, 4=blend:flowfield:polar, 5=fader:colormap:.3 (see Commands.hpp)
 // Video (Phase 5F; architecture §5c):
-//   --video SOURCE        play SOURCE on the colour video layer at startup (file path, file:PATH,
+//   --video SOURCE        play SOURCE on the color video layer at startup (file path, file:PATH,
 //                         camera[:ID], syphon:NAME, or a video library name); settings
 //                         reforce.Video.Layer.Source. Movies in the Sprite package (and in
 //                         reforce.ExternalSpritesDir) are movie sprites; reforce.VideoDir adds a movie
@@ -128,6 +128,7 @@
 #include "render/SolidPipeline.hpp"
 #include "audio/MicPermission.hpp"
 #include "audio/SystemAudioTap.hpp"
+#include "engine/ModelScenes.hpp"
 #include "engine/Commands.hpp"
 #include "engine/DanceClips.hpp"
 #include "engine/Prefs.hpp"
@@ -446,6 +447,8 @@ int main(int argc, char** argv) {
 
     // reforce settings (never G-Force's files at runtime).
     engine::Settings prefs;
+    // A settings-free run (tests, --no-settings) reads no user model folder unless --set gives one.
+    if (noPrefs) prefs.modelDir = "none";
     if (!noPrefs) {
         std::string err;
         prefs = engine::loadSettings(settingsPath, &err);
@@ -494,16 +497,20 @@ int main(int argc, char** argv) {
     int rc = 0;
     try {
         app::VisualizerOptions vo;
-        vo.width = options.frameWidth;
-        vo.height = options.frameHeight;
+        // reforce.Supersample (live runs only): everything renders at 2x the output size; the App averages it down.
+        const int supersample = !offscreen && (prefs.supersample == "2x" || prefs.supersample == "2") ? 2 : 1;
+        vo.width = options.frameWidth * uint32_t(supersample);
+        vo.height = options.frameHeight * uint32_t(supersample);
+        vo.supersample = supersample;
+        options.supersample = supersample;
         vo.seed = seed;
         vo.prefs = prefs;
         vo.pipeline.format = intensity == "hq" ? render::IntensityFormat::Half16 : render::IntensityFormat::GForce8;
         vo.pipeline.antialias = prefs.antiAlias && !noAa;
+        vo.pipeline.colorEdges = prefs.lineEdges == "color";
         vo.pipeline.lineAa = lineAa;
         if (prefs.thinLines == "gforce") vo.pipeline.thinLines = render::ThinLines::GForce;
-        else if (prefs.thinLines != "smooth")
-            std::fprintf(stderr, "[reforce] reforce.ThinLines: unknown mode \"%s\" (using smooth)\n", prefs.thinLines.c_str());
+        // (other values: reported with the other Look settings, engine::lookSettingProblems)
         {
             const std::string& r = prefs.flowRounding;
             vo.pipeline.flowRounding = r == "nearest"  ? render::FlowRounding::Nearest
@@ -642,7 +649,8 @@ int main(int argc, char** argv) {
                         web::buildLibrary(haveRoot ? root : fs::path(), prefs.exclude,
                                           prefs.externalSpritesDir.empty() ? fs::path() : fs::path(prefs.externalSpritesDir),
                                           dopts.contentDir,
-                                          prefs.solidDir.empty() ? fs::path() : fs::path(prefs.solidDir)));
+                                          prefs.solidDir.empty() ? fs::path() : fs::path(prefs.solidDir),
+                                          engine::modelFolder(prefs.modelDir)));
                     // Video source picker: the Director's video library is read-only
                     // after construction; cameras and Syphon servers are listed live.
                     auto videoSources = [dir] {
@@ -679,7 +687,7 @@ int main(int argc, char** argv) {
                         },
                         std::move(library));
                     ui->setVideoSources(videoSources);
-                    // Favourites (control panel top bar): saved to settings.json unless --no-settings.
+                    // Favorites (control panel top bar): saved to settings.json unless --no-settings.
                     ui->setFavorites(prefs.favorites,
                                      noPrefs ? std::function<std::string(const std::string&)>()
                                              : [settingsPath](const std::string& text) {
@@ -689,7 +697,7 @@ int main(int argc, char** argv) {
                                                        return err;
                                                    return std::string();
                                                });
-                    // Hidden sprites (Image sprites card, Review images): saved like the favourites.
+                    // Hidden sprites (Image sprites card, Review images): saved like the favorites.
                     ui->setSpriteHidden(prefs.spriteHidden,
                                         noPrefs ? std::function<std::string(const std::string&)>()
                                                 : [settingsPath](const std::string& text) {

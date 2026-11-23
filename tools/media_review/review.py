@@ -5,7 +5,7 @@
     python3 tools/media_review/review.py collect [FOLDER]           # dry run: what --copy/--prune would do
     python3 tools/media_review/review.py collect --copy [FOLDER]    # copy new Keep movies into ~/reforce/movies
     python3 tools/media_review/review.py collect --prune [FOLDER]   # delete copies whose original is no longer Keep
-    python3 tools/media_review/review.py collect --move [FOLDER]    # move instead of copy (old behaviour)
+    python3 tools/media_review/review.py collect --move [FOLDER]    # move instead of copy (old behavior)
 
 Copies are APFS clones when possible (instant, no extra space until a side changes). The Finder tags in FOLDER
 are the switch: tag Keep + --copy adds, re-tag Maybe/Drop + --prune removes (or just delete the copy by hand,
@@ -499,7 +499,7 @@ async function beats(id){const row=document.getElementById('r'+id);if(!row)retur
   q('.sv').textContent=st.bpm&&!same?'Save *':'Save';
   q('.bdots').innerHTML=Array.from({length:st.bpb},(_,k)=>`<i class="${k?'':'one'}"></i>`).join('')}
  function setFrom(o){if(o&&o.bpm){st.bpm=o.bpm;st.start=o.beatStart??o.beat_start??0;st.bpb=o.beatsPerBar||o.beats_per_bar||4;norm()}show()}
- function alts(a){const box=q('.balt');if(!a){box.textContent=st.saved&&st.saved.bpm?'':'Not analysed yet: Analyze, or tap along.';return}
+ function alts(a){const box=q('.balt');if(!a){box.textContent=st.saved&&st.saved.bpm?'':'Not analyzed yet: Analyze, or tap along.';return}
   const c=(a.candidates||[]).slice(1,5).map(x=>x.bpm),o=Object.values(a.alternatives||{}).map(x=>x.bpm);
   box.innerHTML=`analysis: <b>${a.bpm.toFixed(2)}</b> BPM, confidence ${a.confidence.toFixed(2)} (${a.signal||''}) · try: `;
   for(const b of [...new Set([a.bpm,...o,...c].map(x=>+x.toFixed(2)))]){const bt=document.createElement('button');bt.className='chip';bt.textContent=b;
@@ -522,8 +522,8 @@ async function beats(id){const row=document.getElementById('r'+id);if(!row)retur
   st.start=st.taps[0];norm();show()};
  q('.tap').onclick=tap;
  q('.spd').onchange=e=>{v.playbackRate=+e.target.value};
- q('.ana').onclick=async()=>{msg('analysing… (about 10–30 s)');q('.ana').disabled=true;
-  try{const j=await post('/api/beats/analyze',{id});if(j.error){msg(j.error);return}st.an=j.analysis;setFrom(st.an);alts(st.an);msg('analysed (not saved yet)')}
+ q('.ana').onclick=async()=>{msg('analyzing… (about 10–30 s)');q('.ana').disabled=true;
+  try{const j=await post('/api/beats/analyze',{id});if(j.error){msg(j.error);return}st.an=j.analysis;setFrom(st.an);alts(st.an);msg('analyzed (not saved yet)')}
   finally{q('.ana').disabled=false}};
  q('.sv').onclick=async()=>{if(!st.bpm){msg('no BPM');return}const j=await post('/api/beats/save',{id,bpm:st.bpm,beatStart:st.start,beatsPerBar:st.bpb});
   if(j.error){msg(j.error);return}st.saved=j.options;items[id].bpm=j.options.bpm;show();msg('saved to .reforce.txt')};

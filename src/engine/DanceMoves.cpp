@@ -70,7 +70,7 @@ void keyFeet(float b, const FeetKey* keys, int n, const MoveCtx& c, DancePose& p
     p.hip.z += mz * 0.6f;
     if (lMoves != rMoves) p.hipRoll += (lMoves ? -0.07f : 0.07f) * up;
 }
-// 0..1 weight that is 1 on the even `per`-beat blocks and 0 on the odd ones, eased over the switch (centred on it).
+// 0..1 weight that is 1 on the even `per`-beat blocks and 0 on the odd ones, eased over the switch (centered on it).
 float sideWeight(float b, float per, float ease = 0.35f) {
     const float x = b / per;  // switches at whole numbers
     const float f = fr(x);
@@ -232,7 +232,7 @@ void legsTwist(float b, const MoveCtx& c, DancePose& p) {
 }
 
 void legsCharleston(float b, const MoveCtx& c, DancePose& p) {
-    // Kick forward (1), back to centre (2), kick back (3), centre (4) with the other foot; toes swivel.
+    // Kick forward (1), back to center (2), kick back (3), center (4) with the other foot; toes swivel.
     const int beat = int(std::floor(b)) % 4;
     const float in = bump(fr(b));
     const bool left = (int(std::floor(b / 4)) % 2 == 0) != bool(c.variant & 1);
@@ -332,14 +332,14 @@ void legsHop(float b, const MoveCtx& c, DancePose& p) {
 }
 
 void legsGrapevine(float b, const MoveCtx& c, DancePose& p) {
-    // 8 beats: side, behind, side, close (travelling to the dancer's left), then the same back.
+    // 8 beats: side, behind, side, close (traveling to the dancer's left), then the same back.
     const float w = 0.12f;
     const FeetKey keys[8] = {
         {0, 0, 0, 0},             {w, 0, 0, 0},           {w, 0, w - 0.02f, -0.08f}, {2 * w, 0, w - 0.02f, -0.08f},
         {2 * w, 0, 2 * w, 0},     {2 * w, 0, w, 0},       {w + 0.02f, -0.08f, w, 0}, {w + 0.02f, -0.08f, 0, 0},
     };
     keyFeet(b, keys, 8, c, p, 0.04f);
-    p.hip.x -= w * c.amp * 0.85f;  // centred on the middle of the walk
+    p.hip.x -= w * c.amp * 0.85f;  // centered on the middle of the walk
     p.footL.x -= w * c.amp;
     p.footR.x -= w * c.amp;
     p.hip.y -= 0.025f * onBeat(b, 2);
@@ -506,7 +506,7 @@ void armsTut(float b, const MoveCtx& c, DancePose& p) {
 }
 
 void armsWave(float b, const MoveCtx& c, DancePose& p) {
-    // An arm wave travelling from one hand, through the shoulders, to the other hand and back (4 beats).
+    // An arm wave traveling from one hand, through the shoulders, to the other hand and back (4 beats).
     const float t = fr(b / 4);
     const float pos = t < 0.5f ? t * 2 : 2 - t * 2;  // 0 at the left hand .. 1 at the right
     auto bumpAt = [&](float x) { return std::exp(-std::pow((x - pos) * 4.0f, 2.0f)); };
@@ -779,9 +779,9 @@ void fullDab(float b, const MoveCtx& c, DancePose& p) {
 void fullCabbage(float b, const MoveCtx& c, DancePose& p) {
     // Cabbage patch: fists together circling in front, hips circling, knees bent.
     const float a = TAU * b / 2;
-    const V3 centre = L(0.0f, -0.02f + 0.06f * std::sin(a), 0.16f + 0.05f * std::cos(a));
-    p.handL = centre + V3{0.05f + 0.06f * std::cos(a), 0, 0};
-    p.handR = centre + V3{-0.05f + 0.06f * std::cos(a), 0.01f, 0.02f};
+    const V3 center = L(0.0f, -0.02f + 0.06f * std::sin(a), 0.16f + 0.05f * std::cos(a));
+    p.handL = center + V3{0.05f + 0.06f * std::cos(a), 0, 0};
+    p.handR = center + V3{-0.05f + 0.06f * std::cos(a), 0.01f, 0.02f};
     p.hip.x += 0.04f * std::cos(a) * c.amp;
     p.hip.z += 0.02f * std::sin(a);
     p.hip.y -= 0.05f;
@@ -957,7 +957,7 @@ void legsPopWalk(float b, const MoveCtx& c, DancePose& p) {
 }
 
 void legsTick(float b, const MoveCtx& c, DancePose& p) {
-    // Ticking: tiny side steps on the 8ths, staccato, travelling and coming back over 4 beats.
+    // Ticking: tiny side steps on the 8ths, staccato, traveling and coming back over 4 beats.
     const float k = std::floor(b * 2);
     const float in = snap(fr(b * 2), 2);
     const float pos = (k + in);  // 0..8
@@ -1726,7 +1726,7 @@ DancePose Choreographer::pose(const MusicState& g, const Skeleton& sk, double de
     const double beat = g.beat - delay;
     const Routine* cur = routineAt(beat);
     if (!cur) return restPose(sk);
-    // Crossfade over 2 x kBlend beats centred on each change (from half a beat before the bar line to half a beat
+    // Crossfade over 2 x kBlend beats centered on each change (from half a beat before the bar line to half a beat
     // after), with a smootherstep so it eases in and out. A routine that cut in (a drop) fades in only from then.
     const Routine* prev = nullptr;
     const Routine* next = nullptr;

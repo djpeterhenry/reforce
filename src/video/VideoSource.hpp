@@ -1,7 +1,7 @@
 #pragma once
 // Video sources (Phase 5F): one abstraction for movie files, cameras and
 // Syphon inputs, used by movie/live sprites (engine sprite pass) and by the
-// colour video layer (colorize pass). Implemented in VideoSourceMac.mm
+// color video layer (colorize pass). Implemented in VideoSourceMac.mm
 // (AVFoundation, CoreVideo, Syphon); this header has no Objective-C.
 //
 // Every source decodes/captures on its own thread(s) and hands out frames as
@@ -198,7 +198,7 @@ void initSyphonDirectory();
 // ---- test videos (tools and tests; our own synthetic content)
 enum class TestCodec { H264, HEVC, ProRes422 };
 enum class TestPattern {
-    Card,    // frame index as 8 bit blocks on top, colour patches below (exact tests)
+    Card,    // frame index as 8 bit blocks on top, color patches below (exact tests)
     Motion,  // moving gradients + scrolling noise (realistic decode load)
 };
 struct TestVideoSpec {

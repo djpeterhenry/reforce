@@ -22,10 +22,10 @@ plus Syphon for OBS.
    the bar line matches its downbeat and to set `reforce.Link.OffsetMs`.
 7. **5B.10 sprite layering**: built. Look card "Sprites and the flow": Overlay (G-Force, built-in default) / Melt
    (reforce's old look) / Overlay + trails. Pick yours and "Save as default".
-   Also **`reforce.SpriteAlpha`** (settings.json, #42): G-Force ignores a PNG's alpha channel (the colour under
+   Also **`reforce.SpriteAlpha`** (settings.json, #42): G-Force ignores a PNG's alpha channel (the color under
    transparent pixels shows, often junk); reforce's default `black` treats transparent pixels as black (not drawn),
    `ignore` copies G-Force. **Decided 2026-11-13 (Peter): keep `black` as the default.**
-8. **5K sprite visibility**: try the Mix sliders (Image / Movie sprites cards, keys `[` `]`), Full colour (Movie
+8. **5K sprite visibility**: try the Mix sliders (Image / Movie sprites cards, keys `[` `]`), Full color (Movie
    sprites card) and movie levels (review.py Black / White / Gamma), then pick defaults for settings.json.
 9. Open question: is the Python scripting layer (`_package.py`, `Scripts/`) in scope? (Assumed: no.)
 10. (Install: Claude now runs `scripts/install-app.sh` after each finished item; Peter 2026-11-15.)
@@ -33,9 +33,9 @@ plus Syphon for OBS.
     loop with Beat sync on; look at bird (~88) and fry_and_laurie in the beat panel; check the dance_beats
     previews by eye; choose shadow_dance's tempo (one section or a tempo map).
 12. **5L solids:** Peter liked the Solids theme (2026-11-15). Try the control panel's Solids card (5L.5): Interval,
-    Duration, Start next / Clear, library and favourites.
+    Duration, Start next / Clear, library and favorites.
     5L.6: start **Rubik Cube** with the beat clock locked: does it land solved on the 8-bar lines, and do the six
-    colours read well across ColorMaps? Check it stays solid over the camera backdrop.
+    colors read well across ColorMaps? Check it stays solid over the camera backdrop.
 13. **5N organics:** try the Organics card (or the Organics theme) and the seven trees; say which look right and which
     to tune (growth speed, thickness, sway, buds).
 14. **5O rhythm** (built 2026-11-17 while Peter was away; start with docs/prototypes.md): the Rhythm section (phrase
@@ -69,8 +69,8 @@ plus Syphon for OBS.
 - **G-Force renders frames above ~5.2 MP at half size** (#38): Retina full screen on this Mac is really a 1728×1117 frame,
   pixel-doubled. Matters for any full-screen comparison (lines, flow speed per pixel, decay).
 - **Match G-Force, but don't copy its flaws blindly** (Peter, 2026-11-11). If matching G-Force means something that's
-  intuitively worse (lost precision, aliasing, quantisation, frame-rate dependence, measurement artefacts), build the
-  G-Force behaviour as a selectable option, keep or propose a "done right" alternative, and let Peter pick the default.
+  intuitively worse (lost precision, aliasing, quantization, frame-rate dependence, measurement artifacts), build the
+  G-Force behavior as a selectable option, keep or propose a "done right" alternative, and let Peter pick the default.
   Rule of thumb: **scene semantics** that scene authors relied on (operators, tiers, timing, what a config means) should
   match G-Force; **rendering quality** (precision, filtering, edge shapes) is a candidate for doing it right. Options live in
   `settings.json` (`reforce.*`) so a Dock launch can use them. See "Fidelity choices" below.
@@ -207,7 +207,7 @@ Known gaps from `docs/parity.md`:
   +-0.05 s of reforce's; frame-counted (600 frames at the true ~55.6 fps = 10.8 s) fits 2x worse. The old "0.11-0.17 s
   late" was the strip decoder: it timed columns via B0 frames, but G-Force's strip scrolls ~0.95 px/frame (#34), so a
   column is ~1.055 frames. Now read from the clock's time band: #30 3/3 (half-way deltas +0.04/-0.03/+0.06 s). No reforce change.
-- [x] 5B.2 Probed (run 18, parity #31): same artefact; timed by the time band the fade-out matches #19 (all 12 within
+- [x] 5B.2 Probed (run 18, parity #31): same artifact; timed by the time band the fade-out matches #19 (all 12 within
   +-0.11 s, 224 -> 32 in 3.9-4.1 s vs 4.0). No reforce change.
 - [x] 5B.3 Default stays **60 Hz** (G-Force's design; Peter decided). Peter's G-Force really runs ~55.6, adjustable via `Graphics.TargetFrameRate`.
 Things we haven't checked yet:
@@ -236,7 +236,7 @@ Things we haven't checked yet:
 - [x] 5B.10 (built 2026-11-12: `reforce.SpriteLayering = gforce | melt | trails`, Look card "Sprites and the flow";
   built-in default gforce; replay of run 26 in reforce matches #40: lighten rule on 77,271/77,271 band pixels, Pen/both
   bands 255/128 and 128/64, identical trails for Pen and Pen+EPen; `trails` = the overlay plus a max feed at
-  EPen × `reforce.SpriteTrails` (0.35). Run 27 (#41) settled the two open points: X/Y map to centre = X·max(0, 1 −
+  EPen × `reforce.SpriteTrails` (0.35). Run 27 (#41) settled the two open points: X/Y map to center = X·max(0, 1 −
   size/frame) (cover sprites never move), EPen 0 draws nothing; also Pen stamps replace at fade × Pen (not blended).
   Runs 28-31 (#42, 2026-11-13): all blend flags measured (keyed copy at ~10 levels, half-way lighten with the envelope
   on the source, additive, AlphaMask = darken, AlphaBlend = screen), alpha ignored, Rec. 601, oldest sprite on top; run
@@ -256,7 +256,7 @@ Things we haven't checked yet:
 G-Force facts: the scene language exposes `mag()`, `fft()`, `BASS` (documented as "approximates the overall beat"),
 plus `LEVEL` and `ENERGY` (undocumented; 5 and 10 files). There's no MID/TREBLE/BEAT in scenes. Internally the engine
 also computes `impulseFast`, `impulseSlow`, `energy`, `beat`, `level`, alternative FFTs `fft1`/`fft2`, and
-normalised/"persist" FFT stages (SSEngine.py `AudioData`), which matches the `Audio.FFT.Params` names (Persist*,
+normalized/"persist" FFT stages (SSEngine.py `AudioData`), which matches the `Audio.FFT.Params` names (Persist*,
 Short/Long envelopes, Exciter, FloorRaise). Settings: `Audio.Response.Scale`, `FreqLo`/`FreqHi`, `FFT.Smooth`,
 `PCM.Smooth`, bins.
 - [x] 5C.1–5C.3 Kit done (`b97b8a8`); **G-Force audio runs 7–14 captured 2026-11-11 17:05–17:10** (strip charts decode with
@@ -264,7 +264,7 @@ Short/Long envelopes, Exciter, FloorRaise). Settings: `Audio.Response.Scale`, `F
   Round 2 (2026-11-11 evening, done): runs 15/16 (tones 125 Hz–4 kHz, 20 s tone, falling sweep) + run 23 (two/three-tone
   chords). **Found: G-Force's fft() axis adapts to the content** (upper edge contracts onto the highest tone, τ ≈ 2 s, back
   toward ~11 kHz in silence; lower edge floor ~240 Hz, rises slowly) — explains tone drift, the "3.5× sweep", the dark
-  phases and the low high-band LEVEL (docs/audio-probe-results.md §9). Not modelled yet (exploratory fit too poor for single
+  phases and the low high-band LEVEL (docs/audio-probe-results.md §9). Not modeled yet (exploratory fit too poor for single
   tones). **`mag()` = 7-point moving average** → implemented (`pcmBoxcar`). Audio parity 100 % outside gaps (276 checks).
 - [x] 5C.1 Controlled audio route (**Loopback**, decided): Peter creates a Loopback virtual device named `reforce probe`
   (default Pass-Thru source, no monitors, so it's silent). Our player tool outputs test WAVs to it, and it is G-Force's input
@@ -275,7 +275,7 @@ Short/Long envelopes, Exciter, FloorRaise). Settings: `Audio.Response.Scale`, `F
 - [x] 5C.3 **Strip-chart probes**: a FlowField that scrolls left 1 px per frame plus a WaveShape that draws a dot at
   the right edge at y = f(BASS / LEVEL / ENERGY / fft(k) / mag(k)). One screenshot then shows several seconds of a
   signal's time series. Also snapshot probes of the full `fft(s)` and `mag(s)` curves.
-- [x] 5C.4 Fit reforce's Analyzer to the measurements: FFT bin mapping and normalisation, attack/release
+- [x] 5C.4 Fit reforce's Analyzer to the measurements: FFT bin mapping and normalization, attack/release
   envelopes, BASS/LEVEL/ENERGY definitions and ranges, `mag` scaling and smoothing, `Response.Scale`. Add the
   signals to `tools/parity` (reforce reads the same WAVs deterministically).
 - [x] 5C.5 reforce extensions (**Peter chose: yes**): `MID`, `TREBLE`, `BEAT` (onset pulse) + tempo estimate as extra
@@ -302,7 +302,7 @@ Goal: every displayed frame on time, during switches, transitions, spawns and UI
     times when the accumulator phase drifts. Ask CAMetalDisplayLink for an exact 60 Hz (or a whole multiple) and lock
     the sim step to vsync; also handle variable refresh. Catch-up (up to 4 steps) should never trigger in normal
     running.
-  - Logging, settings writes, web UI state serialisation and SSE: off the render thread, with nothing on the hot path
+  - Logging, settings writes, web UI state serialization and SSE: off the render thread, with nothing on the hot path
     allocating.
   - Syphon publish and window present must never block the sim (present thread done in M7b; check Syphon too).
   - Audio device changes/reconnects, full-screen Space switches, display changes, App Nap/timer coalescing,
@@ -315,7 +315,7 @@ Status: present since M3, as analytic per-pixel coverage on capsule quads (`Wave
 default), blended as `pen·cov + dst·(1−cov)` so that overwrite semantics hold in the core.
 - [x] 5E.1 Quality review: the faint double-blend where segments of one polyline overlap at joints (each segment
   blends separately), thin lines (LWdt·scale < 1 px) going dim or aliased, dot roundness, and edges on the 8-bit
-  intensity buffer (quantised AA ramps that then flow and decay → possible banding or crawling).
+  intensity buffer (quantized AA ramps that then flow and decay → possible banding or crawling).
 - [x] 5E.2 (per-path max coverage in tile memory chosen) Options to evaluate: per-polyline coverage (max-coverage within one path before blending, e.g. a
   per-path coverage pass or depth/stencil trick) vs current; minimum-width clamping with alpha compensation; 4×MSAA
   as a comparison baseline. Match G-Force's edge profile (5B.7 measures it).
@@ -325,7 +325,7 @@ default), blended as `pen·cov + dst·(1−cov)` so that overwrite semantics hol
   0.033-0.172 ms at 4K (unchanged within noise by the #32 work); gforce 0.015-0.111 / 0.036-0.224 ms.
 
 ### 5F. Video files  (Peter, 2026-11-11)  `[x]` all three parts work
-Movie sprites, colour layer (over/under, 4 blend modes, keys, crossfade), Syphon + camera inputs (camera **verified by Peter 2026-11-11**). Files decoded with AVAssetReader by sim time (frame-exact in deterministic mode). 1080p stress with
+Movie sprites, color layer (over/under, 4 blend modes, keys, crossfade), Syphon + camera inputs (camera **verified by Peter 2026-11-11**). Files decoded with AVAssetReader by sim time (frame-exact in deterministic mode). 1080p stress with
 video: 0 hitches. Open: G-Force's own movie-frame mapping not probed (5F.6). Polish (round 2): minified frames (< 0.6×)
 sampled via a half-size box filter + mips (render/VideoMips, ~0.25 ms GPU per new 4K frame); camera permission through
 CameraGate (async, one shared prompt; waiting / denied / no-usage-key states in the Video card and menu); failed sources
@@ -336,12 +336,12 @@ same params/flags as image sprites (scene-format §5.6; G-Force version history:
 files present in the Sprites folder"). reforce currently ignores them (M6 open issue).
 - [x] 5F.1 Scope (**Peter: all three**, 2026-11-11):
   (a) G-Force-compatible **movie sprites** (video → luminance → intensity buffer → ColorMap);
-  (b) a **full-colour video layer** composited over or under the visualizer (blend modes: normal/add/screen/multiply,
+  (b) a **full-color video layer** composited over or under the visualizer (blend modes: normal/add/screen/multiply,
       opacity, fit, a layer order relative to the colorized visualizer, optional luma/chroma key);
   (c) **live sources**: cameras (AVCaptureDevice) and **Syphon input** (SyphonMetalClient). Each can feed either (a) as a
-      "live sprite" or (b) as the colour layer.
+      "live sprite" or (b) as the color layer.
   Design: one `VideoSource` abstraction (file / camera / Syphon), producing Metal textures on its own thread, used by
-  both the sprite path (a) and the colour layer (b). Order: (a) → (b) → (c). Self-capture guard: never subscribe to
+  both the sprite path (a) and the color layer (b). Order: (a) → (b) → (c). Self-capture guard: never subscribe to
   our own "reforce" Syphon server (feedback loop) unless explicitly allowed.
 - [x] 5F.2 Decoding: AVFoundation (built with `AVAssetReader` by sim time instead of `AVPlayer`), hardware decode (H.264/HEVC/ProRes),
   frames as IOSurface-backed CVPixelBuffers mapped zero-copy into Metal with `CVMetalTextureCache`. Decode runs off
@@ -351,12 +351,12 @@ files present in the Sprites folder"). reforce currently ignores them (M6 open i
   flags, fades (lifetime rule), Pen/EPen, `~` invert, slideshow and Theme membership, a sibling `.txt` for params.
   Sprite catalog: add video extensions.
 - [x] 5F.4 Controls: a "Video" section in the web UI and menu: source picker (files, cameras, Syphon servers), start/stop,
-  loop, layer mode (sprite vs colour layer), blend/opacity/fit, crossfade between sources; video folders outside `scenes/`
+  loop, layer mode (sprite vs color layer), blend/opacity/fit, crossfade between sources; video folders outside `scenes/`
   (an external path, like G-Force's `ExternalSprites.Path`). Camera permission prompt (NSCameraUsageDescription).
 - [x] 5F.5 Smoothness: preroll before a video starts (no first-frame stall), pooled textures, decode time
   measured in the 5D perf tooling; 4K ProRes/HEVC test files; no hitches in `--stress` with videos.
 - [-] 5F.6 **Dropped (Peter, 2026-11-11): G-Force can't play movies on this Mac at all** (it relies on 32-bit Intel
-  QuickTime, unsupported here), so movie playback can't be black-box compared. reforce's behaviour stands as designed.
+  QuickTime, unsupported here), so movie playback can't be black-box compared. reforce's behavior stands as designed.
   Earlier notes: probed (runs 21/22): G-Force does **not** play movies from `G-Force.ExternalSprites.Path` (our PNG there works;
   .mov/.mp4 Card test movies never appear). Needs the Sprite package folder: **Peter: `sudo probes/install.sh`** (now also
   creates `G-Force.Sprite.package/zz reforce probes`), then run21 with `PROBE_SPRITE_DIR=build/probe-movies` (probes/README.md).
@@ -430,18 +430,18 @@ audio tracker with a new phase estimate). Peter may not DJ with Link on, so audi
   tempogram refined to 0.002 BPM; phase from the peaks. `--preview` renders the clip with flashing beats, a signal
   strip and a click track; `--write` saves `BPM` / `BeatStart` / `BeatsPerBar` to `<stem>.reforce.txt`.
   `selftest.py` (synthetic dancers, incl. 25->15->23.976 bouncing silhouettes) passes. luma 1/2/5 ~90 BPM,
-  luma 3/4 ~113 BPM (they were 150/100 before: duplicate-frame artefacts). Peter to check the previews by eye.
+  luma 3/4 ~113 BPM (they were 150/100 before: duplicate-frame artifacts). Peter to check the previews by eye.
   Later: pose keypoints (Apple Vision) for non-silhouette clips.
-- [x] 5J.6 Loops and the colour layer (Peter, 2026-11-14):
+- [x] 5J.6 Loops and the color layer (Peter, 2026-11-14):
   - beat-synced movies start from a downbeat (the first at or after Start) and the section is any whole number of
-    bars (`sectionEnd` honours `loopUnit`, like the decoder)
+    bars (`sectionEnd` honors `loopUnit`, like the decoder)
   - play-once movies last as long as they take at the synced rate
-  - the colour video layer is beat-synced too
+  - the color video layer is beat-synced too
   - the setting is renamed `reforce.Video.BeatSync`
   - not done (Peter): best-loop-point search, seam crossfade.
 - [x] 5J.5 Survey of the other dance clips (2026-11-14) and three detector fixes:
   - auto keeps the more confident of the bounce-led and hits fits
-  - dark-on-light silhouettes are recognised
+  - dark-on-light silhouettes are recognized
   - timing cleanup works locally between cuts and holds, with cadence patterns up to 8 frames that must hold steady
     across the clip.
   Results:
@@ -477,17 +477,17 @@ audio tracker with a new phase estimate). Peter may not DJ with Link on, so audi
   - later: pose keypoints (Apple Vision) for non-silhouette clips; best-loop-point search and seam crossfade
     (Peter: not now).
 - [ ] 5J.9 More content (research 2026-11-15, links unverified, nothing downloaded). No source sells full-body
-  dancer silhouettes that are seamless and BPM-labelled, so packs go through dance_sync / the beat panel.
-  - Visual 3xplosiv3 (sites.google.com/view/visual3xplosiv3): 300+ free loops incl. 4K silhouettes; licence allows
+  dancer silhouettes that are seamless and BPM-labeled, so packs go through dance_sync / the beat panel.
+  - Visual 3xplosiv3 (sites.google.com/view/visual3xplosiv3): 300+ free loops incl. 4K silhouettes; license allows
     live VJ / streaming. **First pick.**
   - Gumroad loops with a stated tempo (length-lock syncs them): rtificial "Endorphin" (69 loops, 130 BPM, EUR 4;
     first pick), DizArt "Pulse Geometry" (122 BPM), Jiagual Essentials (120 BPM, alpha), NonVisualCult free packs.
   - Silhouette dancers (no BPM): AEJuice "Shadow Dancers" (69, 4K, mattes), Motion Array, VideoHive "Dancer Pack".
-  - Resolume Footage (clearest live licence): WhiteDancer, MoCapMayhem.
+  - Resolume Footage (clearest live license): WhiteDancer, MoCapMayhem.
   - Beeple resources page: C4D projects, some BPM-named (render needed).
   - Reddit: r/vjing (Gumroad roundups; freestockfootagearchive.com, Prelinger archive), r/VJloops (sellers).
     Next: search r/vjing for "silhouette" / "dancer".
-  - Licence watch-outs: Envato / VideoHive are per project; Pexels / Pixabay / Mixkit are not seamless or clearly
+  - License watch-outs: Envato / VideoHive are per project; Pexels / Pixabay / Mixkit are not seamless or clearly
     OK for venues.
 - [x] 5J.2 Beat panel in tools/media_review (button or key b; `?beats=ID` opens one):
   - plays with a beat flash, bar dots and a click scheduled on the video's clock (also at 1/2 and 3/4 speed)
@@ -498,7 +498,7 @@ audio tracker with a new phase estimate). Peter may not DJ with Link on, so audi
   - Tested: API round trip on a scratch clone, headless Chrome render with no script errors.
 - [x] 5J.3 `tools/dance_sync/interpolate.py`: restore real timing (drop repeats; RIFE recreates the frames a 2-2-1
   cadence dropped), then RIFE x4 -> `<stem>.rife4x.mov` beside the original (HEVC 10-bit q85, same start and length).
-  All five luma clips done (25 -> 100 fps); their BPM/BeatStart re-analysed on the smooth files and written to
+  All five luma clips done (25 -> 100 fps); their BPM/BeatStart re-analyzed on the smooth files and written to
   the originals' and the copies' `.reforce.txt`.
 - [x] 5J.4 `sync/BeatClock` (Link > audio phase loop: strength-weighted onset phase average, confident only when
   onsets agree) and `engine/MovieBeatSync` (playhead from beat deltas, octave 1/2,1,2 with hysteresis, 0.5-2x,
@@ -555,14 +555,14 @@ ColorMap's MapFunction (default `i^2.1`) pushes into the dark end of the palette
   fix). Interpolated copies share their original's options. `tools/media_review/review.py`: Black / White / Gamma
   fields per row (original + `~/reforce/movies` copy, other keys kept). Unit tests (MediaOptions) and render tests
   (Gamma 0.5 lifts gray 64 → 90; per-movie Gamma 2 × global 0.5 = unchanged; Black/White stretch).
-- [x] 5K.3 **Full-colour movie sprites** (option): `reforce.MovieSprite.Colour = off` (default, G-Force) `| over`.
+- [x] 5K.3 **Full-color movie sprites** (option): `reforce.MovieSprite.Color = off` (default, G-Force) `| over`.
   With `over`, movie / live sprites skip the intensity buffer; their frames are alpha-over composited in the
-  colorize pass (after the colour video layer, so on top of it; in the window and Syphon alike), at the sprite's
+  colorize pass (after the color video layer, so on top of it; in the window and Syphon alike), at the sprite's
   rectangle, alpha = envelope × (0.5 + 0.5 × movie Mix), levels per channel, `~` inverts; Pen/EPen and blend flags
-  unused. Panel "Full colour" toggle on the Movie sprites card (`videoset:spritecolour:over|off`, saved). Fixed on
+  unused. Panel "Full color" toggle on the Movie sprites card (`videoset:spritecolor:over|off`, saved). Fixed on
   the way: the API rejected `videoset` keys the Visualizer handles itself, so the panel's Beat sync toggle got a
   400 and never reached the engine.
-- [ ] 5K.4 Peter: try Mix on the Image / Movie sprites cards and Full colour live; pick defaults for settings.json.
+- [ ] 5K.4 Peter: try Mix on the Image / Movie sprites cards and Full color live; pick defaults for settings.json.
 
 ### 5L. 3D solids  (Peter, 2026-11-15)  `[~]`
 Polyhedra (and a sphere, torus and prism) wearing the current WaveShape, drawn into the intensity buffer before the
@@ -577,11 +577,11 @@ Peter's decisions:
 - Faces wear the current WaveShape; `Text=1` uses the frame, `Text=2` is flat.
 
 - [x] 5L.1 Meshes and math (`engine/Meshes`) + unit tests; projection / bounding-box reference. Faces from a
-  convex hull of each vertex set, fanned around their centres (UVs on the tile's inscribed circle, edge 1 -> 0),
+  convex hull of each vertex set, fanned around their centers (UVs on the tile's inscribed circle, edge 1 -> 0),
   geodesic sphere, torus; sprite-coordinate model and view-projection matrices, clipped screen bounds.
 - [x] 5L.2 `render/SolidPipeline`: flat-shaded solid behind `--solid-test`, MSAA + depth, composite via the
   sprite pass. One vertex buffer (ranges per MeshKind), PSO / depth state at startup, `reforce.Solid.MaxLive` (3)
-  frame-size RG8 targets registered as sprite textures, a shared memoryless 4x MSAA colour + Depth32Float pair
+  frame-size RG8 targets registered as sprite textures, a shared memoryless 4x MSAA color + Depth32Float pair
   (`reforce.Solid.Msaa` 4 | 1), back-face culling, depth test. The solid is drawn at its target's top-left with the
   render area limited to its pixel box (projectBounds + 1 px), so clear / resolve scale with its size; the sprite quad
   covers the box and samples that sub-rectangle (new `SpriteQuad::u0..v1`, SpriteP 80 -> 96 bytes; defaults = whole
@@ -596,10 +596,10 @@ Peter's decisions:
 - [x] 5L.3 WaveShape tile (`Text=0`) and frame texture (`Text=1`). Each step with a live `Text=0` solid,
   `wsOut_` is mapped again into a `reforce.Solid.TileSize` (512) R8Unorm tile with mips. The tile shows the
   config's square [-1, 1]^2 in authored units (x · X_EXTENTS, y · Y_EXTENTS; circles stay round for Aspc 0 and 1),
-  centred. The lines are drawn by `ScenePipeline::encodeTileLines` (line_vs / line_fs, analytic AA, its own
+  centered. The lines are drawn by `ScenePipeline::encodeTileLines` (line_vs / line_fs, analytic AA, its own
   R8Unorm PSO), at the frame's widths × tile / frame height × 2, min 3 tile px. Then `generateMipmaps`, and
   trilinear sampling in solid_fs.
-  `Text=1`: the previous intensity frame (`previousIntensity`, the frame this step's flow reads), its centred square
+  `Text=1`: the previous intensity frame (`previousIntensity`, the frame this step's flow reads), its centered square
   crop downsampled with 4 taps into a second mipmapped tile. Gives the Droste look.
   solid_fs: `lum = fill + (1 - fill) * tex`, then shading and edge as before; `Text=2` is flat.
   Everything is made at startup: the tiles, the PSOs, 8 extra 1 MB line buffers. A source that was never drawn
@@ -634,7 +634,7 @@ Peter's decisions:
 - [x] 5L.5 Control panel Solids card, `--stress` spawns, perf report (2026-11-15). Peter: "the solids theme looks
   sweet".
   - Solids card (web UI extra cards): Interval / Duration sliders (saved as `Solid.Slideshow.Interval.Duration`,
-    `Solid.Duration`), Start next, Clear (`kill:solid`), alive list, countdown, library with favourites.
+    `Solid.Duration`), Start next, Clear (`kill:solid`), alive list, countdown, library with favorites.
   - `--stress` starts a solid every other round (so all three slots fill and the oldest makes way) and kills them
     every sixth. New perf cause tag `solid-start` (was counted as sprite-start); `TagCount` is now an int constant
     (fixes four old -Wsign-compare warnings in Perf.cpp).
@@ -644,13 +644,13 @@ Peter's decisions:
     GPU cost of three solids is ~0.2 ms; 13 frames of 8-12 ms CPU, about one per start (not traced further;
     well inside the 16.7 ms budget).
 
-- [x] 5L.6 Rubik's cube solid (Peter, 2026-11-22): `Mesh="rubik"` with `Moves` / `Turn` / `Seed`, sticker colours
+- [x] 5L.6 Rubik's cube solid (Peter, 2026-11-22): `Mesh="rubik"` with `Moves` / `Turn` / `Seed`, sticker colors
   picked per ColorMap (engine/StickerColors), `ColorKey = 0` for solids (opaque in the Syphon alpha and over the
   backdrop); content's Rubik Cube: scrambled in 2 beats, solved one turn per beat over the next 30, on every 8-bar
   line. Tests: test_engine_rubik.cpp, test_render_solids.cpp (rubik, ColorKey). docs/3d-design.md "Rubik's cube".
 - [x] 5L.7 15 puzzle solid (Peter, 2026-11-22): `Mesh="fifteen"`, `Shuf`; content's Fifteen Puzzle (later replaced by Fifteen Glass, 5L.8): the tiles leap
-  into a scramble on the 8-bar line, then 31 slides one per beat land it solved on the next. Row colours from the
-  puzzle colours, seven-segment numbers. Tests: test_engine_fifteen.cpp, test_render_solids.cpp (fifteen).
+  into a scramble on the 8-bar line, then 31 slides one per beat land it solved on the next. Row colors from the
+  puzzle colors, seven-segment numbers. Tests: test_engine_fifteen.cpp, test_render_solids.cpp (fifteen).
   docs/3d-design.md "15 puzzle".
 - [x] 5L.8 Glass 15 puzzle (Peter, 2026-11-22): `Glas = 1` with `Fros` / `Tint` / `Bend`; clear 3D glass buttons
   (engine::makeGlassButton, MSAA) over the colorized frame, refracting a half-size blur of it, one light tint,
@@ -680,12 +680,12 @@ likely next kinds.
   Willow's trunk right round), pipe-model tips, never grows onto an existing node, bounded by MaxNodes / maxTrunk.
 - [x] 5N.2 `SceneType::Organic` (`reforce.Organic.package`), `scene::OrganicInstance` (C vars run per point / root
   before PX/PY and RtX/RtY/RtA so both coordinates share one random angle), `engine::OrganicRun`: growth in sim
-  time (at most 8 iterations per step), the newest generation drawn at its fraction, sway as a travelling wave
+  time (at most 8 iterations per step), the newest generation drawn at its fraction, sway as a traveling wave
   weighted by thinness, buds, wither (ungrow by generation over the fade-out), one path per tree.
 - [x] 5N.3 `Layer::Organic` (kLayerCount 8): Director (catalog from content/, spawn timer, theme interval
   `Organic.Slideshow.Interval.Duration`, kill, alive), Visualizer (`startOrganic` / `killOrganics` /
   `stepOrganics`, after the particles' segments; MaxLive replaces the oldest), settings `Organic.*`,
-  `reforce.Organic.MaxLive` / `.MaxNodes`, perf tag `organic-start`, web API library + favourites.
+  `reforce.Organic.MaxLive` / `.MaxNodes`, perf tag `organic-start`, web API library + favorites.
 - [x] 5N.4 Control panel Organics card, seven content configs (Oak, Willow, Roots, Lightning, Neurons, Kelp
   Forest, Radial Bloom), Organics theme, docs (scene-format §5.8, README, design doc). Cost: three growing at
   once peak at 6,412 segments, CPU p99 0.27 ms. **Peter to try.**
@@ -730,7 +730,7 @@ card. Peter away while built: **all of it waits for Peter to try**.
 
 ### 5P. Dancers: 3D cartoon characters dancing to the beat  (Peter, 2026-11-18)  `[~]`
 Peter: "animated 3D dancing cartoonish character avatars ... a wide variety of dance moves ... dance to the beat ...
-vaguely like Wii characters", later friends' faces on them. Decisions: full colour on top of the visuals,
+vaguely like Wii characters", later friends' faces on them. Decisions: full color on top of the visuals,
 procedural characters and moves (no mocap), dancers along the bottom each doing their own moves (canon an option),
 an optional disco floor only while a dancer is live; "different characters could have different dance styles, and
 within each style a lot of variety"; "the rest of the visuals act as the lighting". Design: docs/dancers-design.md.
@@ -748,8 +748,8 @@ within each style a lot of variety"; "the rest of the visuals act as the lightin
   (every style), Dance Party theme, docs.
 - [x] 5P.6 Social mode (partners, call & response, face to face, cypher) and milling around the floor; floor fades
   just behind the dancers (committed 0b58b0c).
-- [x] 5P.7 Walking steps (planted feet, a step on each 8th while travelling), 25 moves made continuous, two-beat
-  crossfades centred on the bar line, inertial blending between sources (docs/dancers-design.md).
+- [x] 5P.7 Walking steps (planted feet, a step on each 8th while traveling), 25 moves made continuous, two-beat
+  crossfades centered on the bar line, inertial blending between sources (docs/dancers-design.md).
 - [x] 5P.8 Humanising (`reforce.Dancer.Human`, 0..2, default 1; Human slider on the Dancers card): a seeded
   personality per dancer (timing lean, size of arms / hips / knees / head, left-right asymmetry, slouch, head tilt,
   weight on one leg, stance) plus slow drifts (timing, effort, hand wander, head looking around, breathing) and
@@ -799,7 +799,7 @@ dies. Our own art and names (the repo is public). Design: docs/arcade-design.md.
   underneath", name "Objects", the full merge): Layer::Object replaces Layer::Solid and Layer::Organic (kLayerCount 8);
   one catalog (solids, then organics; Director::entryType says which), one card, one timer, Object.* settings and theme
   keys (old Solid.* / Organic.* read as fallbacks), reforce.Object.MaxLive counting both, groups in
-  content/Categories/Object (plus Solids, Puzzles), themes "Objects" / "Objects: <group>", commands and favourites
+  content/Categories/Object (plus Solids, Puzzles), themes "Objects" / "Objects: <group>", commands and favorites
   accept solid / organic as object.
 - [x] 5Q.11 Trees (Peter 2026-11-22): Bush, Fern, Roots, Willow removed; Lightning strikes 4 times a bar apart from new
   points on the top edge (Strk, SGap); Oak sways over 2 beats about a fixed base (SwyB); Radial Bloom pushes out and
@@ -809,6 +809,24 @@ dies. Our own art and names (the repo is public). Design: docs/arcade-design.md.
   more glow; Arc for every config (Peter picked it; the comparison configs and a headlight beam were removed).
 - [ ] Later: the games stir the warp (a low-res displacement added to the flow pass: explosions push, landings ripple,
   cycles leave a wake).
+
+### 5R. 3D models: your own textured model with moving cameras  (Peter, 2026-11-22)  `[~]` built; Peter to try his model
+A `Mesh="model"` Object that draws a user-supplied glTF (`.glb`) in real time from moving cameras (dolly, pass,
+orbit, under, flyby, warp, beat cuts, or a free expression camera). Peter: both looks, A (luminance into the visuals:
+palette colors, trails) and B (the model's own textures and lighting over the visuals, optional trails). Models and
+their scene files live in `reforce.Model.Dir`, never in the repo; tests generate their own model. Model scenes join the
+default Objects slideshow (Peter); bloom on by default. Design:
+docs/model-design.md.
+- [x] 5R.1 cgltf, `engine/ModelFile` loader + normalization, generated test model, unit tests
+- [x] 5R.2 Look A: MeshKind::Model, render/ModelPipeline (`model_lum_fs`), free camera (scene files instead of a `--solid-test` hook)
+- [x] 5R.3 Camera moves (`engine/CameraMoves`), scene keys, `reforce.Model.Dir`, catalog + panel list, app/ModelLoader (worker, preload, cache)
+- [x] 5R.4 Look B: color pass, rim light, emissive bloom (on by default, emissive only), Tint, trails from Pen, ColorKey
+- [x] 5R.5 Prep script (`tools/model_prep/prep.py`, Blender headless) + MAP.json, usage.md, scene-format §5.7; 500k tris at 1080p: A 0.65 ms, B 0.85 ms GPU
+- [ ] 5R.6 Peter: prep his own model, write his scenes locally, try both looks live; tune the moves
+- [x] 5R.7 Camera paths as keyframes (Peter 2026-11-22: "more general to describe the camera path in the scene file"):
+  `K1..` lines (t, eye, aim, fov, roll), `Ease`, `Step` / `Rand` / `Push` beat cuts; the moves became presets in
+  content/Camera (and the model folder's Camera/), tested against the old code; warp was removed first (Peter: not
+  compelling), with the model's own offset / stretch / flash / streaks.
 
 ### Fidelity choices: match G-Force vs do it right  (Peter, 2026-11-11)  `[ ]` Peter to decide defaults
 Past decisions that copy a G-Force quirk. "Option" = can already switch it; "Proposed" = what the "done right" option
@@ -827,7 +845,7 @@ live in the web UI (A/B toggle, presets "G-Force exact" / "Done right", per-key 
 | F9 | Adaptive fft frequency axis (Later L1, not built) | audio | n/a | a fixed log axis is steadier and makes MID/TREBLE meaningful; Peter to choose before L1 is built |
 | F10 | `mag()` 7-point smoothing | audio | none | keep (cheap, harmless); could expose |
 | F11 | Out-of-frame flow sources → black; EPen-only sprites a half-way lighten; overwrite line blending | semantics | sprites: **`reforce.Sprite.Mix` / `reforce.MovieSprite.Mix`** (5K, default 0 = G-Force) | keep G-Force (part of how scenes look) |
-| F13 | Sprite image alpha ignored (#42): transparent pixels show their stored colour | quality | **`reforce.SpriteAlpha` = black \| ignore** (default black = transparent counts as black, not drawn) | `black` (Peter, 2026-11-13) |
+| F13 | Sprite image alpha ignored (#42): transparent pixels show their stored color | quality | **`reforce.SpriteAlpha` = black \| ignore** (default black = transparent counts as black, not drawn) | `black` (Peter, 2026-11-13) |
 | F12 | Sim at 60 Hz while Peter's G-Force really runs ~55.6 | already "right" | `Graphics.TargetFrameRate` | done |
 
 ### Later (Peter, 2026-11-11: saved for later)
@@ -847,7 +865,7 @@ live in the web UI (A/B toggle, presets "G-Force exact" / "Done right", per-key 
   (FlowRounding buttons, or A/B with only FlowRounding differing between the slots; needs `Intensity = gforce`).
 Round 3 done (2026-11-11): Nebula fixed by the Aspc=1 grid (#36) → FlowFields 349/352 (only the 3 rnd-load configs fail);
 thin lines/dots rule derived (#32) as `reforce.ThinLines = gforce` (default smooth) → probe parity 166/186, 0 unexpected.
-Offline (2026-11-11): #30/#31 were a strip-decoder artefact (B0 frames vs columns, 5B.1) → probe parity **181/186**, 0 unexpected.
+Offline (2026-11-11): #30/#31 were a strip-decoder artifact (B0 frames vs columns, 5B.1) → probe parity **181/186**, 0 unexpected.
 
 ### Order
 5A first (small, immediately useful) ∥ 5C.1–5C.3 probe kit. Then G-Force probe sessions (screen unlocked):
@@ -874,7 +892,7 @@ follows 5D's instrumentation, so its cost is measured with the same tools.
 | 2026-11-11 | Simulation runs at a fixed 60 Hz tick (G-Force decay and B-var counters are per frame); present and Syphon run at display rate. |
 | 2026-11-11 | Next order: M5 → (M5b web UI ∥ M6 particles/sprites/themes) → M7 side-by-side pixel calibration vs G-Force → cleanup. |
 | 2026-11-11 | Phase 5 decisions: Dock = Peter drags; audio probing via a Loopback `reforce probe` device; add MID/TREBLE/BEAT(+tempo) extensions; default sim rate stays 60. |
-| 2026-11-11 | Video (5F): all three — G-Force-style movie sprites, a full-colour video layer, live camera/Syphon inputs — sharing one VideoSource abstraction. |
+| 2026-11-11 | Video (5F): all three — G-Force-style movie sprites, a full-color video layer, live camera/Syphon inputs — sharing one VideoSource abstraction. |
 | 2026-11-12 | Peter's defaults (in his settings.json; built-in defaults stay G-Force so parity tests are unchanged): blends FlowField polar, WaveShape aligned, ColorMap oklab; Look "Done right": ThinLines smooth, Intensity hq, FlowRounding nearest, FlowPrecision double, AA on, LineScale frame. |
 | 2026-11-12 | Skip list `reforce.Exclude` (Peter): the three sprites with their own .txt (Space/Moon, Space/Astronaut, G-Force Logo) are never used; run 25 (#39) showed G-Force's Moon blacks out the whole frame. Stays excluded regardless of #40 (Peter, 2026-11-12). |
 | 2026-11-12 | Ableton Link (5H): GPL library accepted; `LINK_*` variables plus `BEAT`/`TEMPO` following Link by default; slideshow on bars, manual switches on beats. |
@@ -885,7 +903,7 @@ follows 5D's instrumentation, so its cost is measured with the same tools.
 | 2026-11-13 | Sprite replacement (#44) across kinds is an option: `reforce.SpriteReplace` = own (default, Peter: images only replace images, movies only movies) \| any (G-Force). |
 | 2026-11-13 | Panel slideshow sliders save to settings.json; movie sprites get their own timer and shuffle, separate from image sprites (Peter). |
 | 2026-11-13 | Ableton Link follow mode (5H.6): reforce joins a Link session only after another app is running, so it takes rekordbox's tempo instead of setting it (`reforce.Link.Follow`, default 1). |
-| 2026-11-13 | FlowField Unions (probe #45, runs 41-43): the Union's ALFA blend persists after its transition until the next FlowField transition (G-Force); #18's opposite conclusion was a decay artefact. reforce now keeps the baked blend. Scene semantics, so no option. |
+| 2026-11-13 | FlowField Unions (probe #45, runs 41-43): the Union's ALFA blend persists after its transition until the next FlowField transition (G-Force); #18's opposite conclusion was a decay artifact. reforce now keeps the baked blend. Scene semantics, so no option. |
 | 2026-11-14 | Dance clip beats come from motion only (clips are silent): offline detector + RIFE x4 interpolation; playback position derived from a beat clock (Link or audio phase), not a rate (Peter). |
-| 2026-11-15 | Sprite visibility (5K, Peter): a Mix per sprite card (0 = G-Force, 1 = the sprite takes over its rectangle; display draws only), movie levels (global Gamma, per-movie Black/White/Gamma), and full-colour movie sprites as an option (`reforce.MovieSprite.Colour = over`). All default to G-Force. |
+| 2026-11-15 | Sprite visibility (5K, Peter): a Mix per sprite card (0 = G-Force, 1 = the sprite takes over its rectangle; display draws only), movie levels (global Gamma, per-movie Black/White/Gamma), and full-color movie sprites as an option (`reforce.MovieSprite.Color = over`). All default to G-Force. |
 | 2026-11-11 | Probes are installed into user-owned subfolders of G-Force packages (one-time sudo) and triggered by the `Key 5.py` hotkey script. Screenshots come from G-Force's own `TakeScreenshot()`. |

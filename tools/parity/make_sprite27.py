@@ -3,7 +3,7 @@
 Writes build/probe-sprites27/. Images (grayscale):
   A  600x382 (the 1980x1260 frame's aspect): black, white band u in [.725, .875], 50% gray band u in [.125, .275]
      (same as run 26)
-  W  800x400 (2:1, wider than the frame): the same bands plus a centre stripe of 200 at u in [.49, .51], so a
+  W  800x400 (2:1, wider than the frame): the same bands plus a center stripe of 200 at u in [.49, .51], so a
      cover fit crops its sides and leaves horizontal slack, a contain fit letterboxes it vertically
 Sprites (each its own image copy + params .txt, EPen-only unless noted):
   zz x a5     A, Flag 7 (cover), X = .5            does X move a cover sprite with no slack?
@@ -27,8 +27,8 @@ import sys
 import zlib
 
 
-def band(u, centre=False):
-    if centre and .49 <= u < .51:
+def band(u, center=False):
+    if center and .49 <= u < .51:
         return 200
     if .725 <= u < .875:
         return 255
@@ -75,8 +75,8 @@ def main():
     out = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(__file__), "../../build/probe-sprites27")
     os.makedirs(out, exist_ok=True)
     for name, (img, params) in SPRITES.items():
-        w, h, centre = IMAGES[img]
-        row = bytes(band((i + .5) / w, centre) for i in range(w))
+        w, h, center = IMAGES[img]
+        row = bytes(band((i + .5) / w, center) for i in range(w))
         write_png(os.path.join(out, name + ".png"), w, h, row)
         with open(os.path.join(out, name + ".txt"), "w") as f:
             f.write("// reforce probe run 27 params\n" + params + "Vers=100\n")

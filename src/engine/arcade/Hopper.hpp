@@ -3,8 +3,8 @@
 // check the rules (landings on the beat lines, the board done exactly on the cycle line, balls never meeting the
 // player). Pure state: no canvas, no audio.
 //
-// Cube units: a cube is 1 wide; the apex's top-face centre is the origin, y up. Cube (row r, column c), c = 0..r, has
-// its top-face centre at (c - r / 2, -.75 r): a top diamond 1 x .5 and two side faces .5 tall below it, so the cube
+// Cube units: a cube is 1 wide; the apex's top-face center is the origin, y up. Cube (row r, column c), c = 0..r, has
+// its top-face center at (c - r / 2, -.75 r): a top diamond 1 x .5 and two side faces .5 tall below it, so the cube
 // down-left of it (r + 1, c) and down-right (r + 1, c + 1) sit .5 left / right and .75 lower.
 
 #include <cstdint>
@@ -19,14 +19,14 @@ inline int cubeCount(int rows) { return rows * (rows + 1) / 2; }
 inline int cubeIndex(int r, int c) { return r * (r + 1) / 2 + c; }
 int rowOf(int cube);
 int colOf(int cube);
-// Diagonal neighbours (one row up or down, half a cube left or right).
+// Diagonal neighbors (one row up or down, half a cube left or right).
 bool adjacent(int a, int b);
-// Top-face centre in cube units.
+// Top-face center in cube units.
 double topX(int cube);
 double topY(int cube);
 
 // The smallest cycle (Cyc bars, doubled as needed, at most 64) whose 4 x bars hops can land on every cube levels - 1
-// times (dark to bright): the pyramid's graph is two-coloured by row parity, so each colour needs enough landings of
+// times (dark to bright): the pyramid's graph is two-colored by row parity, so each color needs enough landings of
 // its own.
 int cycleBarsFor(int rows, int cycBars, int levels = 2);
 
@@ -108,7 +108,7 @@ public:
     // Plans made so far (cycle starts and drop replans), for the tests.
     int plansMade() const { return plansMade_; }
 
-    // A walk of landings pos[from + 1 .. hops] from pos[from], each a neighbour of the last, landing at least need[i]
+    // A walk of landings pos[from + 1 .. hops] from pos[from], each a neighbor of the last, landing at least need[i]
     // (0..2) times on cube i, the last such landing exactly at `hops`. False when the search gives up.
     bool walk(std::vector<int>& pos, int from, const std::vector<int>& need, std::uint64_t rngSeed) const;
 

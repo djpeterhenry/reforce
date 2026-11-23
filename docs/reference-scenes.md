@@ -16,7 +16,7 @@ Feature names follow [scene-format.md](scene-format.md). Counts come from
 | 1 | `G-Force.WaveShape.package/WaveShapes/Simple Vertical.txt` | Smallest real WaveShape: one path from `mag(s)`, constant `Pen`/`LWdt`, `Aspc=1`, `ConB=1`, default `Stps`. Exercises the basic draw path. |
 | 2 | `G-Force.WaveShape.package/WaveShapes/Rotating Corridor.txt` | The documented WaveShape [RC]. It covers all three tiers (A at load, B per frame, C per step), two paths, `Stps=NUM_SAMPLE_BINS`, and the `#waveshape-particle-also` tag, and shows `B0` defined but read as `b0` (case-insensitive names). |
 | 3 | `G-Force.WaveShape.package/WaveShapes/DT/Bass Circle.txt` | Minimal **B-var persistence**: `B0` reads its own previous value (a one-pole smoother over `mag()`), which needs a defined starting value. Polar shape with `Aspc=1`, and lines with leading whitespace. |
-| 4 | `G-Force.WaveShape.package/WaveShapes/Genesis Device.txt` | **Instances plus shared state**: `NUM` is randomised, B vars are shared across `ID` with an `ID == 0` guard, B vars refer forward/to themselves (an integrator: `B3` uses `B3`, `B2` uses `B3`), `level` (undocumented), `wrap`, empty `B4=""`, `A0="t"` start-time capture, and `LWdt`/`Pen` from A/C vars. |
+| 4 | `G-Force.WaveShape.package/WaveShapes/Genesis Device.txt` | **Instances plus shared state**: `NUM` is randomized, B vars are shared across `ID` with an `ID == 0` guard, B vars refer forward/to themselves (an integrator: `B3` uses `B3`, `B2` uses `B3`), `level` (undocumented), `wrap`, empty `B4=""`, `A0="t"` start-time capture, and `LWdt`/`Pen` from A/C vars. |
 | 5 | `G-Force.WaveShape.package/WaveShapes/Lifeshift.txt` | First **vector-VM** case: `{...}` array literals in A vars indexed per instance with `map1D(…, ID/(NUM-1), 0)`, `pow`, `fft(trwv(...))`, `Stps="3 * NUM_FFT_BINS"`, quoted `NUM="8"`, and spaces around `=`. |
 
 Stress tests once those pass: `JRM/Flakes.txt` (heavy matrix use: `vectorLR`/`row`/`col`/`select`/`choice`, `PDur`, `X_EXTENTS`) and `JRM/Adapter.txt` (a 21 KB expression, the largest in the corpus). Both are under `G-Force.WaveShape.package/WaveShapes/`.
@@ -25,7 +25,7 @@ Stress tests once those pass: `JRM/Flakes.txt` (heavy matrix use: `vectorLR`/`ro
 
 | # | Scene | Why |
 |---|---|---|
-| 1 | `G-Force.WaveShape.package/Particles/Raindrops.txt` | Smallest particle: dots only (`ConB=0`), and `X0`/`Y0`/`LWdt` come straight from `rnd()`, so it tests whether `rnd` gives a new value at each step (open question 4). Has no `Pen` envelope, so the engine's fade behaviour shows. |
+| 1 | `G-Force.WaveShape.package/Particles/Raindrops.txt` | Smallest particle: dots only (`ConB=0`), and `X0`/`Y0`/`LWdt` come straight from `rnd()`, so it tests whether `rnd` gives a new value at each step (open question 4). Has no `Pen` envelope, so the engine's fade behavior shows. |
 | 2 | `G-Force.WaveShape.package/Particles/Spinners.txt` | The documented particle [SP]: `NUM="2 + rnd( 5 )"` (truncated), `ID`, and the "A once, B per ID" rule. It is the baseline for spawn and lifetime handling with the default duration. |
 | 3 | `G-Force.WaveShape.package/Particles/Gold/Ring.txt` | Deterministic randomness per instance: `srand(B0 + A0)` in a B var reseeds `rnd()` for each `ID`. Also uses `dt` (life progress 0→1) in the projection, empty values (`A2=""`, `C0=""`), and a long C-var chain (3D rotation and perspective). |
 | 4 | `G-Force.WaveShape.package/Particles/JRM/Dots.txt` | **`PDur`** (60 s), the `end_time < 1e30` particle check, and `s` used as a vector inside an **A** var (`{cos(2πs), sin(2πs)}`, unpacked with `row()`). Also `Num`/`Lwdt` in non-canonical case and a `/* */` header that contains the `#waveshape-particle-only` tag. |
@@ -59,7 +59,7 @@ Extra baseline: `G-Force.FlowField.package/Nowhere.txt` (`Aspc=0`, the identity 
 |---|---|---|
 | 1 | `G-Force.ColorMap.package/ColorWheel.txt` | The documented **HSV** map [CW]. Only `H=".03 * t"` is set, so it tests the default `S`/`V`, the time-only recompute, and **H wrapping**. |
 | 2 | `G-Force.ColorMap.package/Gold/Lust.txt` | HSV as a function of `i` with random A vars and fractional powers (`(1-i)^.3`, `i^A1`), which checks the 256-entry sampling of `i`. |
-| 3 | `G-Force.ColorMap.package/Clear Blue Water.txt` | The documented **RGB** map [CBW]: B and C vars, `R`/`G`/`B` keys (and `B` the colour vs `B0` the var). Also has the lexer trap of a `"` inside a `//` comment that follows a quoted value. |
+| 3 | `G-Force.ColorMap.package/Clear Blue Water.txt` | The documented **RGB** map [CBW]: B and C vars, `R`/`G`/`B` keys (and `B` the color vs `B0` the var). Also has the lexer trap of a `"` inside a `//` comment that follows a quoted value. |
 | 4 | `G-Force.ColorMap.package/Gold/CyanoChroma.txt` | **`CCal` override** (`.0333`), a per-frame B var driving a per-`i` C var, `clamp(pow(sin(…), 80))` (a steep exponent, so precision matters). HSV. |
 | 5 | `G-Force.ColorMap.package/Ted/Neon II.txt` | Most complex text map: RGB from 8 B vars and 5 C vars, using `trwv`/`sqwv`/`clip` and lower-case var references. |
 

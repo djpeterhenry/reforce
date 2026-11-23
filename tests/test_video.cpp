@@ -1,4 +1,4 @@
-// Phase 5F: video sources and the colour-layer composite math.
+// Phase 5F: video sources and the color-layer composite math.
 #include <doctest/doctest.h>
 
 #include "PerfBudget.hpp"
@@ -220,7 +220,7 @@ TEST_CASE("video composite: keys") {
     CHECK(engine::lumaKeyAlpha({1, 1, 1}, 0.1f, 0.1f) == 1.0f);
     CHECK(engine::lumaKeyAlpha({0.15f, 0.15f, 0.15f}, 0.1f, 0.1f) == doctest::Approx(0.5f));
     CHECK(engine::lumaKeyAlpha({0.11f, 0.11f, 0.11f}, 0.1f, 0.0f) == 1.0f);  // hard cut
-    // Chroma: the key colour is transparent, other hues opaque.
+    // Chroma: the key color is transparent, other hues opaque.
     const engine::Rgb green{0, 1, 0};
     CHECK(engine::chromaKeyAlpha(green, green, 0.15f, 0.1f) == 0.0f);
     CHECK(engine::chromaKeyAlpha({0.1f, 0.9f, 0.1f}, green, 0.15f, 0.1f) == 0.0f);  // near green
@@ -266,7 +266,7 @@ TEST_CASE("video composite: blend modes, order, opacity, crossfade") {
     const engine::VideoSample a{{1, 0, 0}, 1}, none{{0, 0, 0}, 0};
     auto s = engine::crossfadeSamples(a, none, 0.25f);
     CHECK(s.a == doctest::Approx(0.75f));
-    CHECK(s.c[0] == doctest::Approx(1.0f));  // colour kept, fades by alpha
+    CHECK(s.c[0] == doctest::Approx(1.0f));  // color kept, fades by alpha
     s = engine::crossfadeSamples(a, {{0, 0, 1}, 1}, 0.5f);
     CHECK(s.a == doctest::Approx(1.0f));
     CHECK(s.c[0] == doctest::Approx(0.5f));
@@ -326,7 +326,7 @@ TEST_CASE("video: deterministic file decoding is frame exact (H.264)") {
     CHECK(st.decodeMsAvg > 0);
 }
 
-TEST_CASE("video: decoded colours (Card)") {
+TEST_CASE("video: decoded colors (Card)") {
     Device dev;
     REQUIRE(dev.d);
     auto src = openDet(dev.d, cardVideo("card_h264.mov", video::TestCodec::H264, 40));
@@ -605,7 +605,7 @@ TEST_CASE("video mips: GPU cost with a 4K source at 1080p and 4K output") {
         return v.empty() ? 0.0 : v[v.size() / 2];
     };
     // The filter pass depends on the source only (half size + mips); measured
-    // per new frame, as for a 4K movie sprite or a 4K colour layer at 1080p.
+    // per new frame, as for a 4K movie sprite or a 4K color layer at 1080p.
     std::vector<double> prep;
     for (int i = 0; i < n + 5; ++i) {
         MTL::CommandBuffer* cmd = q->commandBuffer();
@@ -618,7 +618,7 @@ TEST_CASE("video mips: GPU cost with a 4K source at 1080p and 4K output") {
                                                      << *std::max_element(prep.begin(), prep.end()) << " ms per new frame");
     PERF_BUDGET(median(prep) < 2.0);  // generous: ~0.3 ms on Apple silicon
 
-    // The colour-layer pass at 1080p / 4K output: raw 4K frame vs the
+    // The color-layer pass at 1080p / 4K output: raw 4K frame vs the
     // prefiltered copy (at 4K output the scale is 1: prepare returns the raw
     // frame and costs nothing). Interleaved so GPU clock changes hit both.
     for (auto [ow, oh] : {std::pair{1920, 1080}, std::pair{3840, 2160}}) {
@@ -639,7 +639,7 @@ TEST_CASE("video mips: GPU cost with a 4K source at 1080p and 4K output") {
             cmd->waitUntilCompleted();
             if (i >= 10) (prepOn ? withMips : raw).push_back(gpuMs(cmd));
         }
-        MESSAGE("colour layer, 4K source at " << ow << "x" << oh << ": colorize+video median " << median(raw)
+        MESSAGE("color layer, 4K source at " << ow << "x" << oh << ": colorize+video median " << median(raw)
                                               << " ms raw, " << median(withMips)
                                               << " ms incl. the filter pass (new frame every time)");
         out->release();
@@ -696,7 +696,7 @@ TEST_CASE("video: Syphon alpha: colorize tracks it, ColorKey = 0 movies raise it
     CHECK(at(16, 18, 3) == 255);
     CHECK(at(48, 18, 3) == 255);
     const int rgbOpaque = at(16, 18, 2), rgbKeyed = at(48, 18, 2);
-    // Tracked: 0 for the visuals and the keyed movie, the opacity under the ColorKey = 0 movie; colour unchanged.
+    // Tracked: 0 for the visuals and the keyed movie, the opacity under the ColorKey = 0 movie; color unchanged.
     run([&](MTL::CommandBuffer* cmd) { pipe.encodeColorize(cmd, pal, lut, out, nullptr, quads, 2, true); });
     CHECK(at(2, 2, 3) == 0);
     CHECK(at(48, 18, 3) == 0);
@@ -704,7 +704,7 @@ TEST_CASE("video: Syphon alpha: colorize tracks it, ColorKey = 0 movies raise it
     CHECK(at(16, 18, 2) == rgbOpaque);
     CHECK(at(48, 18, 2) == rgbKeyed);
 
-    // The key: alpha = opaque + (1 - opaque) * clamp((|rgb| - similarity) / smoothness), colour unchanged.
+    // The key: alpha = opaque + (1 - opaque) * clamp((|rgb| - similarity) / smoothness), color unchanged.
     struct P { std::uint8_t r, g, b, a; };
     const P cases[] = {{0, 0, 0, 0}, {26, 0, 0, 0}, {51, 0, 0, 0}, {10, 10, 10, 0}, {0, 0, 0, 128}, {26, 0, 0, 128},
                        {200, 30, 90, 0}, {0, 0, 0, 255}};
@@ -731,7 +731,7 @@ TEST_CASE("video: Syphon alpha: colorize tracks it, ColorKey = 0 movies raise it
         CHECK(at(int(i), 0, 2) == c.r);
         CHECK(at(int(i), 0, 0) == c.b);
     }
-    // Premultiplied (reforce.Syphon.AlphaPremultiplied): colour times the alpha.
+    // Premultiplied (reforce.Syphon.AlphaPremultiplied): color times the alpha.
     run([&](MTL::CommandBuffer* cmd) { pipe.encodeSyphonAlpha(cmd, frame, out, 0.08f, 0.05f, true); });
     CHECK(at(0, 0, 2) == 0);
     CHECK(std::abs(at(1, 0, 2) - int(std::lround(26 * at(1, 0, 3) / 255.0))) <= 1);
@@ -877,7 +877,7 @@ TEST_CASE("video: body tracking: the person mask cuts the visuals on the backdro
     body.front = 0;
     body.mask = nullptr;
     body.show = true;
-    body.joints[0] = 0.5f;  // nose at the centre
+    body.joints[0] = 0.5f;  // nose at the center
     body.joints[1] = 0.5f;
     body.joints[2] = 1.0f;
     fillFrame();

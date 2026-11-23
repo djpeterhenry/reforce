@@ -258,9 +258,9 @@ void stopCapture(Capture& c) {
     c.unit = nullptr;
 }
 
-// Centre (in samples, fractional) of the loudest 2 kHz-ish burst in [0, limit): envelope-weighted centroid
+// Center (in samples, fractional) of the loudest 2 kHz-ish burst in [0, limit): envelope-weighted centroid
 // of |x| within +-40 ms of the peak.
-double burstCentre(const std::vector<float>& x, size_t count, double rate, double limitSeconds, float* peakOut) {
+double burstCenter(const std::vector<float>& x, size_t count, double rate, double limitSeconds, float* peakOut) {
     const size_t lim = std::min(count, static_cast<size_t>(limitSeconds * rate));
     size_t pk = 0;
     float pv = 0;
@@ -428,9 +428,9 @@ int main(int argc, char** argv) {
         stopCapture(cap);
         const size_t n = cap.n.load();
         float srcPeak = 0, capPeak = 0;
-        const double srcC = burstCentre(p.mono, p.mono.size(), fileRate, 1.5, &srcPeak);
+        const double srcC = burstCenter(p.mono, p.mono.size(), fileRate, 1.5, &srcPeak);
         const double capOff = (hostSeconds(p.startHost.load()) - hostSeconds(cap.firstHost.load())) * cap.rate;
-        const double capC = burstCentre(cap.data, n, cap.rate, std::max(0.0, capOff / cap.rate) + 1.5, &capPeak);
+        const double capC = burstCenter(cap.data, n, cap.rate, std::max(0.0, capOff / cap.rate) + 1.5, &capPeak);
         if (capPeak < 1e-4 || !p.startHost.load() || !cap.firstHost.load()) {
             std::printf("route_test=FAIL captured_peak=%.6f (nothing arrived on the input side)\n", capPeak);
             return 1;

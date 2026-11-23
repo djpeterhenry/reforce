@@ -168,7 +168,7 @@ void Visualizer::beginFieldTransition(double t) {
     render::TextureHandle mask;
     if (p.hasMask) mask = p.mask.get();
     if (!grid->texture) {
-        rlog("[reforce] FlowField \"%s\": build failed or cancelled; ignored\n", p.field.label.c_str());
+        rlog("[reforce] FlowField \"%s\": build failed or canceled; ignored\n", p.field.label.c_str());
         return;
     }
     lastFieldBuild_ = grid->buildSeconds;
@@ -226,7 +226,7 @@ void Visualizer::stepFlowField(double t) {
         if (ffTrans_->mask) {
             // A Union's blend stays: the field is the outgoing and incoming fields mixed by ALFA (weight 1 x ALFA)
             // until the next FlowField transition, which morphs from it (probe #45, runs 41-43; #18's "the new
-            // field applies everywhere" was a decay artefact).
+            // field applies everywhere" was a decay artifact).
             ffCur_ = std::make_shared<GpuField>(GpuField{pipeline_->bakeField(1.0f, ffTrans_->mode, true), 0, false});
             ffHeldUnion_ = ffTrans_->unionName;
             ffName_ = ffTrans_->toName;

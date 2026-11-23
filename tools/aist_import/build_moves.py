@@ -20,7 +20,7 @@ File format (little-endian), read by engine/DanceClips:
   "RFMOVES2", u32 channel count C, C channel names (u8 length + bytes), C bytes: bits per channel (8 or 16), u32 move
   count, then per move: u8 length + id, u8 length + label, 2 bytes genre code, u8 kind (0 basic, 1 routine), u16
   source BPM, u16 beats, u16 samples per beat, i16 whole body turns over the loop, f32 x 2C (min, max per channel),
-  then beats * spb samples, each C values (channel fastest): u8 (8 bits) or u16 (16), quantised over min..max.
+  then beats * spb samples, each C values (channel fastest): u8 (8 bits) or u16 (16), quantized over min..max.
   8 bits is plenty for a channel within one move (a step of 1/255 of its range: about 2 mm on a character or half a
   degree, smoothed by the interpolation); the body's heading has 16 (spins cover several turns).
 """

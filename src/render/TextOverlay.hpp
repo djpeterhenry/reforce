@@ -35,8 +35,8 @@ struct TextBlockSpec {
     double maxWidth = 1000;   // px
     bool uppercase = false;
     // A speech bubble (the dancers' guest messages): the first line's text wrapped to maxWidth (at most 5 lines), white
-    // in full colour (emoji too) on a dark rounded box with a light outline and a tail at the bottom centre pointing
-    // down. Drawn as a colour image (rasterizeBubble); the box's size is the whole image, tail included.
+    // in full color (emoji too) on a dark rounded box with a light outline and a tail at the bottom center pointing
+    // down. Drawn as a color image (rasterizeBubble); the box's size is the whole image, tail included.
     bool bubble = false;
     bool operator==(const TextBlockSpec& o) const;
 };
@@ -49,7 +49,7 @@ struct TextImage {
     std::vector<std::uint8_t> bgra;
 };
 TextImage rasterizeText(const TextBlockSpec& spec);
-// A speech bubble (TextBlockSpec::bubble): premultiplied BGRA in full colour, inset 0.
+// A speech bubble (TextBlockSpec::bubble): premultiplied BGRA in full color, inset 0.
 TextImage rasterizeBubble(const TextBlockSpec& spec);
 
 struct TextShadow {
@@ -77,8 +77,8 @@ public:
         int slot = 0;
         double x = 0, y = 0;    // the text box's top-left, px of the output
         double opacity = 1;
-        double scale = 1;       // drawn this much bigger / smaller around the box's centre (a pop)
-        bool image = false;     // the slot holds a colour image (a speech bubble): drawn as it is, no shadow
+        double scale = 1;       // drawn this much bigger / smaller around the box's center (a pop)
+        bool image = false;     // the slot holds a color image (a speech bubble): drawn as it is, no shadow
     };
     using Shadow = TextShadow;
     // Render thread: picks up finished images, then blends the draws over `output`. `dt`: seconds since the last

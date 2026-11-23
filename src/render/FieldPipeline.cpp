@@ -80,11 +80,11 @@ fragment float4 ripple_show_fs(FOut in [[stage_in]], constant ShowP& P [[buffer(
 }
 
 // ---- Julia set (see render/FieldPipeline.hpp)
-struct JuliaP { float2 c; float2 centre; float2 inv; float aspect; int iter; float gain; float bands; float phase;
+struct JuliaP { float2 c; float2 center; float2 inv; float aspect; int iter; float gain; float bands; float phase;
                 float pad; };
 
 fragment float4 julia_fs(FOut in [[stage_in]], constant JuliaP& P [[buffer(0)]]) {
-    const float2 p = float2((in.uv.x * 2.0f - 1.0f) * P.aspect, 1.0f - 2.0f * in.uv.y) - P.centre;
+    const float2 p = float2((in.uv.x * 2.0f - 1.0f) * P.aspect, 1.0f - 2.0f * in.uv.y) - P.center;
     float2 z = 1.6f * float2(P.inv.x * p.x + P.inv.y * p.y, -P.inv.y * p.x + P.inv.x * p.y);
     float r2 = dot(z, z);
     int i = 0;
@@ -135,18 +135,18 @@ static float2 df_sqr(float2 a) {
     return fast_two_sum(p, e);
 }
 
-// c: the view centre as df64 (hi re, hi im, lo re, lo im); rs: cos, sin of the turn x plane units per tree unit.
+// c: the view center as df64 (hi re, hi im, lo re, lo im); rs: cos, sin of the turn x plane units per tree unit.
 // pix: plane units per pixel; glow: the edge's glow in pixels (0 = none). mode: 0 float32, 1 double-float,
-// 2 perturbation around the reference orbit `ref` (refLen + 1 points, ref[0] = 0) of the view centre.
-struct MandelP { float4 c; float2 centre; float2 rs; float aspect; int iter; float gain; float band; float phase;
+// 2 perturbation around the reference orbit `ref` (refLen + 1 points, ref[0] = 0) of the view center.
+struct MandelP { float4 c; float2 center; float2 rs; float aspect; int iter; float gain; float band; float phase;
                  int mode; float pix; float glow; int refLen; int mini; float2 nOff; float2 invS; int pad0; int pad1; };
 
 static float2 cmul(float2 a, float2 b) { return float2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x); }
 
 fragment float4 mandel_fs(FOut in [[stage_in]], constant MandelP& P [[buffer(0)]],
                           const device float2* ref [[buffer(1)]]) {
-    const float2 p = float2((in.uv.x * 2.0f - 1.0f) * P.aspect, 1.0f - 2.0f * in.uv.y) - P.centre;
-    const float2 d = float2(P.rs.x * p.x - P.rs.y * p.y, P.rs.y * p.x + P.rs.x * p.y);  // offset from the centre
+    const float2 p = float2((in.uv.x * 2.0f - 1.0f) * P.aspect, 1.0f - 2.0f * in.uv.y) - P.center;
+    const float2 d = float2(P.rs.x * p.x - P.rs.y * p.y, P.rs.y * p.x + P.rs.x * p.y);  // offset from the center
     const float2 c0 = P.c.xy + (P.c.zw + d);
     int i = 0;
     float r2 = 0.0f;
@@ -186,7 +186,7 @@ fragment float4 mandel_fs(FOut in [[stage_in]], constant MandelP& P [[buffer(0)]
             if (r2 > 256.0f) break;
         }
     } else {
-        // Perturbation: z = Z_m + e, with Z the reference orbit (the view centre's, computed in double on the CPU)
+        // Perturbation: z = Z_m + e, with Z the reference orbit (the view center's, computed in double on the CPU)
         // and e the pixel's difference from it, e' = 2 Z_m e + e^2 + d, all small numbers float holds well.
         // Rebasing (Zhuoran 2021): when |z| < |e| (or the reference runs out) carry on from e = z, m = 0: no
         // glitches and one reference orbit for the frame.
@@ -243,14 +243,14 @@ struct ShowP {
     float texel[2];
 };
 struct JuliaP {
-    float c[2], centre[2], inv[2];
+    float c[2], center[2], inv[2];
     float aspect;
     int32_t iter;
     float gain, bands, phase, pad;
 };
 static_assert(sizeof(JuliaP) == 48, "JuliaP must match the MSL struct");
 struct MandelP {
-    float c[4], centre[2], rs[2];
+    float c[4], center[2], rs[2];
     float aspect;
     int32_t iter;
     float gain, band, phase;
@@ -407,8 +407,8 @@ SolidQuad FieldPipeline::encode(MTL::CommandBuffer* cmd, int slot, const engine:
         JuliaP p{};
         p.c[0] = float(f.cre);
         p.c[1] = float(f.cim);
-        p.centre[0] = float(f.x);
-        p.centre[1] = float(f.y);
+        p.center[0] = float(f.x);
+        p.center[1] = float(f.y);
         p.inv[0] = float(std::cos(f.rot) / sc);
         p.inv[1] = float(std::sin(f.rot) / sc);
         p.aspect = float(aspect);
@@ -421,14 +421,14 @@ SolidQuad FieldPipeline::encode(MTL::CommandBuffer* cmd, int slot, const engine:
         const double sc = std::abs(f.scale) > 1e-6 ? f.scale : 1e-6;
         res = std::clamp(std::isfinite(f.res) ? f.res : 1.0, 0.25, 1.0);
         MandelP p{};
-        // The centre in double-float: hi = the nearest float, lo = the rest.
+        // The center in double-float: hi = the nearest float, lo = the rest.
         const double cx = std::isfinite(f.cx) ? f.cx : 0.0, cy = std::isfinite(f.cy) ? f.cy : 0.0;
         p.c[0] = float(cx);
         p.c[1] = float(cy);
         p.c[2] = float(cx - double(p.c[0]));
         p.c[3] = float(cy - double(p.c[1]));
-        p.centre[0] = float(f.x);
-        p.centre[1] = float(f.y);
+        p.center[0] = float(f.x);
+        p.center[1] = float(f.y);
         const double k = (std::isfinite(f.half) ? f.half : 1.0) / sc;
         p.rs[0] = float(std::cos(f.rot) * k);
         p.rs[1] = float(std::sin(f.rot) * k);
@@ -440,7 +440,7 @@ SolidQuad FieldPipeline::encode(MTL::CommandBuffer* cmd, int slot, const engine:
         p.mode = std::clamp(f.precision, 0, 2);
         MTL::Buffer* refBuf = s.ref[0];  // bound in every mode (the shader declares it)
         if (p.mode == 2) {
-            // The view centre's orbit in double, stored as float (it only multiplies the small difference).
+            // The view center's orbit in double, stored as float (it only multiplies the small difference).
             refBuf = s.ref[s.refNext];
             s.refNext = (s.refNext + 1) % int(std::size(s.ref));
             auto* z = static_cast<float*>(refBuf->contents());
@@ -455,14 +455,14 @@ SolidQuad FieldPipeline::encode(MTL::CommandBuffer* cmd, int slot, const engine:
                 ++len;
                 z[2 * len] = float(zx);
                 z[2 * len + 1] = float(zy);
-                if (zx * zx + zy * zy > 1e4) break;  // the centre escapes: pixels rebase onto ref[0] when it ends
+                if (zx * zx + zy * zy > 1e4) break;  // the center escapes: pixels rebase onto ref[0] when it ends
             }
             p.refLen = len;
         }
         p.pix = float(2.0 * k / double(std::max(1u, height_)));
         const double s2 = f.sre * f.sre + f.sim * f.sim;
         if (f.mini && s2 > 0 && std::isfinite(s2)) {
-            // In the shader's offset units (plane units from the centre): the nucleus's offset, 1 / size.
+            // In the shader's offset units (plane units from the center): the nucleus's offset, 1 / size.
             p.mini = 1;
             p.nOff[0] = float(f.nre - cx);
             p.nOff[1] = float(f.nim - cy);

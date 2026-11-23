@@ -73,9 +73,9 @@ TEST_CASE("Analyzer: output sizes and G-Force bin layout (120 Hz .. 5.5 kHz, log
     const AudioFrame& f = an.analyze(1.0 / kFps);
     CHECK(f.wave.size() == 255);
     CHECK(f.fft.size() == 255);
-    CHECK(an.binCentreHz(0) == doctest::Approx(120.0));
-    CHECK(an.binCentreHz(254) == doctest::Approx(5500.0));
-    CHECK(an.binCentreHz(127) == doctest::Approx(std::sqrt(120.0 * 5500.0)).epsilon(1e-6));
+    CHECK(an.binCenterHz(0) == doctest::Approx(120.0));
+    CHECK(an.binCenterHz(254) == doctest::Approx(5500.0));
+    CHECK(an.binCenterHz(127) == doctest::Approx(std::sqrt(120.0 * 5500.0)).epsilon(1e-6));
     for (size_t i = 1; i < f.binLoHz.size(); ++i) CHECK(f.binLoHz[i] > f.binLoHz[i - 1]);
     CHECK(an.binForFrequency(1000.0) == doctest::Approx(141).epsilon(0.01));  // G-Force: 1 kHz at s ~ .56
 
@@ -84,7 +84,7 @@ TEST_CASE("Analyzer: output sizes and G-Force bin layout (120 Hz .. 5.5 kHz, log
     lin.freqLoHz = 100.0;
     lin.freqHiHz = 2640.0;
     Analyzer al(lin, kSr);
-    CHECK(al.binCentreHz(127) == doctest::Approx(1370.0));
+    CHECK(al.binCenterHz(127) == doctest::Approx(1370.0));
 }
 
 TEST_CASE("Analyzer: silence gives zeros") {
@@ -112,8 +112,8 @@ TEST_CASE("Analyzer: 1 kHz tone is broad and LEVEL rises with level (G-Force ton
     // Raw band amplitude (before the tilt) peaks at the tone: a_j / tilt_j is largest at 1 kHz.
     size_t best = 0;
     for (size_t i = 0; i < f.fftRaw.size(); ++i)
-        if (f.fftRaw[i] / std::pow(an.binCentreHz(int(i)) / 1000.0, an.config().tilt) >
-            f.fftRaw[best] / std::pow(an.binCentreHz(int(best)) / 1000.0, an.config().tilt))
+        if (f.fftRaw[i] / std::pow(an.binCenterHz(int(i)) / 1000.0, an.config().tilt) >
+            f.fftRaw[best] / std::pow(an.binCenterHz(int(best)) / 1000.0, an.config().tilt))
             best = i;
     CHECK(std::abs(int(best) - k) <= 2);
     CHECK(f.fft[size_t(k)] > 0.4f);  // G-Force ~0.92 (clamped plateau); the fitted model reads ~0.56

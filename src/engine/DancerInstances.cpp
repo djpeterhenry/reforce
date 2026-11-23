@@ -28,8 +28,8 @@ void packDancerPart(const dance::BodyPart& p, const dance::BodyOut& body, float*
     put(o + 16, f.x * (1.0f / p.scaleX), 0);
     put(o + 20, f.y, 0);
     put(o + 24, f.z * (1.0f / p.scaleZ), 0);
-    put(o + 28, p.colour0, float(int(p.material)));
-    put(o + 32, p.colour1, p.split);
+    put(o + 28, p.color0, float(int(p.material)));
+    put(o + 32, p.color1, p.split);
     o[36] = p.len;
     o[37] = p.r0;
     o[38] = p.r1;

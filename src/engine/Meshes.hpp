@@ -4,11 +4,11 @@
 // Meshes are built once and live at circumradius 1 around the origin:
 //   - Platonic solids and the prism come from their vertex lists. Faces are found as the planes that have every
 //     vertex on one side and at least three on them (a convex hull, fine for <= 20 vertices). Each face is a
-//     fan of triangles around its centre:
+//     fan of triangles around its center:
 //       - vertices are duplicated per face (flat normals)
 //       - the face polygon's UVs lie on the inscribed circle of the [0,1]^2 texture (radius 0.5 around
-//         (0.5, 0.5)), so a centred WaveShape tile sits centred on every face
-//       - `edge` is 1 at the face centre and 0 on its border, for edge highlights.
+//         (0.5, 0.5)), so a centered WaveShape tile sits centered on every face
+//       - `edge` is 1 at the face center and 0 on its border, for edge highlights.
 //   - The geodesic sphere (a subdivided icosahedron) and the torus are smooth (vertex normals) with spherical /
 //     parametric UVs, and edge = 1.
 // Triangles wind counter-clockwise seen from outside (cross(b - a, c - a) points along the outward normal), so
@@ -29,11 +29,13 @@ namespace reforce::engine {
 
 // Rubik: one cubie of the Rubik's cube solid (engine/Rubik.hpp), a unit cube [-.5, .5]^3: the plastic body (uv.y = 0)
 // and a sticker on each face, slightly raised (uv = (direction 0..5, 1), engine::rubik direction order). The solid
-// pass draws it once per cubie with its own transform and sticker colours; Scal is the whole cube's circumradius.
+// pass draws it once per cubie with its own transform and sticker colors; Scal is the whole cube's circumradius.
 // Fifteen: one tile of the 15-puzzle solid (engine/Fifteen.hpp), a unit box [-.5, .5]^3 whose +z face has uv 0..1
 // (u right, v up, seen from +z) and whose other faces have uv (-1, -1). Drawn once per tile and once for the tray.
-enum class MeshKind { Tetrahedron, Cube, Octahedron, Dodecahedron, Icosahedron, Sphere, Torus, Prism, Rubik, Fifteen };
-// The puzzles (rubik, fifteen): drawn in their own colours (engine/StickerColors, the colorize pass's colour overlay).
+// Model: a user-supplied glTF model (engine/ModelFile, render/ModelPipeline; docs/model-design.md). makeMesh gives an
+// empty mesh: its geometry comes from the scene's File, not from here.
+enum class MeshKind { Tetrahedron, Cube, Octahedron, Dodecahedron, Icosahedron, Sphere, Torus, Prism, Rubik, Fifteen, Model };
+// The puzzles (rubik, fifteen): drawn in their own colors (engine/StickerColors, the colorize pass's color overlay).
 inline bool isPuzzleMesh(MeshKind k) { return k == MeshKind::Rubik || k == MeshKind::Fifteen; }
 std::optional<MeshKind> parseMeshKind(std::string_view name);  // case-insensitive; "tetrahedron", "cube", ...
 const char* meshKindName(MeshKind k);
@@ -42,7 +44,7 @@ struct MeshVertex {
     float pos[3];
     float normal[3];
     float uv[2];
-    float edge;  // 1 at a face centre, 0 on its border (smooth meshes: 1)
+    float edge;  // 1 at a face center, 0 on its border (smooth meshes: 1)
 };
 static_assert(sizeof(MeshVertex) == 36);
 

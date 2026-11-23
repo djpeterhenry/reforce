@@ -23,7 +23,7 @@
 //        "camera[:ID]", "syphon:NAME" or a video library name (GET /api/video lists them)
 //   {"action":"videostop","target":"layer"|"sprite"}
 //   {"action":"videohold"}                             movie sprites loop until stopped (session only)
-//   {"action":"videoset","key":K,"value":V}           colour layer setting (engine::applyVideoSetting)
+//   {"action":"videoset","key":K,"value":V}           color layer setting (engine::applyVideoSetting)
 //   {"action":"beatset","key":K,"value":V}            rhythm: phrases, quantize, kick zoom (engine::validateBeatSetting)
 //   {"action":"look","key":K,"value":V}                rendering-quality choice (engine/Look.hpp): K = thinlines,
 //        intensity, flowrounding, flowprecision, aa, linescale, sprites (or the settings key); session-only
@@ -54,7 +54,7 @@ struct LibraryEntry {
     bool movie = false;                   // Sprite: a movie file (Movie sprites card)
     double bpm = 0;                       // movie: BPM from its .reforce.txt (beat sync, tools/dance_sync); 0 = none
     bool noColorKey = false;              // movie: ColorKey = 0 in its .reforce.txt (opaque in the Syphon alpha)
-    bool beat = false;                    // Solid: its expressions read the beat or tempo (scene::usesBeat)
+    bool beat = false;                    // Objects: it follows the beat (engine::objectFollowsBeat)
     std::filesystem::path path;           // the file (not sent: GET /api/sprites/image serves image sprites)
 };
 
@@ -84,9 +84,10 @@ struct Library {
 // (reforce.Solid.Dir) more solids ("Extra/..." ids), in the Director's order.
 Library buildLibrary(const std::filesystem::path& scenesDir, const std::string& exclude = {},
                      const std::filesystem::path& externalSpritesDir = {},
-                     const std::filesystem::path& contentDir = {}, const std::filesystem::path& solidDir = {});
+                     const std::filesystem::path& contentDir = {}, const std::filesystem::path& solidDir = {},
+                     const std::filesystem::path& modelDir = {});
 
-// Favourites (reforce.Favorites): "layer:id; layer:id", layer = the UI key
+// Favorites (reforce.Favorites): "layer:id; layer:id", layer = the UI key
 // (flowfield, waveshape, colormap, union, particle, sprite). Unknown layers and
 // duplicates are dropped.
 struct Favorite {

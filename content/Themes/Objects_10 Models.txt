@@ -1,0 +1,4 @@
+ThemeName = "Objects: Models"
+About = "reforce: everything as in (Standard), plus one of your own 3D models (reforce.Model.Dir) every 30 seconds or so."
+Object.CategoryExpr = "+Models"
+Object.Slideshow.Interval.Duration = 30

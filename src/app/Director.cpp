@@ -1,5 +1,7 @@
 #include "app/Director.hpp"
 
+#include "engine/ModelScenes.hpp"
+
 #include <algorithm>
 
 #include "audio/Analyzer.hpp"
@@ -8,6 +10,7 @@
 #include <cstdio>
 
 #include "engine/Log.hpp"
+#include "engine/Look.hpp"
 #include "engine/Perf.hpp"
 #include "sync/LinkClock.hpp"
 
@@ -49,6 +52,7 @@ const engine::LayerPrefs& layerPrefs(const engine::Settings& p, Layer l) {
 
 Director::Director(std::unique_ptr<Visualizer> vis, const engine::Settings& prefs, const DirectorOptions& opts)
     : vis_(std::move(vis)), prefs_(prefs), opts_(opts), rng_(opts.seed), spawnRng_(opts.seed * 7919 + 17) {
+    vis_->setContentDir(opts.contentDir);  // camera presets for model scenes
     // Objects hold two scene types (solids and organics, objectSolids_ says which); d.type is Organic for them.
     const Layer ls[8] = {Layer::WaveShape, Layer::ColorMap, Layer::FlowField, Layer::Union, Layer::Particle,
                          Layer::Sprite,    Layer::Object,   Layer::Dancer};
@@ -87,6 +91,15 @@ Director::Director(std::unique_ptr<Visualizer> vis, const engine::Settings& pref
         if (!opts.scenesDir.empty()) add(engine::listScenes(opts.scenesDir, SceneType::Solid), SceneType::Solid);
         if (!prefs.solidDir.empty())
             add(engine::listSceneFolder(prefs.solidDir, SceneType::Solid, "Extra/"), SceneType::Solid);
+        // 3D model scenes (docs/model-design.md): the user's own models in reforce.Model.Dir, "Model/..." ids; in
+        // the slideshow like any Object (Peter 2026-11-22). Scenes whose model file is missing are left out.
+        {
+            std::vector<std::string> skipped;
+            auto models = engine::listModelScenes(engine::modelFolder(prefs.modelDir), &skipped);
+            for (const auto& s : skipped) rlog("[reforce] model scene left out: %s\n", s.c_str());
+            if (!models.empty()) rlog("[reforce] models: %zu model scene file(s)\n", models.size());
+            add(std::move(models), SceneType::Solid);
+        }
         if (!opts.contentDir.empty()) add(engine::listScenes(opts.contentDir, SceneType::Organic), SceneType::Organic);
         if (!opts.scenesDir.empty()) add(engine::listScenes(opts.scenesDir, SceneType::Organic), SceneType::Organic);
         objectInterval_ = prefs.object.slideshowInterval;
@@ -153,6 +166,14 @@ Director::Director(std::unique_ptr<Visualizer> vis, const engine::Settings& pref
             if (!dup) videoFiles_.push_back(std::move(e));
         }
     for (const auto& err : prefs.settingErrors) rlog("[reforce] settings: %s (ignored)\n", err.c_str());
+    // Settings reforce does not read (misspelled, renamed or retired) and Look values it does not know: they would
+    // otherwise be ignored silently. Also in the control panel's log.
+    if (!prefs.unknownKeys.empty()) {
+        std::string keys;
+        for (const auto& k : prefs.unknownKeys) keys += (keys.empty() ? "" : ", ") + k;
+        rlog("[reforce] settings: unknown setting(s) ignored: %s\n", keys.c_str());
+    }
+    for (const auto& p : engine::lookSettingProblems(prefs)) rlog("[reforce] settings: %s\n", p.c_str());
     // FlowField transitions with a Union use the FlowField curve; the Union
     // only shapes the per-pixel weight.
     themes_ = engine::ThemeLibrary::loadAll(opts.scenesDir, opts.contentDir);
@@ -241,16 +262,19 @@ void Director::applyTheme(const std::string& name) {
         auto skip = [&](const engine::SceneEntry& e) {
             return engine::excludedFromSlideshow(e.name) || hiddenSprite(d, e);
         };
-        std::vector<std::string> names;
+        std::vector<std::string> names, catalogIds;
         for (const auto& e : d.catalog)
-            if (!skip(e)) names.push_back(e.name);
+            if (!skip(e)) {
+                names.push_back(e.name);
+                catalogIds.push_back(e.id);
+            }
         std::vector<std::string> warnings;
         const std::vector<std::string> keepNames =
             d.layer == Layer::Union ? names
                                     : themes_.filter(theme,
                                                      d.layer == Layer::Object ? std::string("Object")
                                                                               : std::string(scene::sceneTypeName(d.type)),
-                                                     names, &warnings);
+                                                     names, &warnings, &catalogIds);
         for (const auto& w : warnings) log("theme " + theme_ + ": " + w);
         std::vector<std::string> ids, movies;
         // Sprites: movies go to their own shuffle (own timer); images stay in the layer's.

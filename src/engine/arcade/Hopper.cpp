@@ -22,7 +22,7 @@ constexpr double kCrouch = 0.2;      // share of a beat spent on the cube after 
 constexpr long kWalkBudget = 3000;  // search nodes per attempt (a 7-row board takes a few hundred); short
 constexpr int kWalkAttempts = 12;   // attempts with fresh seeded orders beat long backtracking (heavy-tailed)
 
-int neighbours(int cube, int rows, int out[4]) {
+int neighbors(int cube, int rows, int out[4]) {
     const int r = rowOf(cube), c = colOf(cube);
     int n = 0;
     if (r > 0 && c > 0) out[n++] = cubeIndex(r - 1, c - 1);  // up-left
@@ -95,7 +95,7 @@ Game::Game(const Config& c)
         while (head < tail) {
             const int a = queue[std::size_t(head++)];
             int nb[4];
-            const int n = neighbours(a, rows_, nb);
+            const int n = neighbors(a, rows_, nb);
             for (int i = 0; i < n; ++i)
                 if (d[nb[i]] == 255) {
                     d[nb[i]] = (unsigned char)(d[a] + 1);
@@ -111,7 +111,7 @@ std::uint64_t Game::seedFor(long long cycle, std::uint64_t salt) const {
 
 namespace {
 
-// Depth-first route search with Warnsdorff ordering (cubes still to brighten with the fewest such neighbours first,
+// Depth-first route search with Warnsdorff ordering (cubes still to brighten with the fewest such neighbors first,
 // seeded ties) over the steps each cube still needs (`need`), and four cuts: every cube still to brighten within reach,
 // enough landings left on each row parity for its steps, the cycle's last landing (on a fixed parity) still has a step
 // to take, and that step is not on the only way into a corner that needs as many visits.
@@ -136,13 +136,13 @@ struct Walker {
         if (i == hops) return true;
         if (--budget < 0) return false;
         int nb[4];
-        const int n = neighbours(pos[std::size_t(i)], rows, nb);
+        const int n = neighbors(pos[std::size_t(i)], rows, nb);
         int key[4];
         for (int k = 0; k < n; ++k) {
             const int q = nb[k];
             if (need[q] > 0) {
                 int nn[4], fresh = 0;
-                const int m = neighbours(q, rows, nn);
+                const int m = neighbors(q, rows, nn);
                 for (int t = 0; t < m; ++t) fresh += need[nn[t]] > 0;
                 key[k] = fresh * 8 + int(rng.next() % 12);
             } else {
@@ -172,8 +172,8 @@ struct Walker {
                      o2[lastCls] >= 1;
                 for (int x = 0; x < cubes && ok; ++x)
                     if (need[x] > 0 && dist[q * cubes + x] > rem) ok = false;
-                // A bottom corner has one neighbour, landed on before each visit: while the corner needs as many
-                // visits as that neighbour has steps left, the neighbour's last step cannot be the cycle's last.
+                // A bottom corner has one neighbor, landed on before each visit: while the corner needs as many
+                // visits as that neighbor has steps left, the neighbor's last step cannot be the cycle's last.
                 if (ok && ((rows - 1) & 1) != lastCls) {
                     int forced = 0;
                     for (int side = 0; side < 2; ++side) {
@@ -338,7 +338,7 @@ void Game::newCycle(long long cycle) {
         // Never seen in the tests; keep it on the pyramid (down and up again); the line resets the board anyway.
         for (int k = 1; k <= hops_; ++k) {
             int nb[4];
-            const int n = neighbours(plan_.pos[std::size_t(k - 1)], rows_, nb);
+            const int n = neighbors(plan_.pos[std::size_t(k - 1)], rows_, nb);
             plan_.pos[std::size_t(k)] = nb[k % n];
         }
     }
@@ -568,7 +568,7 @@ void inset(double* xs, double* ys, int n, double g) {
 }
 
 // The creature's local frame: units of its body radius, origin between its feet, facing right (mirrored for left),
-// squashed about the feet and spun about the body's centre; then scaled into cube units at the pose.
+// squashed about the feet and spun about the body's center; then scaled into cube units at the pose.
 struct Critter {
     const Board& b;
     double fx, fy, r, sx, sy, spin;
@@ -634,7 +634,7 @@ public:
         const Board bd{c, w, 0.0, w * (0.75 * R - head) / 2};
         const double gap = std::max(0.016, 1.2 / std::max(1e-9, c.pixelsPerUnit() * w));
 
-        // The pyramid, one path: the silhouette in the edge colour, every face inset on it (max-combined, so the
+        // The pyramid, one path: the silhouette in the edge color, every face inset on it (max-combined, so the
         // gaps stay dark).
         {
             double xs[4 * kMaxSil], ys[4 * kMaxSil];

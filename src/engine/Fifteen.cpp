@@ -14,8 +14,8 @@ uint64_t splitmix(uint64_t& s) {
     return z ^ (z >> 31);
 }
 
-// Neighbours of `cell` into out; returns how many.
-int neighbours(int cell, int* out) {
+// Neighbors of `cell` into out; returns how many.
+int neighbors(int cell, int* out) {
     const int r = cell / kSize, c = cell % kSize;
     int n = 0;
     if (r > 0) out[n++] = cell - kSize;
@@ -74,7 +74,7 @@ int scramble(uint64_t seed, int count, std::array<int8_t, kMaxMoves + 1>& path) 
         for (int m = 1; m <= count; ++m) {
             const int at = cand[std::size_t(m - 1)];
             int nb[4];
-            const int n = neighbours(at, nb);
+            const int n = neighbors(at, nb);
             int opts[4], o = 0;
             for (int i = 0; i < n; ++i)
                 if (nb[i] != prev) opts[o++] = nb[i];

@@ -27,8 +27,10 @@
 
 namespace reforce::engine {
 
-enum class LookKey : int { ThinLines = 0, Intensity, FlowRounding, FlowPrecision, Antialias, LineScale, SpriteLayering };
-constexpr int kLookKeys = 7;
+enum class LookKey : int {
+    ThinLines = 0, Intensity, FlowRounding, FlowPrecision, Antialias, LineScale, SpriteLayering, LineEdges, Supersample
+};
+constexpr int kLookKeys = 9;
 
 struct LookKeyInfo {
     LookKey key;
@@ -64,6 +66,8 @@ struct LookValues {
 std::optional<LookValues> lookPreset(const std::string& name);
 // From settings (unknown values fall back to the defaults).
 LookValues lookFromSettings(const Settings& s);
+// The settings' Look values that are not one of their choices, each "key: \"value\" is not a | b (using x)".
+std::vector<std::string> lookSettingProblems(const Settings& s);
 
 struct LookState {
     bool valid = false;           // false offline / before the visualizer publishes

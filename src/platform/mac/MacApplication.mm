@@ -287,7 +287,7 @@ static NSMenuItem* RFAddItem(NSMenu* menu, NSString* title, SEL action, NSString
     audioItem.submenu = _audioMenu;
     [bar addItem:audioItem];
 
-    // Video (Phase 5F): sources and colour-layer settings, rebuilt each time it opens.
+    // Video (Phase 5F): sources and color-layer settings, rebuilt each time it opens.
     NSMenuItem* videoItem = [[NSMenuItem alloc] init];
     _videoMenu = [[NSMenu alloc] initWithTitle:@"Video"];
     _videoMenu.delegate = self;

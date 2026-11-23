@@ -39,7 +39,7 @@ struct PatternParams {
     float2 resolution;
 };
 
-// Animated test pattern: drifting colour gradient, 16 bouncing bars, a
+// Animated test pattern: drifting color gradient, 16 bouncing bars, a
 // sweeping scanline, and a 4px white border to check edges/letterboxing.
 fragment float4 pattern_fs(VOut in [[stage_in]], constant PatternParams& P [[buffer(0)]]) {
     float2 uv = in.uv;

@@ -247,7 +247,7 @@ TEST_CASE("organics: a tree grows in simulation time, sways, and withers at the 
         CHECK(s.radius > 0.f);
         CHECK(s.path == 0.f);  // one path per tree
     }
-    // The trunk grows up from the bottom centre of the frame (y = -1 -> pixel row 1080).
+    // The trunk grows up from the bottom center of the frame (y = -1 -> pixel row 1080).
     CHECK(segs.front().ax == doctest::Approx(960.5).epsilon(0.01));
     CHECK(segs.front().ay == doctest::Approx(1080.5).epsilon(0.01));
     // Grown out by the middle of its life; the root's segment is the thickest.
@@ -502,7 +502,7 @@ TEST_CASE("organics: pendulum ring and side views") {
     SpriteAudio a;
     a.sync.on = 1;
     a.sync.bar = 16.0;  // a cycle line
-    // Ring: on a cycle line every bob is Len / 2 + Amp from the centre.
+    // Ring: on a cycle line every bob is Len / 2 + Amp from the center.
     OrganicRun ring(compileOrganic("Kind=\"pendulums\"\nView=\"2\"\nNum=\"12\"\nLen=\"1\"\nAmp=\".2\"\nStrg=\"0\"\n"), env,
                     "r", 0.0, 0.5, 60.0, nullptr);
     std::vector<LineSegment> segs;

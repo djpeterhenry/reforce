@@ -74,7 +74,7 @@ in vec3 vWorld;
 in vec3 vN;
 in vec3 vLocal;
 flat in int vIid;
-out vec4 outColour;
+out vec4 outColor;
 vec4 row(int k) { return texelFetch(uInst, ivec2(k, vIid), 0); }
 // smoothstep that also takes reversed edges (Metal allows them; GLSL leaves them undefined).
 float sstep(float a, float b, float x) { float t = clamp((x - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
@@ -356,7 +356,7 @@ void main() {
     float core = pow(sat(dot(n, V)), 2.0);
     vec3 hue = albedo / max(max(albedo.r, max(albedo.g, albedo.b)), 1e-3);
     vec3 col = hue * (0.95 + 0.35 * pulse) * (0.75 + 0.35 * core) + vec3(0.12) * core * core;
-    outColour = vec4(col, 1.0);
+    outColor = vec4(col, 1.0);
     return;
   }
   // The studio light (reforce.Dancer.Lighting 0).
@@ -403,11 +403,11 @@ void main() {
     float glint = sstep(0.75, 1.0, sat(dot(normalize(vec2(vLocal.x, vLocal.y) + 1e-5), vec2(-0.6, 0.8))));
     col += glint * 0.25 * (1.0 - lensRim);
     col = mix(col, c1.rgb * lit, lensRim);
-    outColour = vec4(col, 1.0);
+    outColor = vec4(col, 1.0);
     return;
   }
   col += fres * vec3(0.3) * (fabric == 3 ? 0.25 : 0.7);
-  outColour = vec4(col, 1.0);
+  outColor = vec4(col, 1.0);
 }`;
 
 const FS_OUTLINE = FS_COMMON + `
@@ -415,7 +415,7 @@ void main() {
   vec4 c0 = row(7), clip = row(10), clip2 = row(17);
   if (dot(vLocal, clip.xyz) > clip.w) discard;
   if (int(c0.w + 0.5) == 4 && dot(vLocal, clip2.xyz) > clip2.w) discard;
-  outColour = vec4(c0.rgb * 0.18 + 0.01, 1.0);
+  outColor = vec4(c0.rgb * 0.18 + 0.01, 1.0);
 }`;
 
 // render/DancerPipeline capsuleMesh: a unit sphere split at the equator, the lower half at end 0 and the upper half

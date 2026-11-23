@@ -1,7 +1,7 @@
-"""Probe run 28 sprite set: blend flags, alpha, keying threshold, EPen scaling, colour weights, fades (stdlib only).
+"""Probe run 28 sprite set: blend flags, alpha, keying threshold, EPen scaling, color weights, fades (stdlib only).
 
 Writes build/probe-sprites28/. Images:
-  G  660x420 RGBA (native size, Flag bits without fit, so 1:1 in the frame centre, cells 60x70 px):
+  G  660x420 RGBA (native size, Flag bits without fit, so 1:1 in the frame center, cells 60x70 px):
      11 columns of luminance  0 1 4 16 64 120 127 128 136 192 255
       6 rows of alpha        255 192 128 127 64 0   (straight, not premultiplied)
   C  660x420 RGB: 6 columns red green blue yellow cyan magenta (255), rows: full, half (128)
@@ -42,7 +42,7 @@ import zlib
 
 LUMS = [0, 1, 4, 16, 64, 120, 127, 128, 136, 192, 255]
 ALPHAS = [255, 192, 128, 127, 64, 0]
-COLOURS = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255), (255, 0, 255)]
+COLORS = [(255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (0, 255, 255), (255, 0, 255)]
 FLAGS = {"copy": 0, "thr": 1024, "add": 2048, "sel": 4096, "am": 8192, "ab": 16384, "inv": 16}
 
 
@@ -71,7 +71,7 @@ def img_c():
     rows = []
     for y in range(420):
         k = 1.0 if y < 210 else 128 / 255
-        rows.append(b"".join(bytes(int(round(c * k)) for c in COLOURS[x // 110]) for x in range(660)))
+        rows.append(b"".join(bytes(int(round(c * k)) for c in COLORS[x // 110]) for x in range(660)))
     return 660, 420, 2, rows
 
 

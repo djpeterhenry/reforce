@@ -27,7 +27,7 @@ Surprises / things a parser must handle:
   commas after values (`A0="...",`) in 36 files.
 - **Quoted strings span lines** (94 values, up to 63 lines). Newlines inside quotes are whitespace.
 - **Empty values** `A2=""` (303) must be accepted (treat as 0 / undefined).
-- **Duplicate keys** in 12 files (last-wins vs first-wins must be decided; G-Force behaviour unknown).
+- **Duplicate keys** in 12 files (last-wins vs first-wins must be decided; G-Force behavior unknown).
 - **`Meta="reactive=4 detail=4 ..."`** is a metadata string, not an expression.
 - **Typos that G-Force tolerates**: `NUM_FTT_BINS`, `rnd16`, `1L` numeric suffix, `.5.5` / `.1.5` double-dot
   literals, bare stray text outside comments (3 files, e.g. an author byline and a lone `w`). No reference to an

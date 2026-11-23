@@ -111,7 +111,7 @@ TEST_CASE("solids: drawn coverage matches the CPU hull, faces shade as the refer
         double cov = 0;
         for (float a : b.alpha) cov += a;
         CHECK(cov == doctest::Approx(ref.area).epsilon(0.01));
-        // Face centres: premultiplied luminance = the reference (alpha 1 inside).
+        // Face centers: premultiplied luminance = the reference (alpha 1 inside).
         REQUIRE(ref.faces.size() == 3);
         for (const auto& f : ref.faces) {
             const int x = int(f.x - (sq.cx - sq.w / 2)), y = int(f.y - (sq.cy - sq.h / 2));
@@ -326,8 +326,8 @@ TEST_CASE("solids: the WaveShape tile has lines and a full mip chain; Text=0 / 1
     d.text = render::SolidText::Wave;
     render::SolidQuad sq;
     Box b = drawOne(scene, solids, d, &sq);
-    auto centre = [&](const Box& bx) { return bx.lum[std::size_t((bx.h / 2) * bx.w + bx.w / 2)]; };
-    CHECK(centre(b) == doctest::Approx(0.25).epsilon(0.03));
+    auto center = [&](const Box& bx) { return bx.lum[std::size_t((bx.h / 2) * bx.w + bx.w / 2)]; };
+    CHECK(center(b) == doctest::Approx(0.25).epsilon(0.03));
 
     // The tile: lines at level 0; the mips average them (level 4 = 16x16 px of level 0 per texel).
     const auto segs = tileWaves(256, 6, 64, 0.0f);
@@ -360,7 +360,7 @@ TEST_CASE("solids: the WaveShape tile has lines and a full mip chain; Text=0 / 1
     CHECK(hi > 0.6f);
     d.text = render::SolidText::Flat;
     b = drawOne(scene, solids, d);
-    CHECK(centre(b) == doctest::Approx(1.0).epsilon(0.01));
+    CHECK(center(b) == doctest::Approx(1.0).epsilon(0.01));
 
     // Text=1: the previous intensity frame (cleared: 0) -> the floor.
     d.text = render::SolidText::Frame;
@@ -372,7 +372,7 @@ TEST_CASE("solids: the WaveShape tile has lines and a full mip chain; Text=0 / 1
     }
     REQUIRE(solids.frameTile()->mipmapLevelCount() == 9);
     b = drawOne(scene, solids, d);
-    CHECK(centre(b) == doctest::Approx(0.25).epsilon(0.03));
+    CHECK(center(b) == doctest::Approx(0.25).epsilon(0.03));
     q->release();
 }
 
@@ -472,7 +472,7 @@ render::SolidDraw rubikDraw(double turn) {
 }
 }  // namespace
 
-TEST_CASE("solids: rubik: solved shows one colour from each opposite pair, scrambled shows all six; plastic between") {
+TEST_CASE("solids: rubik: solved shows one color from each opposite pair, scrambled shows all six; plastic between") {
     if (!device()) return;
     const int W = 640, H = 360;
     render::ScenePipeline scene(device(), W, H, {});
@@ -485,7 +485,7 @@ TEST_CASE("solids: rubik: solved shows one colour from each opposite pair, scram
     for (int pair = 0; pair < 3; ++pair) {
         const int a = n[std::size_t(2 * pair)], b = n[std::size_t(2 * pair + 1)];
         CHECK((a > 500) != (b > 500));  // one face of each pair faces the camera
-        // (anti-aliased sticker borders pass through the other levels, so a hidden colour still gets a few pixels)
+        // (anti-aliased sticker borders pass through the other levels, so a hidden color still gets a few pixels)
         CHECK(std::min(a, b) * 4 < std::max(a, b));
         shown += (a > 500) + (b > 500);
     }
@@ -562,7 +562,7 @@ TEST_CASE("solids: ColorKey = 0 keeps the whole solid opaque in the tracked alph
     q->release();
 }
 
-TEST_CASE("solids: rubik in colour: sticker borders blend the sticker and plastic colours, not the ColorMap between") {
+TEST_CASE("solids: rubik in color: sticker borders blend the sticker and plastic colors, not the ColorMap between") {
     if (!device()) return;
     const int W = 320, H = 180;
     render::ScenePipeline scene(device(), W, H, {});
@@ -620,7 +620,7 @@ TEST_CASE("solids: rubik in colour: sticker borders blend the sticker and plasti
     q->release();
 }
 
-TEST_CASE("solids: fifteen: the solved board shows the four row colours, numbers on the tiles, no tray") {
+TEST_CASE("solids: fifteen: the solved board shows the four row colors, numbers on the tiles, no tray") {
     if (!device()) return;
     const int W = 640, H = 360;
     render::ScenePipeline scene(device(), W, H, {});
@@ -643,11 +643,11 @@ TEST_CASE("solids: fifteen: the solved board shows the four row colours, numbers
         for (int k = 0; k < 6; ++k)
             if (std::fabs(b.lum[i] - d.stickers[std::size_t(k)]) < 0.01f) ++n[std::size_t(k)];
     }
-    for (int r = 0; r < 4; ++r) CHECK(n[std::size_t(render::kFifteenRowColour[r])] > 2000);  // each row's colour
-    CHECK(n[3] + n[5] < 200);  // the colours no row uses
+    for (int r = 0; r < 4; ++r) CHECK(n[std::size_t(render::kFifteenRowColor[r])] > 2000);  // each row's color
+    CHECK(n[3] + n[5] < 200);  // the colors no row uses
     CHECK(digits > 500);       // the numbers' strokes (b = 0)
     CHECK(empty > 3000);       // the blank cell at least (a tile's area), and the gaps
-    // A tile's centre: tile 6 (row 1, col 1) at board (-.5, .5); its "6" crosses the centre (segment g).
+    // A tile's center: tile 6 (row 1, col 1) at board (-.5, .5); its "6" crosses the center (segment g).
     const engine::fifteen::Frame f = d.fifteen;
     bool found = false;
     for (const auto& t : f.tiles) found = found || (t.number == 6 && t.x == doctest::Approx(-0.5f) && t.y == doctest::Approx(0.5f));

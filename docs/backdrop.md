@@ -13,8 +13,8 @@ now-playing text, one in-place pass mixes the backdrop in; the dancers, their fl
 over it as usual:
 
 ```
-a   = opaque + (1 - opaque) * key(colour)     # exactly the Syphon alpha (OBS Color Key on black)
-out = colour * a + backdrop * opacity * fade * (1 - a)
+a   = opaque + (1 - opaque) * key(color)     # exactly the Syphon alpha (OBS Color Key on black)
+out = color * a + backdrop * opacity * fade * (1 - a)
 alpha = 1
 ```
 
@@ -30,7 +30,7 @@ alpha = 1
 ## Window shows the visuals only (room lights)
 
 `reforce.Window.VisualsOnly = 1` (View menu: Window Shows Visuals Only (for Lights); web control panel: the
-"Visuals only" button in the top bar, lit when on): the reforce window shows the visuals alone, with the colour movie layer and movie sprites, but no
+"Visuals only" button in the top bar, lit when on): the reforce window shows the visuals alone, with the color movie layer and movie sprites, but no
 backdrop, dancers, name tags, bubbles or now-playing text. Syphon (OBS) is unchanged and still gets everything. It is
 for screen mirroring (Nanoleaf Desktop on the second monitor): the room lights follow the visuals, as they did with
 G-Force, not the camera or the dancers. `Visualizer::colorize(..., visualsCopy)` copies the frame right after the
@@ -38,7 +38,7 @@ visuals pass into the window's own frame (one blit); when the video layer is kep
 stops there instead (`overlays` false). Command: `videoset windowvisuals on|off`.
 
 Counts as visuals (in the window): scenes (wave shapes, particles, organics, flow fields, feedback), 3D solids, image
-sprites, movie sprites (luminance and full colour), the colour movie layer (movies, or a camera / Syphon source played
+sprites, movie sprites (luminance and full color), the color movie layer (movies, or a camera / Syphon source played
 on it), live sprites (a camera as a sprite too), and body tracking drawn into the visuals (hand trails, burn).
 Left out: the backdrop with body Front and Show, the dancers and their floor, name tags, bubbles, now-playing text.
 

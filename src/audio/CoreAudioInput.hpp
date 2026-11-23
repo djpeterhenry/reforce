@@ -21,7 +21,7 @@
 // process tap and its private aggregate device and reads that; teardown()
 // removes both.
 //
-// Microphone permission (TCC): when the process is not authorised, CoreAudio
+// Microphone permission (TCC): when the process is not authorized, CoreAudio
 // still runs the callback but delivers zeros. See MicPermission.hpp.
 
 #include <atomic>

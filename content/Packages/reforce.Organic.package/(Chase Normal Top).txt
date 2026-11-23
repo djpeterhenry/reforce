@@ -1,5 +1,5 @@
 Vers=100
-Meta="reforce organic: Chase Normal's light-cycle game seen from straight above: four cycles on a 40 x 24 grid, riding on the beat and turning only on beat lines (most of all on bar lines, often as mirror-image pairs), each leaving a wall in its own colour that retracts after four bars; on every phrase line the walls burst into sparks and the cycles start again from a new formation; a cycle that gets boxed in crashes in an explosion and rezzes in at the border two bars later; a drop doubles their speed for a bar and flashes the walls."
+Meta="reforce organic: Chase Normal's light-cycle game seen from straight above: four cycles on a 40 x 24 grid, riding on the beat and turning only on beat lines (most of all on bar lines, often as mirror-image pairs), each leaving a wall in its own color that retracts after four bars; on every phrase line the walls burst into sparks and the cycles start again from a new formation; a cycle that gets boxed in crashes in an explosion and rezzes in at the border two bars later; a drop doubles their speed for a bar and flashes the walls."
 Kind="cycles"
 PBar="32"
 // the game as in Chase Normal

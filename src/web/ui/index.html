@@ -26,12 +26,6 @@
     <button class="toggle" id="windowVisuals" aria-pressed="false" title="For room lights that mirror the screen (Nanoleaf Desktop): the reforce window shows the visuals alone (movie layer and sprites included), without the camera backdrop, dancers, name tags or song text. Syphon (OBS) always gets everything. Also in the View menu. Lit (highlighted) = on. Saved to settings.json (reforce.Window.VisualsOnly)">Visuals only</button>
     <button class="toggle" id="lights" aria-pressed="false" title="Room lights: the Nanoleaf panels follow the visuals (not the camera, dancers or text). Also in the View menu. Saved to settings.json (reforce.Lights.Enabled)">Lights</button>
     <div class="stats" id="stats" aria-live="off">–</div>
-    <label class="field compact live-rate" title="How often the meters, Link, progress bars and countdowns update. Each step costs the browser CPU (about 15% of a core at 10 Hz, 21% at 20 Hz in Chrome). The Link beat dots step on the beat at any rate. Stored in this browser. A hidden tab stops updating either way.">
-      <span>Live</span>
-      <select id="liveRate" aria-label="Live update rate">
-        <option value="20">20 Hz</option><option value="10">10 Hz</option><option value="5">5 Hz</option><option value="0">off</option>
-      </select>
-    </label>
     <div class="perf-hist" id="perfHist" aria-hidden="true" hidden></div>
     <div class="meters" id="meters" hidden title="Audio: BASS, MID, TREBLE (0..2), BEAT pulse, TEMPO (reforce extensions besides BASS)">
       <span class="meter" data-k="bass"><i></i><b>B</b></span>
@@ -51,8 +45,8 @@
   </div>
 </header>
 
-<section class="favs" id="favs" aria-label="Favourites">
-  <span class="favs-title" title="Favourites: star (☆) a scene in any list to add it here">★</span>
+<section class="favs" id="favs" aria-label="Favorites">
+  <span class="favs-title" title="Favorites: star (☆) a scene in any list to add it here">★</span>
   <div class="fav-buttons" id="favButtons"></div>
   <button class="fav-clear" id="favClear" title="Fade out every sprite on screen, movie sprites included (quick fade)">Clear sprites</button>
 </section>
@@ -77,7 +71,7 @@
         <div class="current" id="ltNow">–</div>
         <div class="vmeta" id="ltMeta"></div>
       </div>
-      <svg class="lt-preview" id="ltPreview" role="img" aria-label="The panels as they hang, in the colours last sent"></svg>
+      <svg class="lt-preview" id="ltPreview" role="img" aria-label="The panels as they hang, in the colors last sent"></svg>
       <div class="row buttons">
         <button class="primary" id="ltOn" title="Drive the panels from the visuals. Quit the Nanoleaf Desktop app first: both would fight over them. Saved to settings.json (reforce.Lights.Enabled)">Turn on</button>
         <button id="ltPair" title="Pair with the panels (first time, or after a reset): reforce finds them, then you hold the controller's power button 5-7 s until its lights flash. The panels stop following the visuals while pairing">Pair…</button>
@@ -85,9 +79,9 @@
       <div class="settings vsettings cols3">
         <label class="field" title="How bright the panels are for a given picture (100% = as measured). Saved to settings.json (reforce.Lights.Brightness)"><span>Brightness <em id="ltBrightnessVal"></em></span>
           <input type="range" id="ltBrightness" min="0" max="2" step="0.05" aria-label="Lights brightness"></label>
-        <label class="field" title="Colour strength (1× = as on screen). Saved to settings.json (reforce.Lights.Saturation)"><span>Saturation <em id="ltSaturationVal"></em></span>
+        <label class="field" title="Color strength (1× = as on screen). Saved to settings.json (reforce.Lights.Saturation)"><span>Saturation <em id="ltSaturationVal"></em></span>
           <input type="range" id="ltSaturation" min="0" max="3" step="0.05" aria-label="Lights saturation"></label>
-        <label class="field" title="The panels never go darker than this, keeping their colour. Saved to settings.json (reforce.Lights.Floor)"><span>Floor <em id="ltFloorVal"></em></span>
+        <label class="field" title="The panels never go darker than this, keeping their color. Saved to settings.json (reforce.Lights.Floor)"><span>Floor <em id="ltFloorVal"></em></span>
           <input type="range" id="ltFloor" min="0" max="0.5" step="0.01" aria-label="Lights floor"></label>
         <label class="field" title="How slowly a panel falls back when its part of the picture goes darker (it rises six times faster). Saved to settings.json (reforce.Lights.Smoothing)"><span>Smoothing <em id="ltSmoothingVal"></em></span>
           <input type="range" id="ltSmoothing" min="0" max="2" step="0.05" aria-label="Lights smoothing"></label>
@@ -170,7 +164,7 @@
   </section>
   <section class="video" id="video" aria-labelledby="videoTitle">
    <details class="fold" id="videoWrap">
-    <summary title="A full-frame colour video (file, camera or Syphon) over or under the visualizer, with blend modes and keying. Movie sprites are on the Movie sprites card; the camera under the visuals is the Camera backdrop.">
+    <summary title="A full-frame color video (file, camera or Syphon) over or under the visualizer, with blend modes and keying. Movie sprites are on the Movie sprites card; the camera under the visuals is the Camera backdrop.">
       <span class="vsum-title">Video layer</span> <span class="vsum-note" id="vSummary">off</span></summary>
     <article class="card">
       <header class="card-head">
@@ -178,7 +172,7 @@
         <span class="chip status" id="vStatus">off</span>
       </header>
       <div class="now">
-        <div class="current" id="vNow" title="Colour layer source">–</div>
+        <div class="current" id="vNow" title="Color layer source">–</div>
         <div class="vmeta" id="vMeta"></div>
         <div class="vmeta" id="vWaiting" hidden></div>
       </div>
@@ -188,19 +182,19 @@
         <button id="vRefresh" title="List files, cameras and Syphon servers again">↻</button>
       </div>
       <div class="row buttons">
-        <button class="primary" id="vPlayLayer" title="Crossfade the colour layer to this source">Play on layer</button>
+        <button class="primary" id="vPlayLayer" title="Crossfade the color layer to this source">Play on layer</button>
       </div>
       <div class="row buttons">
         <button id="vStopLayer">Stop layer</button>
         <button id="vHoldSprites" title="The movie sprite playing now loops and stays until you stop it (this playback only)">⟳ Loop until stopped</button>
-        <label id="vBeatSyncLabel" class="beatsync" title="Movies with a BPM (found by tools/dance_sync), as sprites or on the colour layer, play locked to the beat: Link when it runs, else the audio. Saved to settings.json (reforce.Video.BeatSync)"><input type="checkbox" id="vBeatSync"> Beat sync <em id="vBeatClock"></em></label>
-        <label id="vSpriteColourLabel" class="beatsync" title="Movie and live sprites in full colour, drawn over the visualizer (alpha = fade × (0.5 + 0.5 × Mix)) instead of as luminance in it. Off = G-Force. Saved to settings.json (reforce.MovieSprite.Colour)"><input type="checkbox" id="vSpriteColour"> Full colour</label>
+        <label id="vBeatSyncLabel" class="beatsync" title="Movies with a BPM (found by tools/dance_sync), as sprites or on the color layer, play locked to the beat: Link when it runs, else the audio. Saved to settings.json (reforce.Video.BeatSync)"><input type="checkbox" id="vBeatSync"> Beat sync <em id="vBeatClock"></em></label>
+        <label id="vSpriteColorLabel" class="beatsync" title="Movie and live sprites in full color, drawn over the visualizer (alpha = fade × (0.5 + 0.5 × Mix)) instead of as luminance in it. Off = G-Force. Saved to settings.json (reforce.MovieSprite.Color)"><input type="checkbox" id="vSpriteColor"> Full color</label>
       </div>
       <div class="row buttons">
-        <label class="beatsync" title="Send transparency in the Syphon output's alpha (the window is unchanged): the visuals are keyed like OBS's Color Key on black, the dancers stay opaque, and so do full-colour movie sprites whose .reforce.txt says ColorKey = 0. In OBS: tick Allow Transparency on the Syphon source and remove its Color Key filter. Saved to settings.json (reforce.Syphon.Alpha)"><input type="checkbox" id="vSyphonAlpha"> Syphon alpha</label>
+        <label class="beatsync" title="Send transparency in the Syphon output's alpha (the window is unchanged): the visuals are keyed like OBS's Color Key on black, the dancers stay opaque, and so do full-color movie sprites whose .reforce.txt says ColorKey = 0. In OBS: tick Allow Transparency on the Syphon source and remove its Color Key filter. Saved to settings.json (reforce.Syphon.Alpha)"><input type="checkbox" id="vSyphonAlpha"> Syphon alpha</label>
       </div>
       <div class="settings vsettings" id="vSyphonKey">
-        <label class="field" title="OBS Color Key Similarity (1-1000): colours this close to black are fully transparent. Saved to settings.json (reforce.Syphon.KeySimilarity)"><span>Key similarity <em id="vKeySimVal"></em></span>
+        <label class="field" title="OBS Color Key Similarity (1-1000): colors this close to black are fully transparent. Saved to settings.json (reforce.Syphon.KeySimilarity)"><span>Key similarity <em id="vKeySimVal"></em></span>
           <input type="range" id="vKeySim" min="1" max="400" step="1" aria-label="Key similarity"></label>
         <label class="field" title="OBS Color Key Smoothness (1-1000): how far past Similarity the fade to opaque runs. Saved to settings.json (reforce.Syphon.KeySmoothness)"><span>Key smoothness <em id="vKeySmoothVal"></em></span>
           <input type="range" id="vKeySmooth" min="1" max="400" step="1" aria-label="Key smoothness"></label>
@@ -220,7 +214,7 @@
           <select id="vKey"><option>none</option><option>luma</option><option>chroma</option></select></label>
         <label class="field vkey-luma"><span>Luma threshold <em id="vThresholdVal"></em></span>
           <input type="range" id="vThreshold" min="0" max="1" step="0.01"></label>
-        <label class="field vkey-chroma"><span>Key colour</span>
+        <label class="field vkey-chroma"><span>Key color</span>
           <input type="color" id="vKeyColor" value="#00ff00"></label>
         <label class="field vkey-chroma"><span>Tolerance <em id="vToleranceVal"></em></span>
           <input type="range" id="vTolerance" min="0" max="0.8" step="0.01"></label>
@@ -229,7 +223,7 @@
         <label class="field"><span>Rate (next file) <em id="vRateVal"></em></span>
           <input type="range" id="vRate" min="0" max="4" step="0.05"></label>
         <div class="row checks">
-          <label title="Colour layer only: loop the movie on the layer (now and the next ones). Sprites: per movie (.reforce.txt) or Loop until stopped"><input type="checkbox" id="vLoop"> Loop layer movies</label>
+          <label title="Color layer only: loop the movie on the layer (now and the next ones). Sprites: per movie (.reforce.txt) or Loop until stopped"><input type="checkbox" id="vLoop"> Loop layer movies</label>
           <label title="Off: Syphon gets the plain visualizer, the window shows the composite"><input type="checkbox" id="vSyphon"> In Syphon output</label>
         </div>
       </div>
@@ -280,7 +274,7 @@
       <div class="rh-grid">
         <label class="field" title="Slideshow changes (FlowField, WaveShape, ColorMap) wait for the next line. Beat and bar: with Link only. Saved to settings.json (reforce.Link.Quantize).">
           <span>Slideshow changes on</span><select id="rhQuantize"><option value="off">off</option><option value="beat">beat</option><option value="bar">bar</option><option value="phrase">phrase</option></select></label>
-        <label class="field" title="Switches you make (library, Next, favourites) wait for the next line. Saved to settings.json (reforce.Link.QuantizeManual).">
+        <label class="field" title="Switches you make (library, Next, favorites) wait for the next line. Saved to settings.json (reforce.Link.QuantizeManual).">
           <span>Manual switches on</span><select id="rhQuantizeManual"><option value="off">off</option><option value="beat">beat</option><option value="bar">bar</option><option value="phrase">phrase</option></select></label>
         <label class="field" title="Slideshow particles, sprites and objects wait for the next line. Saved to settings.json (reforce.Quantize.Spawn).">
           <span>New particles, sprites, objects on</span><select id="rhQuantizeSpawn"><option value="off">off</option><option value="beat">beat</option><option value="bar">bar</option><option value="phrase">phrase</option></select></label>

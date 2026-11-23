@@ -10,7 +10,11 @@ add_library(reforce_engine STATIC
     src/engine/LineGeometry.cpp
     src/engine/Look.cpp
     src/engine/MediaOptions.cpp
+    src/engine/CameraMoves.cpp
     src/engine/Meshes.cpp
+    src/engine/ModelFile.cpp
+    src/engine/ModelScenes.cpp
+    src/engine/ObjectBeat.cpp
     src/engine/MovieBeatSync.cpp
     src/engine/Log.cpp
     src/engine/Palette.cpp
@@ -47,6 +51,7 @@ add_library(reforce_engine STATIC
     src/engine/LightsSettings.cpp
 )
 target_include_directories(reforce_engine PUBLIC src)
+target_link_libraries(reforce_engine PRIVATE cgltf)
 target_compile_options(reforce_engine PRIVATE ${REFORCE_WARNINGS})
 target_link_libraries(reforce_engine PUBLIC reforce_scene)
 
@@ -54,6 +59,8 @@ target_link_libraries(reforce_engine PUBLIC reforce_scene)
 target_sources(reforce_render PRIVATE
     src/render/ScenePipeline.cpp
     src/render/SolidPipeline.cpp
+    src/render/ModelPipeline.cpp
+    src/render/Downsample.cpp
     src/render/DancerPipeline.cpp
     src/render/FieldPipeline.cpp
     src/render/ImageFiles.cpp
@@ -73,6 +80,7 @@ target_sources(reforce PRIVATE
     src/app/VisualizerOrganics.cpp
     src/app/VisualizerRhythm.cpp
     src/app/VisualizerSolids.cpp
+    src/app/ModelLoader.cpp
     src/app/VisualizerSprites.cpp
     src/app/VisualizerVideo.cpp
 )
@@ -92,6 +100,7 @@ if(REFORCE_BUILD_TESTS)
         tests/test_engine_m6.cpp
         tests/test_engine_beatsync.cpp
         tests/test_engine_meshes.cpp
+        tests/test_engine_models.cpp
         tests/test_engine_solids.cpp
         tests/test_engine_rubik.cpp
         tests/test_engine_fifteen.cpp
@@ -215,9 +224,10 @@ target_compile_options(reforce-line-lab PRIVATE ${REFORCE_WARNINGS})
 target_link_libraries(reforce-line-lab PRIVATE reforce_render)
 if(REFORCE_BUILD_TESTS)
     add_executable(reforce_render_tests tests/test_main.cpp tests/test_render_lines.cpp tests/test_render_look.cpp
-        tests/test_render_solids.cpp tests/test_render_fields.cpp tests/test_render_dancers.cpp tests/test_render_text.cpp)
+        tests/test_render_solids.cpp tests/test_render_models.cpp tests/test_render_edges.cpp tests/test_render_fields.cpp tests/test_render_dancers.cpp tests/test_render_text.cpp)
     target_compile_options(reforce_render_tests PRIVATE ${REFORCE_WARNINGS})
     target_link_libraries(reforce_render_tests PRIVATE reforce_render doctest::doctest)
+    target_compile_definitions(reforce_render_tests PRIVATE REFORCE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
     add_test(NAME reforce_render_tests COMMAND reforce_render_tests)
 endif()
 

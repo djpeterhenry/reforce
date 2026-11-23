@@ -50,6 +50,8 @@
 #include "render/DancerPipeline.hpp"
 #include "render/FieldPipeline.hpp"
 #include "render/SolidPipeline.hpp"
+#include "render/ModelPipeline.hpp"
+#include "app/ModelLoader.hpp"
 #include "render/VideoMips.hpp"
 #include "scene/Evaluate.hpp"
 #include "sync/BeatClock.hpp"
@@ -73,7 +75,8 @@ namespace reforce::render { class LightsCapture; }
 namespace reforce::app {
 
 struct VisualizerOptions {
-    uint32_t width = 1920, height = 1080;
+    uint32_t width = 1920, height = 1080;  // render size (supersample x the output size)
+    int supersample = 1;                    // reforce.Supersample, for the Look panel's state
     std::uint64_t seed = 1;
     render::ScenePipelineOptions pipeline;
     engine::Settings prefs;
@@ -241,7 +244,7 @@ public:
     // A solid, an organic or a movie / live video sprite at full strength (or a movie prerolling): the slideshow
     // starts none of the three meanwhile (reforce.Slideshow.OneFeature).
     bool featureActive(double t) const;
-    // ---- Dancers (PLAN 5P): reforce.Dancer.package characters, drawn in full colour over the colorized frame.
+    // ---- Dancers (PLAN 5P): reforce.Dancer.package characters, drawn in full color over the colorized frame.
     // Up to reforce.Dancer.MaxLive at once (a new one sends the oldest off). False when dancers are unavailable.
     bool startDancer(std::shared_ptr<const scene::CompiledConfig> cfg, const std::string& label, double t,
                      const FadeSpec& fade);
@@ -266,10 +269,10 @@ public:
     // sprites) until a stop or kill. Session only. Returns how many.
     int holdVideoSprites();
     bool videoSpritesHeld() const;
-    // Colour video layer: opens `spec` (preroll on its own thread) and
+    // Color video layer: opens `spec` (preroll on its own thread) and
     // crossfades to it over params().crossfade once its first frame is in.
     void playVideoLayer(const video::SourceSpec& spec, double t);
-    // Fades the colour layer out over params().crossfade (0: at once).
+    // Fades the color layer out over params().crossfade (0: at once).
     void stopVideoLayer(double t);
     // One `videoset` key (engine::applyVideoSetting); "" or an error.
     std::string setVideoParam(const std::string& key, const std::string& value);
@@ -290,7 +293,7 @@ public:
         return d;
     }
     const engine::VideoLayerParams& videoParams() const { return videoParams_; }
-    // A source is on the colour layer (shown or fading).
+    // A source is on the color layer (shown or fading).
     bool videoLayerActive() const { return vlA_.src || vlB_.src; }
     bool videoToSyphon() const { return videoParams_.toSyphon; }
     void videoState(engine::VideoState& out, double t) const;
@@ -312,7 +315,7 @@ public:
     // One simulation step at time t.
     void step(MTL::CommandBuffer* cmd, double t, const audio::AudioFrame* audio);
     // Colorizes the latest simulation frame into `output` (display rate), with
-    // the colour video layer composited unless `withVideo` is false. `trackAlpha`: the output's alpha holds how
+    // the color video layer composited unless `withVideo` is false. `trackAlpha`: the output's alpha holds how
     // much must stay opaque in the Syphon alpha (encodeSyphonAlpha), else it is 1.
     // `backdrop`: the camera backdrop is mixed in after the visuals and before the dancers and text (encodeBackdrop);
     // the output is then opaque.
@@ -329,7 +332,7 @@ public:
     // Puts the panels back and stops their thread (App::onShutdown, after the GPU is idle).
     void shutdownLights();
     // The Syphon output with transparency (reforce.Syphon.Alpha, docs/syphon-alpha.md): `frame` colorized with
-    // trackAlpha, into `output` (same size, BGRA8) with the colour unchanged and the alpha keyed.
+    // trackAlpha, into `output` (same size, BGRA8) with the color unchanged and the alpha keyed.
     bool syphonAlpha() const { return syphonAlpha_; }
     void encodeSyphonAlpha(MTL::CommandBuffer* cmd, MTL::Texture* frame, MTL::Texture* output);
     // Camera backdrop (docs/backdrop.md): `spec` under everything (nullopt = off; fades in / out over 0.4 s).
@@ -406,6 +409,16 @@ private:
     // 3D solids (PLAN 5L): the solid pass; its targets are sprite textures of pipeline_ (declared after it, so
     // destroyed first). Null when it could not be created.
     std::unique_ptr<render::SolidPipeline> solids_;
+    // 3D models (PLAN 5R, docs/model-design.md): the model pass (shares solids_' slots; declared after it, so
+    // destroyed first) and the worker that loads models (declared after the pass it uploads with).
+    std::unique_ptr<render::ModelPipeline> models_;
+    std::unique_ptr<ModelLoader> modelLoader_;
+    std::vector<render::ModelDraw> modelColorDraws_;  // this step's look-B models (encodeColor after colorize)
+    void preloadModels();
+    std::filesystem::path contentDir_;  // reforce.ContentDir: camera presets (content/Camera)
+public:
+    void setContentDir(const std::filesystem::path& dir) { contentDir_ = dir; }
+private:
     // TEST HOOK (--solid-test): live test solids, each on its own target slot.
     struct LiveSolidTest {
         render::SolidTestSpec spec;
@@ -418,14 +431,22 @@ private:
     struct LiveSolid {
         std::unique_ptr<engine::SolidRun> run;
         int slot = -1;
+        // Model solids: the loader key, the model once resident, and what it takes to start the run again when
+        // the model arrives (it waits, invisible, while loading: `waiting`).
+        std::string modelKey;
+        std::shared_ptr<const render::ModelGpu> model;
+        bool waiting = false;
+        std::shared_ptr<const scene::CompiledConfig> cfg;
+        FadeSpec fade;
     };
     std::vector<LiveSolid> liveSolids_;
+    void stepModel(MTL::CommandBuffer* cmd, LiveSolid& s, double t, const engine::SpriteAudio& a);
     std::vector<render::SpriteQuad> opaqueSolids_;  // this step's ColorKey = 0 solids (encodeColorize)
-    std::vector<render::SpriteQuad> colourSolids_;  // this step's rubik solids, drawn in colour (encodeColorize)
+    std::vector<render::SpriteQuad> colorSolids_;  // this step's rubik solids, drawn in color (encodeColorize)
     std::vector<render::GlassDraw> glassDraws_;     // this step's glass puzzles (encodeGlass after colorize)
     engine::StickerPicker stickerPicker_;           // rubik sticker intensities for the current ColorMap
     int stickerLogged_ = -1;
-    engine::TilePicker tilePicker_;                 // the 15 puzzle's row colours and numbers for the current ColorMap
+    engine::TilePicker tilePicker_;                 // the 15 puzzle's row colors and numbers for the current ColorMap
     int tileLogged_ = -1;
     std::vector<std::unique_ptr<engine::OrganicRun>> organics_;  // start order
     void stepOrganics(double t, const audio::AudioFrame* audio);
@@ -455,7 +476,7 @@ private:
         const engine::DancerRun* run = nullptr;
         std::string text;
         bool placed = false;
-        float x = 0, y = 0, z = 0;   // stage point the tag's bottom centre sits on
+        float x = 0, y = 0, z = 0;   // stage point the tag's bottom center sits on
         float headY = 0;             // low-passed head-top height
         float scale = 0;             // the dancer's pop
         bool seen = false;
@@ -463,7 +484,7 @@ private:
         double bubbleAge = 0;        // seconds since it arrived
     };
     // Guest messages (web/Guests.hpp GuestMessage, Peter 2026-11-20): a speech bubble over the guest's dancer, above
-    // the name tag, for kBubbleSeconds (a new message replaces it). Drawn by bubbles_ in full colour (emoji).
+    // the name tag, for kBubbleSeconds (a new message replaces it). Drawn by bubbles_ in full color (emoji).
     static constexpr double kBubbleSeconds = 30;
     struct GuestBubble {
         const engine::DancerRun* run = nullptr;
@@ -657,9 +678,9 @@ private:
     double spriteTrails_ = 0.35;                                               // reforce.SpriteTrails
     bool spriteIgnoreAlpha_ = false;                                           // reforce.SpriteAlpha = ignore
     double spriteMix_ = 0, movieSpriteMix_ = 0;                                // reforce.Sprite.Mix / MovieSprite.Mix
-    // reforce.MovieSprite.Colour = over (PLAN 5K): movie / live sprites skip the intensity buffer; their frames are
-    // drawn in colour over the colorized frame (colourQuads_, alpha = envelope x (0.5 + 0.5 movie Mix)).
-    bool movieColourOver_ = false;
+    // reforce.MovieSprite.Color = over (PLAN 5K): movie / live sprites skip the intensity buffer; their frames are
+    // drawn in color over the colorized frame (colorQuads_, alpha = envelope x (0.5 + 0.5 movie Mix)).
+    bool movieColorOver_ = false;
     // Syphon alpha (reforce.Syphon.Alpha; videoset syphonalpha / keysimilarity / keysmoothness, OBS's units).
     bool syphonAlpha_ = true, syphonPremultiplied_ = false;
     bool windowVisualsOnly_ = false;
@@ -671,9 +692,9 @@ private:
     void applyLightsSettings();
     void captureLights(MTL::CommandBuffer* cmd, MTL::Texture* frame);
     double keySimilarity_ = 80, keySmoothness_ = 50;
-    std::vector<render::SpriteQuad> colourQuads_;  // this step's colour sprites, drawn by every colorize until the next
-    std::vector<video::FramePtr> colourFrames_;     // their frames, kept alive for those colorize passes
-    std::vector<video::FramePtr> colourHold_;       // scratch for holdFrames
+    std::vector<render::SpriteQuad> colorQuads_;  // this step's color sprites, drawn by every colorize until the next
+    std::vector<video::FramePtr> colorFrames_;     // their frames, kept alive for those colorize passes
+    std::vector<video::FramePtr> colorHold_;       // scratch for holdFrames
     // Camera backdrop (reforce.Backdrop.*; videoset backdrop / backdropmirror / backdropfit / backdropopacity).
     std::optional<video::SourceSpec> bdWanted_;          // what should show (nullopt = off)
     std::unique_ptr<video::VideoSource> bdSrc_, bdPending_;  // shown (or fading out) / opening

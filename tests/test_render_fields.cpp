@@ -103,13 +103,13 @@ TEST_CASE("fields: a ripple spreads at its speed, stays bounded and dies away") 
     auto h = readHeights(q, fields, 0);
     const int cw = fields.rippleCols(), ch = fields.rippleRows();
     auto at = [&](int x, int y) { return h[std::size_t(y * cw + x)]; };
-    // The drop: a bump about 1 high at the centre (it has not moved yet).
+    // The drop: a bump about 1 high at the center (it has not moved yet).
     CHECK(at(cw / 2, ch / 2) == doctest::Approx(1.0).epsilon(0.25));
     float peak0 = 0;
     for (float v : h) peak0 = std::max(peak0, std::abs(v));
     CHECK(peak0 < 1.5f);
 
-    // One second later the ring's crest is about speed * 1 s = 45 cells from the centre.
+    // One second later the ring's crest is about speed * 1 s = 45 cells from the center.
     step(60);
     h = readHeights(q, fields, 0);
     int bestR = -1;

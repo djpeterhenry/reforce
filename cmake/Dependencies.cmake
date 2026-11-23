@@ -40,6 +40,15 @@ FetchContent_Declare(doctest
     EXCLUDE_FROM_ALL
 )
 
+# --- cgltf (MIT) --------------------------------------------------------------
+# Single-header glTF 2.0 loader for 3D model Objects (docs/model-design.md). The
+# implementation is compiled once in src/engine/ModelFile.cpp.
+FetchContent_Declare(cgltf
+    GIT_REPOSITORY https://github.com/jkuhlmann/cgltf.git
+    GIT_TAG        360db1a95480fe102ae9c69b27c5d101167ff5ba  # v1.15
+    SOURCE_SUBDIR  reforce-no-cmake
+)
+
 # --- Ableton Link (GPL-2.0-or-later; Peter OK'd the GPL for this private project,
 # 2026-11-12) ------------------------------------------------------------------
 # Header-only tempo/beat/phase sync (rekordbox Performance mode "LINK"). Only
@@ -56,7 +65,7 @@ FetchContent_Declare(ableton_link
 
 # metal-cpp and Syphon have no CMakeLists.txt, so MakeAvailable only downloads
 # them; their targets are defined below / in third_party/syphon.
-set(_reforce_fetch metal_cpp syphon ableton_link)
+set(_reforce_fetch metal_cpp syphon ableton_link cgltf)
 if(REFORCE_BUILD_TESTS)
     list(APPEND _reforce_fetch doctest)
 endif()
@@ -68,6 +77,9 @@ target_link_libraries(metal_cpp INTERFACE
     "-framework Foundation" "-framework Metal" "-framework QuartzCore")
 
 add_subdirectory(third_party/syphon)
+
+add_library(cgltf INTERFACE)
+target_include_directories(cgltf SYSTEM INTERFACE "${cgltf_SOURCE_DIR}")
 
 # AbletonLinkConfig.cmake sets CMAKE_CXX_STANDARD 17 in our scope: keep ours.
 set(_reforce_cxx_std ${CMAKE_CXX_STANDARD})

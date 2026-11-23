@@ -452,11 +452,11 @@ TEST_CASE("video commands (Phase 5F): text form, JSON, validation, state and sou
     // Validation.
     CHECK_FALSE(web::parseCommandJson(R"({"action":"videoset","key":"opacity","value":3})").ok());
     CHECK_FALSE(web::parseCommandJson(R"({"action":"videoset","key":"bogus","value":1})").ok());
-    // Keys the Visualizer handles (panel toggles): beat sync, full-colour movie sprites (PLAN 5K).
+    // Keys the Visualizer handles (panel toggles): beat sync, full-color movie sprites (PLAN 5K).
     CHECK(web::parseCommandJson(R"({"action":"videoset","key":"beatsync","value":true})").ok());
-    CHECK(web::parseCommandJson(R"({"action":"videoset","key":"spritecolour","value":"over"})").ok());
-    CHECK(web::parseCommandJson(R"({"action":"videoset","key":"spritecolour","value":"off"})").ok());
-    CHECK_FALSE(web::parseCommandJson(R"({"action":"videoset","key":"spritecolour","value":"under"})").ok());
+    CHECK(web::parseCommandJson(R"({"action":"videoset","key":"spritecolor","value":"over"})").ok());
+    CHECK(web::parseCommandJson(R"({"action":"videoset","key":"spritecolor","value":"off"})").ok());
+    CHECK_FALSE(web::parseCommandJson(R"({"action":"videoset","key":"spritecolor","value":"under"})").ok());
     // Syphon alpha (docs/syphon-alpha.md).
     CHECK(web::parseCommandJson(R"({"action":"videoset","key":"syphonalpha","value":true})").ok());
     CHECK(web::parseCommandJson(R"({"action":"videoset","key":"keysimilarity","value":80})").ok());
@@ -594,14 +594,14 @@ TEST_CASE("library: the extra sprite folder (reforce.ExternalSpritesDir) joins t
     REQUIRE(sp->configs.size() == 1);  // the movie is on the skip list
     CHECK(sp->configs[0].id == "External/images/  dj peter henry");
     CHECK(sp->configs[0].name == "  dj peter henry");
-    // A favourite button's command passes validation against this library.
+    // A favorite button's command passes validation against this library.
     const auto r = web::parseCommandJson(R"({"layer":"sprite","action":"switch","config":"External/images/  dj peter henry"})",
                                          &lib);
     CHECK(r.ok());
     fs::remove_all(ext);
 }
 
-TEST_CASE("favourites: parse and join") {
+TEST_CASE("favorites: parse and join") {
     const auto f = web::parseFavorites("sprite:External/images/  dj peter henry;\nWaveShape:Corona; x:y; colormap:");
     REQUIRE(f.size() == 2);
     CHECK(f[0].id == "External/images/  dj peter henry");

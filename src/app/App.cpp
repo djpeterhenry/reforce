@@ -22,13 +22,14 @@
 #include "platform/SyphonPublisher.hpp"
 #include "render/Presenter.hpp"
 #include "render/Renderer.hpp"
+#include "render/Downsample.hpp"
 #include "sync/DeckFeed.hpp"
 #include "sync/LinkClock.hpp"
 #include "video/VideoSource.hpp"
 
 namespace reforce::app {
 
-// The offscreen frame is a single texture, so the GPU serialises frames on the
+// The offscreen frame is a single texture, so the GPU serializes frames on the
 // one queue anyway. Cap CPU run-ahead instead of blocking the main thread.
 constexpr int kMaxFramesInFlight = 2;
 
@@ -59,7 +60,8 @@ App::App(MTL::Device* device, const AppOptions& options, std::unique_ptr<Directo
     : options_(options),
       device_(device->retain()),
       queue_(device->newCommandQueue()),
-      renderer_(std::make_unique<render::Renderer>(device, options.frameWidth, options.frameHeight)),
+      renderer_(std::make_unique<render::Renderer>(device, options.frameWidth * uint32_t(std::max(1, options.supersample)),
+                                                   options.frameHeight * uint32_t(std::max(1, options.supersample)))),
       presenter_(std::make_unique<render::Presenter>(device, *renderer_)),
       syphon_(std::make_unique<platform::SyphonPublisher>(device, options.syphonName)),
       director_(std::move(director)),
@@ -68,6 +70,12 @@ App::App(MTL::Device* device, const AppOptions& options, std::unique_ptr<Directo
       inFlight_(std::make_shared<std::atomic<int>>(0)),
       gpu_(std::make_shared<GpuStats>()),
       stats_(std::make_shared<perf::FrameStats>(8192)) {
+    if (options_.supersample > 1) {
+        downsampler_ = std::make_unique<render::Downsampler>(device, options.frameWidth, options.frameHeight,
+                                                             options.supersample);
+        std::fprintf(stderr, "[reforce] supersample %dx: rendering %ux%u, output %ux%u\n", options.supersample,
+                     renderer_->width(), renderer_->height(), options.frameWidth, options.frameHeight);
+    }
     if (audio_ && !options_.fixedStep) audio_->startControl();
     if (options_.link && !options_.fixedStep) {
         link_ = std::make_unique<sync::LinkClock>(options_.linkQuantum, 120.0, options_.linkFollow);
@@ -161,7 +169,7 @@ void App::onFrame(const platform::FrameInfo& frame) {
     if (steps > 1) perf::tag(perf::TagCatchUp);
     double simMs = 0, colorizeMs = 0;
     bool splitVideo = false, syphonAlpha = false, backdrop = false, windowVisuals = false;
-    // The window's own frame: with the colour video layer when Syphon gets the plain visualizer, or the visuals
+    // The window's own frame: with the color video layer when Syphon gets the plain visualizer, or the visuals
     // alone (reforce.Window.VisualsOnly); created on first use.
     auto windowFrame = [&]() -> MTL::Texture* {
         if (!windowFrame_) {
@@ -196,7 +204,7 @@ void App::onFrame(const platform::FrameInfo& frame) {
         }
         simMs = msSince(c0);
         // Present/colorize/Syphon at display rate (re-colorizes the latest sim frame).
-        // The colour video layer is composited here too; with Syphon set to
+        // The color video layer is composited here too; with Syphon set to
         // the plain visualizer the window gets its own composite below.
         const auto k0 = Clock::now();
         const Visualizer& vis = director_->visualizer();
@@ -234,6 +242,8 @@ void App::onFrame(const platform::FrameInfo& frame) {
             published = syphonFrame_;
         }
     }
+    // Supersampling: what leaves reforce is averaged down to the output size (color first, then the average).
+    if (downsampler_) published = downsampler_->encode(cmd, published, 0);
     syphon_->publish(published, cmd);
 
     // The window present runs on its own thread (it may block in nextDrawable,
@@ -248,6 +258,7 @@ void App::onFrame(const platform::FrameInfo& frame) {
         } else if (windowVisuals && windowFrame_) {
             shown = windowFrame_;  // filled by the main pass above
         }
+        if (downsampler_) shown = downsampler_->encode(cmd, shown, 1);
         presenter_->setLayer(frame.layer);
         presenter_->encodeCapture(cmd, shown);
     }
@@ -351,7 +362,7 @@ void App::stress(double now) {
         q.push(engine::Command::kill(engine::Layer::Sprite));
     }
     if (stressTick_ % 6 == 0) q.push(engine::Command::kill(engine::Layer::Object));
-    // Phase 5F: video start/stop on the colour layer (crossfades interrupted
+    // Phase 5F: video start/stop on the color layer (crossfades interrupted
     // now and then), movie sprites, blend changes.
     const auto& videos = director_->videoFiles();
     if (!videos.empty()) {
@@ -437,13 +448,13 @@ std::vector<platform::MenuItem> App::videoMenu() {
         }
         return out;
     };
-    MenuItem layer{"", "Colour Layer"};
+    MenuItem layer{"", "Color Layer"};
     layer.children = sources("video:layer:", true);
     items.push_back(std::move(layer));
     MenuItem sprite{"", "Video Sprite"};
     sprite.children = sources("video:sprite:", false);
     items.push_back(std::move(sprite));
-    MenuItem stopLayer{"videostop:layer", "Stop Colour Layer"};
+    MenuItem stopLayer{"videostop:layer", "Stop Color Layer"};
     stopLayer.enabled = v.layerActive || !v.layerPending.empty();
     stopLayer.separatorBefore = true;
     items.push_back(std::move(stopLayer));

@@ -136,3 +136,53 @@ TEST_CASE("prefs: reforce.BeatClock.SteadyTempo (default on)") {
     { std::ofstream(js) << "{ \"reforce.BeatClock.SteadyTempo\": 0 }"; }
     CHECK(!loadSettings(js.string()).beatClockSteadyTempo);
 }
+
+// ---- unknown settings and Look values are reported, not ignored silently (Peter 2026-11-22) ----
+#include <regex>
+
+#include "engine/Look.hpp"
+
+TEST_CASE("settings: keys reforce does not read are listed; known ones are not") {
+    const fs::path p = fs::temp_directory_path() / "reforce_unknown_settings.json";
+    {
+        std::ofstream out(p);
+        out << "{\n  \"reforce.Object.MaxLive\": 1,\n  \"reforce.MovieSprite.Colour\": \"off\",\n"
+               "  \"reforce.LineEdges\": \"colour\",\n  \"Reforce.ThinLines\": \"smooth\"\n}\n";
+    }
+    const Settings s = loadSettings(p.string());
+    fs::remove(p);
+    REQUIRE(s.loaded);
+    CHECK(s.unknownKeys == std::vector<std::string>{"reforce.MovieSprite.Colour"});  // keys match case-insensitively
+    const auto problems = lookSettingProblems(s);
+    REQUIRE(problems.size() == 1);
+    CHECK(problems[0] == "reforce.LineEdges: \"colour\" is not gforce | color (using gforce)");
+}
+
+TEST_CASE("settings: every key reforce writes is one it reads (no false 'unknown setting' warnings)") {
+    // Keys written by literal name anywhere in src/ (PrefsTable::set and the Look panel's save), each loaded back.
+    std::set<std::string> keys;
+    const std::regex setCall(R"re(\.set\("((?:reforce|WaveShape|ColorMap|FlowField|Particle|Sprite|Object|Dancer|Graphics)\.[A-Za-z0-9.]+)")re");
+    for (const auto& e : fs::recursive_directory_iterator(fs::path(REFORCE_SOURCE_DIR) / "src")) {
+        if (!e.is_regular_file()) continue;
+        const auto ext = e.path().extension().string();
+        if (ext != ".cpp" && ext != ".hpp" && ext != ".mm") continue;
+        std::ifstream in(e.path());
+        std::stringstream ss;
+        ss << in.rdbuf();
+        const std::string text = ss.str();
+        for (std::sregex_iterator it(text.begin(), text.end(), setCall), end; it != end; ++it) keys.insert((*it)[1]);
+    }
+    for (const auto& k : lookKeys()) keys.insert(k.settingsKey);
+    REQUIRE(keys.size() > 20);
+    const fs::path p = fs::temp_directory_path() / "reforce_written_settings.json";
+    {
+        std::ofstream out(p);
+        out << "{\n";
+        std::size_t n = 0;
+        for (const auto& k : keys) out << "  \"" << k << "\": \"1\"" << (++n < keys.size() ? ",\n" : "\n");
+        out << "}\n";
+    }
+    const Settings s = loadSettings(p.string());
+    fs::remove(p);
+    for (const auto& k : s.unknownKeys) CHECK_MESSAGE(false, "written but never read: " << k);
+}

@@ -11,7 +11,7 @@
 //     rush out), easing in over the first beat and softly capped at Deep; over the last
 //     Out beats it eases back to 0 (a rush back out to the whole set), so the next dive starts from the same
 //     overview: no cut on the phrase line.
-//   - The view centre slides from the overview's centre to the target as it zooms (C = T + (H - T) 2^(-1.5 depth)),
+//   - The view center slides from the overview's center to the target as it zooms (C = T + (H - T) 2^(-1.5 depth)),
 //     so the target drifts into the middle of the frame.
 //   - Started mid-dive (by hand: the slideshow waits for a dive line with SBar), it starts from the overview and
 //     catches up at Ent doublings a beat to where the dive is, then follows it.
@@ -60,7 +60,7 @@ struct MandelTarget {
 int mandelTargetCount();
 const MandelTarget& mandelTarget(int i);  // i wraps
 
-// The overview: the whole set, centred on (kHomeRe, 0), +-kHomeHalf high at Scal 1.
+// The overview: the whole set, centered on (kHomeRe, 0), +-kHomeHalf high at Scal 1.
 constexpr double kMandelHomeRe = -0.65;
 constexpr double kMandelHomeHalf = 1.25;
 
@@ -88,7 +88,7 @@ struct MandelView {
     int target = 0;         // index into mandelTargets
     double pos = 0;         // 0..1 through the dive
     double depth = 0;       // log2 magnification (after kicks and drops)
-    double cx = kMandelHomeRe, cy = 0;  // view centre
+    double cx = kMandelHomeRe, cy = 0;  // view center
     double half = kMandelHomeHalf;      // half the frame height in plane units (before Scal)
     double turn = 0;                    // radians added to Rot: a mini turns upright as the dive lands on it
     bool mini = false;                  // a mini fills a good part of the frame: its affine interior test is safe

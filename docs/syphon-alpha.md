@@ -16,23 +16,23 @@ Instead of a camera layered in OBS, reforce can draw the camera itself with the 
 
 ## What is keyed
 
-The output's alpha is `opaque + (1 - opaque) * key(colour)`:
+The output's alpha is `opaque + (1 - opaque) * key(color)`:
 
-- **key(colour)** is OBS's Color Key (v2) on black: `clamp((|rgb| - similarity) / smoothness, 0, 1)`, with `|rgb|`
+- **key(color)** is OBS's Color Key (v2) on black: `clamp((|rgb| - similarity) / smoothness, 0, 1)`, with `|rgb|`
   the distance from black of the 8-bit sRGB values and similarity / smoothness in OBS's units divided by 1000
   (`reforce.Syphon.KeySimilarity` = 80, `reforce.Syphon.KeySmoothness` = 50, both 1..1000, on the Video card while
   Syphon alpha is on). With the same numbers as the old OBS filter, the visuals look the same as before.
 - **opaque** is built up while the frame is drawn, in the frame texture's alpha (0 after colorize):
-  - Full-colour movie sprites (`reforce.MovieSprite.Colour = over`) with `ColorKey = 0` in their `.reforce.txt`
+  - Full-color movie sprites (`reforce.MovieSprite.Color = over`) with `ColorKey = 0` in their `.reforce.txt`
     raise it by their opacity. Other movies are keyed like the visuals. Movies drawn as luminance into the visuals
-    (Colour = off) are part of the visuals and always keyed.
+    (Color = off) are part of the visuals and always keyed.
   - 3D solids with `ColorKey = 0` (e.g. Rubik Cube) raise it by their coverage times their opacity, so the whole
-    solid stays opaque, dark colours included (`encodeColorize`'s opaque solids: the solid target's alpha, max
+    solid stays opaque, dark colors included (`encodeColorize`'s opaque solids: the solid target's alpha, max
     blend). Other solids are part of the visuals and keyed.
   - Dancers: the bodies set it to 1, and so does the disco floor where it covers the frame (its faded edges by
     their coverage). Floor shadows outside the floor set it to their darkness, so they darken the camera behind.
 
-The colour is never changed (straight alpha, which OBS expects). `reforce.Syphon.AlphaPremultiplied = 1`
+The color is never changed (straight alpha, which OBS expects). `reforce.Syphon.AlphaPremultiplied = 1`
 multiplies it by the alpha for a client that wants premultiplied alpha.
 
 ## Where it happens

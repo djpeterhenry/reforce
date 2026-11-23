@@ -21,7 +21,7 @@ and the audio clock gives neither. So:
 1. **Auto-align** (`reforce.Phrase.AutoAlign`, on): after every beat, the boundary two beats back is scored by how
    much the loudness (mean of LEVEL and BASS) of the 2 beats after it differs from the 4 beats before
    (|log ratio| >= .25). Scores go into a histogram over the phrase's beats that forgets over ~4 phrases. Its peak,
-   once clear (>= 1 and >= 1.5 x the next best that is not a neighbour), is the phrase start; with Link only bar
+   once clear (>= 1 and >= 1.5 x the next best that is not a neighbor), is the phrase start; with Link only bar
    lines are candidates. An existing origin moves only for a peak 1.25 x stronger. Drops (below) vote too.
 2. **Phrase starts now** (panel button, `beatset:phrasenow`): snaps to the nearest bar line (Link) or beat (audio)
    and votes strongly, so auto keeps it unless the music keeps disagreeing. **‹ bar / bar ›** nudge it.
@@ -79,7 +79,7 @@ Panel: **Deck starts** toggle (`reforce.Phrase.DeckStarts`, on); status "deck N 
 deck (▶ / ■, up / down, ★ the start in use, ✓ used before, (start) waiting for its fader) and whether rkbx_link and
 the MIDI source are there. Log: `phrase: deck N start|hot cue|fader, X beats ago -> phrase line at beat B`.
 
-Tests (tests/test_sync_deckstarts.cpp): a simulated rekordbox (120 Hz frames, buffer-quantised positions): start on
+Tests (tests/test_sync_deckstarts.cpp): a simulated rekordbox (120 Hz frames, buffer-quantized positions): start on
 an audible deck, a deck already playing sets nothing, fader down then up, the off-phrase start replaced by the
 restart, loops / beat jumps / hot cues (pad before and after the jump, a stale pad), jog nudge, pitch, a fader first
 seen down, the crossfader, no beatgrid; datagram and MIDI parsing; the phrase clock keeping a deck origin against
@@ -94,7 +94,7 @@ stars). Content: Pendulum Wave, Pendulum Wave (Side), Pendulum Ring.
 
 ## Kick zoom (5O.3, render/ScenePipeline flow pass)
 
-On every beat the FlowField's source coordinates are scaled by (1 - zoom) and turned about the centre (aspect-correct),
+On every beat the FlowField's source coordinates are scaled by (1 - zoom) and turned about the center (aspect-correct),
 with a pulse exp(-age / decay): trails surge outward (and turn) with the kick. The pulse comes from the beat clock when
 it is confident (exactly on the grid, with the beat offset), else from the detected onsets (BEAT). Settings
 `reforce.Kick.Zoom` (0 = off, the default; .01 = 1 % per frame at the peak), `reforce.Kick.Rotate` (degrees per frame),
@@ -152,7 +152,7 @@ envelope and trails. Slots = `reforce.Object.MaxLive` + 1 (the spare for a cross
   the set's edge in a seeded order, the magnification doubling every `Dbl` beats (2: about 2^30 by the end of a
   phrase), easing in over the first beat and softly capped at `Deep`; over the last `Out` beats (4) it rushes back
   out to the whole set, so the phrase line itself is seamless and the next dive starts from the same overview. The
-  view centre slides from the overview's centre to the target as it zooms (T + (H - T) 2^(-1.5 depth)). Beats: the
+  view center slides from the overview's center to the target as it zooms (T + (H - T) 2^(-1.5 depth)). Beats: the
   escape-count bands flow inward one band per beat; started mid-dive (by hand; from the slideshow the configs' `SBar`
   waits for a dive line) it starts from the whole set and catches up at `Ent` doublings a beat; every beat line surges the zoom in by `Kick` doublings, relaxing
   over the beat; a drop (SYNC_DROP) pulls out by `Drop` doublings with an 80 ms attack, then follows the drop's decay
@@ -168,7 +168,7 @@ envelope and trails. Slots = `reforce.Object.MaxLive` + 1 (the spare for a cross
     doublings: on the west antenna (period 13, 2^20, spiky antenna crown), in elephant valley (p19, 2^19, lace
     around it), by the snowflake branch (p20, 2^19), south (p49, 2^31.5, a ring of fine teeth).
   - Decor (3): the ring of Julia-like decorations a dive passes on its way to a deep mini, ending about half way down
-    (in log) centred on the mini: a swirl ring (p112 mini, 2^23), a spiral ring (p49, 2^27), a star (p32, 2^24).
+    (in log) centered on the mini: a swirl ring (p112 mini, 2^23), a spiral ring (p49, 2^27), a star (p32, 2^24).
   Misiurewicz points (the boundary passes through each and looks the same at every depth) by Newton in 50 digits
   from random seeds per valley, exact (k, p) checked; the branch points (top M(4,1), west antenna M(3,1), period-3
   bulb M(10,2), south dendrite M(7,1)) dropped. Minis: the period a small box near a Misiurewicz point first
@@ -182,13 +182,13 @@ envelope and trails. Slots = `reforce.Object.MaxLive` + 1 (the spare for a cross
   with no false insides against the CPU (render test, every mini, upright and turned); 33-40 % less GPU time
   (`Aff` 0 turns it off). Tried and not worth it: derivative / periodicity interior tests (catch an inside pixel only
   after ~37-53 periods), series approximation (the deltas stop being linear within one period).
-  Precision: float32 pixelates past ~2^17 (at 2^30 the whole frame is one float: one flat colour). Two deep paths,
+  Precision: float32 pixelates past ~2^17 (at 2^30 the whole frame is one float: one flat color). Two deep paths,
   both checked against a CPU double reference (the render test at 2^30, by hand at 2^33, 2^38, 2^44: > 99.9 % of
   pixels shaded the same, except double-float at 2^44, 97 %):
   double-float (float2 hi + lo, two-sum / fma two-product, ~48 bits, its own library compiled without fast math),
-  and perturbation (the view centre's orbit in double on the CPU each frame, each pixel iterating only its float
+  and perturbation (the view center's orbit in double on the CPU each frame, each pixel iterating only its float
   difference e' = 2 Z e + e^2 + dc, rebasing to the reference's start when |z| < |e|: no glitches, one reference).
-  The default (`Prec` 0) is float32 to 2^12, perturbation beyond; both stay clean to ~2^40 (the double centre is
+  The default (`Prec` 0) is float32 to 2^12, perturbation beyond; both stay clean to ~2^40 (the double center is
   the limit; df64 starts to drift at 2^44, perturbation holds). Shading comes from the distance estimate in pixels,
   so it looks the same at every depth. Content (Peter's 2026-11-22 review): one config, Mandelbrot Dive: one dive of `Dive` bars (32; PBar="Dive", so
   that one number sets the length), paced (Dbl 0) to 2^32 just before 4 bars out; from the slideshow it starts on a

@@ -1,7 +1,7 @@
 # reforce black-box probe run 44 (G-Force script, Python 2.7): does a sprite's own .txt replace the package's
 # _default_sprite_params.txt (EPen 1, X/Y 0) or merge with it? build/probe-sprites44/'zz m pen': the run 26 band image
 # (600x382) with a .txt holding only Pen=".5". Void field. Merged: EPen 1 replaces the display (white band 255);
-# alone: the Pen stamp shows (127). Fit (no Flag): cover (full frame) or native (600x382 in the centre).
+# alone: the Pen stamp shows (127). Fit (no Flag): cover (full frame) or native (600x382 in the center).
 # PROBE_PREFS Sprite.Transition.Duration=2, deviation 0.
 def ws( name, morph = 0 ):  vis.StartConfig( 'WaveShape', name, morph )
 def cm( name, morph = 0 ):  vis.StartConfig( 'ColorMap', name, morph )

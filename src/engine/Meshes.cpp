@@ -87,7 +87,7 @@ std::vector<V3> platonicVertices(MeshKind k) {
     return normalized(v);
 }
 
-// Faces of the convex hull of a small, centred point set: ordered (counter-clockwise from outside) index lists.
+// Faces of the convex hull of a small, centered point set: ordered (counter-clockwise from outside) index lists.
 std::vector<std::vector<int>> hullFaces(const std::vector<V3>& v) {
     const int n = int(v.size());
     const double eps = 1e-7;
@@ -112,7 +112,7 @@ std::vector<std::vector<int>> hullFaces(const std::vector<V3>& v) {
                 }
                 if (!ok || on.size() < 3) continue;
                 if (faces.count(on)) continue;
-                // order around the face centre, counter-clockwise seen from outside (along nrm)
+                // order around the face center, counter-clockwise seen from outside (along nrm)
                 V3 c{0, 0, 0};
                 for (int q : on) c = add(c, v[q]);
                 c = mul(c, 1.0 / double(on.size()));
@@ -243,7 +243,7 @@ Mesh torus(int detail) {
 }
 
 // One Rubik cubie (see MeshKind::Rubik): per direction d (+x, -x, +y, -y, +z, -z) the body face (uv (d, 0)) and a
-// raised sticker (uv (d, 1)); `edge` runs 0 at the sticker border to 1 at its centre.
+// raised sticker (uv (d, 1)); `edge` runs 0 at the sticker border to 1 at its center.
 Mesh cubie() {
     Mesh m;
     m.kind = MeshKind::Rubik;
@@ -261,7 +261,7 @@ Mesh cubie() {
         for (int k = 0; k < 4; ++k)
             for (int j = 0; j < 3; ++j)
                 c[k][std::size_t(j)] = n[std::size_t(j)] * offset + (u[std::size_t(j)] * cu[k] + v[std::size_t(j)] * cv[k]) * half;
-        // Stickers: a fan around the centre so `edge` is 1 there and 0 on the border; body faces: two triangles.
+        // Stickers: a fan around the center so `edge` is 1 there and 0 on the border; body faces: two triangles.
         if (sticker) {
             V3 ctr{n[0] * offset, n[1] * offset, n[2] * offset};
             for (int k = 0; k < 4; ++k) {
@@ -316,7 +316,7 @@ std::optional<MeshKind> parseMeshKind(std::string_view name) {
         {"tetrahedron", MeshKind::Tetrahedron}, {"cube", MeshKind::Cube},       {"octahedron", MeshKind::Octahedron},
         {"dodecahedron", MeshKind::Dodecahedron}, {"icosahedron", MeshKind::Icosahedron}, {"sphere", MeshKind::Sphere},
         {"torus", MeshKind::Torus},             {"prism", MeshKind::Prism},           {"rubik", MeshKind::Rubik},
-        {"fifteen", MeshKind::Fifteen}};
+        {"fifteen", MeshKind::Fifteen},           {"model", MeshKind::Model}};
     for (const auto& [n, k] : kNames)
         if (s == n) return k;
     return std::nullopt;
@@ -334,6 +334,7 @@ const char* meshKindName(MeshKind k) {
         case MeshKind::Prism: return "prism";
         case MeshKind::Rubik: return "rubik";
         case MeshKind::Fifteen: return "fifteen";
+        case MeshKind::Model: return "model";
     }
     return "?";
 }
@@ -344,6 +345,12 @@ Mesh makeMesh(MeshKind kind, int detail) {
         case MeshKind::Torus: return torus(detail);
         case MeshKind::Rubik: return cubie();
         case MeshKind::Fifteen: return puzzleTile();
+        case MeshKind::Model: {
+            Mesh m;
+            m.kind = MeshKind::Model;
+            m.convex = false;
+            return m;
+        }
         default: return polyhedron(kind);
     }
 }
@@ -488,14 +495,14 @@ Mesh makeGlassButton(double half, double corner, double height, double bevel, in
             at(int(r) + 1, i, p[3], nn[3]);
             for (int q : {0, 1, 2, 0, 2, 3}) m.vertices.push_back(vert(p[q], norm(nn[q]), p[q][0], p[q][1], 0.0));
         }
-    // The cap: a fan from the centre over the top ring.
+    // The cap: a fan from the center over the top ring.
     const int top = int(rings.size()) - 1;
-    const V3 up{0, 0, 1}, centre{0, 0, height};
+    const V3 up{0, 0, 1}, center{0, 0, height};
     for (int i = 0; i < n; ++i) {
         V3 a, b, na, nb;
         at(top, i, a, na);
         at(top, i + 1, b, nb);
-        m.vertices.push_back(vert(centre, up, 0.0, 0.0, 1.0));
+        m.vertices.push_back(vert(center, up, 0.0, 0.0, 1.0));
         m.vertices.push_back(vert(a, up, a[0], a[1], 1.0));
         m.vertices.push_back(vert(b, up, b[0], b[1], 1.0));
     }

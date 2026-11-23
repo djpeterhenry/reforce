@@ -201,7 +201,7 @@ void OrganicRun::buildTree(int strike) {
         p.pointsX = std::move(v[0]);
         p.pointsY = std::move(v[1]);
     } else {
-        // Default crown: an ellipse .9 x .55 centred at (0, .3), evenly filled.
+        // Default crown: an ellipse .9 x .55 centered at (0, .3), evenly filled.
         expr::Pcg32 rng(seed_ ^ 0x7ee5ULL ^ salt);
         for (int i = 0; i < pts; ++i) {
             const double a = rng.uniform01Exclusive() * 2 * kPi, r = std::sqrt(rng.uniform01());
@@ -867,7 +867,7 @@ void OrganicRun::step(double t, const SpriteAudio& audio, const FrameMapping& ma
     }
 
     // Leaves: a path of their own over the branches. Each is a pointed oval of two hard-edged capsules (a body and a
-    // narrower tip; an anti-aliased rim on a fat stroke takes unrelated ColorMap colours), on its twig's displayed
+    // narrower tip; an anti-aliased rim on a fat stroke takes unrelated ColorMap colors), on its twig's displayed
     // position and direction (so it rustles with the sway), turned LeafA off it (tips: almost straight on),
     // fluttering by LFlt. It unfurls over LeafU beats once its node is on an outer twig (opening from along it).
     // While the tree withers they come loose, staggered, and fall turning and shrinking.

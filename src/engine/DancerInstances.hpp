@@ -4,13 +4,13 @@
 // they draw exactly the same thing. Layout (float4 each, kDancerInstFloats in all):
 //   m0 m1 m2 m3   model columns (scale across the axis folded into m0 / m2)
 //   n0 n1 n2      normal matrix columns
-//   c0            colour0, material        c1     colour1, split (local y)
+//   c0            color0, material        c1     color1, split (local y)
 //   geo           len, r0, r1, outline     clip   local plane: discard where dot(p, xyz) > w
-//   face          mouth, blink, brow, strand look (hair)    eyes   eye colour, parting (hair)
+//   face          mouth, blink, brow, strand look (hair)    eyes   eye color, parting (hair)
 //   style         pattern0, pattern1, fabric0, fabric1 (Lens: shape, side, kind, -)
-//   ink           print colour, repeat     faceA  eye shape, brows, mouth style, beard
+//   ink           print color, repeat     faceA  eye shape, brows, mouth style, beard
 //   faceB         lashes, freckles, blush, lipstick
-//   lips          lip colour (hair: the second clip plane)  beard  beard colour
+//   lips          lip color (hair: the second clip plane)  beard  beard color
 
 #include "engine/DancerRig.hpp"
 

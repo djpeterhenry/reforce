@@ -76,15 +76,15 @@ public:
     int orphans() const { return orphans_; }
     int brickCount() const { return int(bricks_.size()); }
     struct Brick {
-        double x, y, w, h;  // centre and size (wall in place)
+        double x, y, w, h;  // center and size (wall in place)
         float pen;
         double broken;  // beat the brick breaks (planned)
     };
     const std::vector<Brick>& bricks() const { return bricks_; }
-    double paddleX(double u) const;  // paddle centre
-    double ballContactY() const { return padContact_; }  // ball centre when it touches the paddle
+    double paddleX(double u) const;  // paddle center
+    double ballContactY() const { return padContact_; }  // ball center when it touches the paddle
     double ballRadius() const { return 0.5 * p_.ball; }
-    // Ball `i`'s centre at beat `u` (false while it is not in play then).
+    // Ball `i`'s center at beat `u` (false while it is not in play then).
     bool ballAt(int i, double u, double& x, double& y) const;
     std::string summary() const;
 
@@ -190,7 +190,7 @@ private:
     int finale_ = 0;                 // the brick the last ones gather around
     std::vector<Seg> segs_;
     std::vector<BallState> st_;
-    std::vector<std::pair<double, double>> padKeys_;  // (beat, paddle centre) at ball 0's paddle hits
+    std::vector<std::pair<double, double>> padKeys_;  // (beat, paddle center) at ball 0's paddle hits
     std::vector<Frag> prevFrags_;                      // pieces of earlier walls still flying
 };
 

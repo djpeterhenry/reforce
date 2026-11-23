@@ -14,7 +14,7 @@ CFURLRef fileUrl(const std::string& path) {
 }
 
 // The same pixels with the alpha channel reinterpreted as padding (NoneSkipLast / NoneSkipFirst), so drawing
-// keeps the straight colour. Null when the image has no straight alpha or Quartz rejects the layout.
+// keeps the straight color. Null when the image has no straight alpha or Quartz rejects the layout.
 CGImageRef withoutAlpha(CGImageRef img) {
     const CGImageAlphaInfo a = CGImageGetAlphaInfo(img);
     CGImageAlphaInfo skip;
@@ -29,12 +29,31 @@ CGImageRef withoutAlpha(CGImageRef img) {
 
 }  // namespace
 
+namespace {
+bool decodeSource(CGImageSourceRef src, ImageRgba8& out, bool ignoreAlpha);
+}  // namespace
+
 bool loadImageRgba8(const std::string& path, ImageRgba8& out, bool ignoreAlpha) {
     CFURLRef url = fileUrl(path);
     if (!url) return false;
     CGImageSourceRef src = CGImageSourceCreateWithURL(url, nullptr);
     CFRelease(url);
     if (!src) return false;
+    return decodeSource(src, out, ignoreAlpha);
+}
+
+bool decodeImageRgba8(const std::uint8_t* bytes, std::size_t size, ImageRgba8& out, bool ignoreAlpha) {
+    if (!bytes || size == 0) return false;
+    CFDataRef data = CFDataCreate(kCFAllocatorDefault, bytes, CFIndex(size));
+    if (!data) return false;
+    CGImageSourceRef src = CGImageSourceCreateWithData(data, nullptr);
+    CFRelease(data);
+    if (!src) return false;
+    return decodeSource(src, out, ignoreAlpha);
+}
+
+namespace {
+bool decodeSource(CGImageSourceRef src, ImageRgba8& out, bool ignoreAlpha) {
     CGImageRef img = CGImageSourceCreateImageAtIndex(src, 0, nullptr);
     CFRelease(src);
     if (!img) return false;
@@ -63,6 +82,7 @@ bool loadImageRgba8(const std::string& path, ImageRgba8& out, bool ignoreAlpha) 
     CGImageRelease(img);
     return ok;
 }
+}  // namespace
 
 bool writePngBgra8(const std::string& path, const std::uint8_t* bgra, int width, int height,
                    std::size_t bytesPerRow) {

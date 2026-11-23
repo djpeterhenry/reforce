@@ -23,7 +23,7 @@ std::array<double, 3> sub(const std::array<double, 3>& a, const std::array<doubl
 }
 
 // Every triangle winds counter-clockwise seen from outside: its geometric normal agrees with the stored normal and,
-// for convex centred meshes, points away from the centre.
+// for convex centered meshes, points away from the center.
 void checkWinding(const Mesh& m) {
     REQUIRE(m.vertices.size() % 3 == 0);
     for (std::size_t t = 0; t < m.vertices.size(); t += 3) {
@@ -64,7 +64,7 @@ TEST_CASE("meshes: Platonic solids and the prism are closed convex polyhedra") {
         for (const auto& p : m.hullVertices)
             CHECK(std::sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2]) == doctest::Approx(1.0).epsilon(1e-5));
         checkWinding(m);
-        // fan triangles: one per polygon edge; centre edge = 1, rim = 0; UVs on the inscribed circle
+        // fan triangles: one per polygon edge; center edge = 1, rim = 0; UVs on the inscribed circle
         std::size_t rim = 0;
         for (const auto& f : m.hullFaces) rim += f.size();
         CHECK(m.vertices.size() == 3 * rim);
@@ -140,7 +140,7 @@ TEST_CASE("solid transforms: screen bounds") {
     const Mesh cube = makeMesh(MeshKind::Cube);
     SolidPose p;
     p.scale = 0.5;
-    // orthographic, centred, unrotated: the cube's face is a square of half-height 0.5/sqrt(3) in y
+    // orthographic, centered, unrotated: the cube's face is a square of half-height 0.5/sqrt(3) in y
     ScreenBox b = projectBounds(cube, solidViewProjection(aspect, 40, false) * solidModel(p, aspect));
     REQUIRE(b.visible);
     const double h = 0.5 / std::sqrt(3.0);

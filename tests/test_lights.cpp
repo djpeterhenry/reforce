@@ -100,7 +100,7 @@ TEST_CASE("lights: each panel follows its own part of the picture; layout y poin
     CHECK(out[2] == Rgb{0, 255, 0});
 }
 
-TEST_CASE("lights: thin bright lines on black still colour the panel; black falls to the floor") {
+TEST_CASE("lights: thin bright lines on black still color the panel; black falls to the floor") {
     LightMapper m;
     Layout l;
     l.panels = {{1, 0, 0}};
@@ -110,13 +110,13 @@ TEST_CASE("lights: thin bright lines on black still colour the panel; black fall
     std::vector<Rgb> out;
     m.update(lines.data(), w, h, w * 4, 0.05, plain(), out);
     CHECK(out[0].r > 80);              // an eighth of the area lit: well above an eighth of full
-    CHECK(out[0].g > out[0].r / 3);    // the lines' orange, not grey
+    CHECK(out[0].g > out[0].r / 3);    // the lines' orange, not gray
     CHECK(out[0].b == 0);
     auto black = grid(w, h, [](int, int) { return Rgb{0, 0, 0}; });
     MapSettings s = plain();
     s.floor = 0.2;
     m.update(black.data(), w, h, w * 4, 0.05, s, out);
-    CHECK(out[0].r == 51);  // the floor, white when there is no colour at all
+    CHECK(out[0].r == 51);  // the floor, white when there is no color at all
 }
 
 TEST_CASE("lights: smoothing rises faster than it falls") {
@@ -146,7 +146,7 @@ TEST_CASE("lights: settings keys, ranges and settings.json entries") {
     CHECK(s.brightness == 1.5);
     CHECK_FALSE(engine::applyLightsSetting(s, "brightness", "3").empty());
     CHECK_FALSE(engine::applyLightsSetting(s, "", "maybe").empty());
-    CHECK_FALSE(engine::applyLightsSetting(s, "colour", "1").empty());
+    CHECK_FALSE(engine::applyLightsSetting(s, "color", "1").empty());
     auto e = engine::lightsSettingEntry("saturation", "2");
     REQUIRE(e);
     CHECK(e->first == "reforce.Lights.Saturation");

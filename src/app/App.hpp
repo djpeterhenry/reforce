@@ -19,7 +19,7 @@
 #include "platform/Platform.hpp"
 
 namespace MTL { class Device; class CommandQueue; class Texture; }
-namespace reforce::render { class Renderer; class Presenter; }
+namespace reforce::render { class Renderer; class Presenter; class Downsampler; }
 namespace reforce::app { class Director; class AudioDriver; }
 namespace reforce::platform { class SyphonPublisher; }
 namespace reforce::sync { class LinkClock; class DeckFeed; }
@@ -27,8 +27,9 @@ namespace reforce::sync { class LinkClock; class DeckFeed; }
 namespace reforce::app {
 
 struct AppOptions {
-    uint32_t frameWidth = 1920;
+    uint32_t frameWidth = 1920;   // the output (window, Syphon) size
     uint32_t frameHeight = 1080;
+    int supersample = 1;          // reforce.Supersample: render at this x the output size, averaged down
     const char* syphonName = "reforce";
     double statsInterval = 5.0;   // seconds between stats lines on stderr; 0 = off
     bool fixedStep = false;       // --deterministic: exactly one simulation step per display frame
@@ -75,7 +76,7 @@ public:
         deferredAnswer_ = std::move(answer);
     }
     void setAudioInputChanged(std::function<void(const std::string&)> fn) { audioInputChanged_ = std::move(fn); }
-    // Video menu (Phase 5F): sources for the colour layer / sprites, layer settings.
+    // Video menu (Phase 5F): sources for the color layer / sprites, layer settings.
     std::vector<platform::MenuItem> videoMenu() override;
     void selectVideoMenu(const std::string& id) override;
     bool windowVisualsOnly() override;
@@ -96,8 +97,9 @@ private:
     MTL::Device* device_;
     MTL::CommandQueue* queue_;
     std::unique_ptr<render::Renderer> renderer_;
+    std::unique_ptr<render::Downsampler> downsampler_;  // supersample > 1: the frame averaged to the output size
     std::unique_ptr<render::Presenter> presenter_;  // window present on its own thread
-    // Window copy with the colour video layer when the Syphon output gets the
+    // Window copy with the color video layer when the Syphon output gets the
     // plain visualizer (reforce.Video.Layer.Syphon = 0); created on first use.
     MTL::Texture* windowFrame_ = nullptr;
     // The Syphon output with its alpha (reforce.Syphon.Alpha); created on first use.

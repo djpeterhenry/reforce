@@ -347,6 +347,12 @@ public:
     bool over() const { return over_; }                // Over != 0: drawn opaque over (coverage as alpha), not by Flag
     int moves() const { return moves_; }               // Moves (scramble length; default 30, 1..64)
     bool hasTurn() const { return turn_ >= 0; }
+    // Model solids (Mesh="model", docs/model-design.md): a literal key's text, trimmed ("" when absent); a load-time
+    // key's value (fallback when absent); a per-frame key's value this frame (call after evaluateFrame).
+    std::string literal(const char* key) const;
+    double loaded(const char* key, double fallback) const;
+    bool defines(const char* key) const { return cfg_->defines(key); }
+    double frameKey(const char* key, double fallback) { return evalScalar(cfg_->indexOf(key), fallback); }
 
 private:
     std::string mesh_;

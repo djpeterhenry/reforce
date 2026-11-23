@@ -276,7 +276,7 @@ footer .wordmark { font-size: 2.2rem; }
       <button type="button" data-v="1" aria-pressed="false">Swirl</button>
       <button type="button" data-v="2" aria-pressed="false">Drift</button>
     </span>
-    <span class="label">Colours</span>
+    <span class="label">Colors</span>
     <span class="seg" id="palSeg">
       <button type="button" data-v="ember" aria-pressed="true">Ember</button>
       <button type="button" data-v="uv" aria-pressed="false">Ultraviolet</button>
@@ -285,7 +285,7 @@ footer .wordmark { font-size: 2.2rem; }
   </div>
   <p class="aside">This toy is the same idea as reforce in about 300 lines: a <b>FlowField</b> moves last frame's
     picture a little (zoom, swirl, drift), a <b>WaveShape</b> draws the sound on top, and a <b>ColorMap</b> turns
-    brightness into colour. Real G-Force scenes are small text files full of formulas for exactly those three things.</p>
+    brightness into color. Real G-Force scenes are small text files full of formulas for exactly those three things.</p>
 
   <div class="stats">
     <div class="stat"><b class="num">11</b><span>days, first commit to Room Lights</span></div>
@@ -308,7 +308,7 @@ footer .wordmark { font-size: 2.2rem; }
     <p>Three rules shaped everything after that:</p>
   </div>
   <div class="rules">
-    <div class="rule"><h3>Never look inside</h3><p>G-Force's licence forbids taking the program apart, so nobody did.
+    <div class="rule"><h3>Never look inside</h3><p>G-Force's license forbids taking the program apart, so nobody did.
       Everything about how it behaves was learned by watching it from the outside.</p></div>
     <div class="rule"><h3>Leave G-Force alone</h3><p>Peter still uses it. Every experiment backed up its settings first,
       restored them after, and checked byte by byte that nothing had changed.</p></div>
@@ -334,7 +334,7 @@ footer .wordmark { font-size: 2.2rem; }
   <div class="col prose" style="margin:0 auto; width:100%">
     <div class="eyebrow"><span class="day">Days 1 – 2</span><span>The Look card</span></div>
     <h2>Match it, or do it right?</h2>
-    <p>Some of what the probes found are flaws: lost precision, jagged edges, muddy colours. reforce can copy each
+    <p>Some of what the probes found are flaws: lost precision, jagged edges, muddy colors. reforce can copy each
       one exactly, which the comparison tests need, or do it properly. The control panel's <b>Look</b> card switches
       each one live, between "G-Force exact" and "Done right", so Peter could compare them on a real set. Peter picked
       "Done right" for all of them. Here are four, side by side.</p>
@@ -375,7 +375,7 @@ footer .wordmark { font-size: 2.2rem; }
   <div class="cmp">
     <div class="cmp-head"><h3>See-through pictures</h3>
       <p>Sprites are pictures that float over the scene, and many have see-through edges. G-Force ignores the
-        see-through part (finding #42) and shows whatever colour happens to be stored there, often a box of leftover
+        see-through part (finding #42) and shows whatever color happens to be stored there, often a box of leftover
         junk from whoever made the picture. Done right, see-through means not drawn.</p></div>
     <div class="pair">
       <figure><div class="stage"><canvas id="alphaL" width="480" height="360" aria-label="A sprite with its hidden junk showing"></canvas><span class="badge">G-Force exact</span></div>
@@ -386,15 +386,15 @@ footer .wordmark { font-size: 2.2rem; }
   </div>
 
   <div class="cmp">
-    <div class="cmp-head"><h3>Changing colour schemes</h3>
-      <p>When the slideshow moves to the next ColorMap, every colour slides to its new value over a couple of seconds.
-        G-Force mixes the red, green and blue numbers directly, which sags through darker, muddier colours halfway.
-        Done right mixes in OKLab, a colour space built around how eyes see, so brightness holds through the change.
-        Each strip below is one colour's journey, start on the left, end on the right.</p></div>
+    <div class="cmp-head"><h3>Changing color schemes</h3>
+      <p>When the slideshow moves to the next ColorMap, every color slides to its new value over a couple of seconds.
+        G-Force mixes the red, green and blue numbers directly, which sags through darker, muddier colors halfway.
+        Done right mixes in OKLab, a color space built around how eyes see, so brightness holds through the change.
+        Each strip below is one color's journey, start on the left, end on the right.</p></div>
     <div class="pair">
-      <figure><div class="stage strips"><canvas id="morphL" width="480" height="240" aria-label="Colour transitions mixed in RGB"></canvas><span class="badge">G-Force exact · RGB</span></div>
+      <figure><div class="stage strips"><canvas id="morphL" width="480" height="240" aria-label="Color transitions mixed in RGB"></canvas><span class="badge">G-Force exact · RGB</span></div>
         <figcaption>Muddy in the middle.</figcaption></figure>
-      <figure><div class="stage strips"><canvas id="morphR" width="480" height="240" aria-label="Colour transitions mixed in OKLab"></canvas><span class="badge">Done right · OKLab</span></div>
+      <figure><div class="stage strips"><canvas id="morphR" width="480" height="240" aria-label="Color transitions mixed in OKLab"></canvas><span class="badge">Done right · OKLab</span></div>
         <figcaption>Even all the way across.</figcaption></figure>
     </div>
   </div>
@@ -411,7 +411,7 @@ footer .wordmark { font-size: 2.2rem; }
   </div>
   <div class="board">
     <div class="row"><span class="what">Probe measurements<small>The same timelines replayed in both apps</small></span><span class="score">241 / 246</span><span class="meter"><i style="width:97.97%"></i></span></div>
-    <div class="row"><span class="what">ColorMaps<small>Every colour scheme on a fixed ramp</small></span><span class="score">250 / 250</span><span class="meter"><i style="width:100%"></i></span></div>
+    <div class="row"><span class="what">ColorMaps<small>Every color scheme on a fixed ramp</small></span><span class="score">250 / 250</span><span class="meter"><i style="width:100%"></i></span></div>
     <div class="row"><span class="what">FlowFields<small>Every motion field on a fixed test grid</small></span><span class="score">349 / 352</span><span class="meter"><i style="width:99.15%"></i></span></div>
     <div class="row"><span class="what">Sound response<small>Test tones played to both; checks outside known gaps</small></span><span class="score">276 / 276</span><span class="meter"><i style="width:100%"></i></span></div>
   </div>
@@ -595,7 +595,7 @@ footer .wordmark { font-size: 2.2rem; }
     </div>
     <figure class="clip">
       <video src="data:video/mp4;base64,@BEEPLE_MP4@" autoplay muted loop playsinline controls
-        aria-label="A colourful Beeple VJ loop with its border flashing on every beat"></video>
+        aria-label="A colorful Beeple VJ loop with its border flashing on every beat"></video>
       <figcaption>"Harvest" by Beeple, a seamless loop at 128.1 BPM, the whole loop at normal speed. The border
         flashes on every beat (red on the "one"). Turn the sound on for the click.</figcaption>
     </figure>
@@ -652,7 +652,7 @@ footer .wordmark { font-size: 2.2rem; }
     </div>
     <ol class="steps">
       <li><span><b>Make a dancer from a photo</b>A guest can upload a selfie. The guest service sends it to Claude,
-        which designs a cartoon dancer to match: hair, clothes, colours, glasses, beard. Claude answers in the same
+        which designs a cartoon dancer to match: hair, clothes, colors, glasses, beard. Claude answers in the same
         settings a reforce dancer file uses. The photo is never stored. Or the guest skips the photo and builds a dancer by hand from the menus.</span></li>
       <li><span><b>See the real thing</b>The preview on the page isn't an approximation. It's reforce's own dancer
         code compiled to run in the browser (the same trick as the dancers above), doing real motion-capture moves in
@@ -687,7 +687,7 @@ footer .wordmark { font-size: 2.2rem; }
       the camera sends. reforce can even hold the camera image back by that one step, so the cut-out lines up with the
       person exactly. The joints are smoothed so they sit still when you do but follow quickly when you move.</p>
     <p>Then the visuals react. The silhouette is written into the same picture the FlowField keeps moving, so the scene
-      carries it off, swirls it and colours it like anything else it draws.</p>
+      carries it off, swirls it and colors it like anything else it draws.</p>
   </div>
   <div class="stage" id="bodyStage">
     <canvas id="bodyCanvas" aria-label="A dancing silhouette drawn into a live visualizer"></canvas>
@@ -728,8 +728,8 @@ footer .wordmark { font-size: 2.2rem; }
       them itself.</p>
     <p>Up to 30 times a second, reforce grabs the finished visuals, before the camera, the dancers and the captions
       are added, so those never tint the room. It shrinks the frame to about 120 pixels wide and stretches the panel
-      layout over it. Each panel takes the colour of the patch underneath, with the brightest pixels counting most,
-      so even a thin bright line lights its panel. The colours go out over Wi-Fi 20 times a second. Panels brighten
+      layout over it. Each panel takes the color of the patch underneath, with the brightest pixels counting most,
+      so even a thin bright line lights its panel. The colors go out over Wi-Fi 20 times a second. Panels brighten
       quickly and fade more slowly, so they flash with the music without flickering. Turning the lights off, or
       quitting, puts the panels back to whatever they were showing before.</p>
   </div>
@@ -738,13 +738,13 @@ footer .wordmark { font-size: 2.2rem; }
       <div class="stage"><canvas id="lightsCanvas" aria-label="A small live visualizer"></canvas><span class="badge">The visuals</span></div>
     </figure>
     <figure>
-      <div class="wall"><svg id="wall" role="img" aria-label="Peter's 24 triangle panels, coloured from the visuals"></svg><span class="badge">Peter's wall</span></div>
+      <div class="wall"><svg id="wall" role="img" aria-label="Peter's 24 triangle panels, colored from the visuals"></svg><span class="badge">Peter's wall</span></div>
     </figure>
   </div>
   <div class="controls"><button class="primary" id="playBtn4" type="button">▶ Play a beat</button></div>
   <div class="col prose" style="margin:0 auto; width:100%">
-    <p class="aside">The wall is the real layout of Peter's panels, read from the panels themselves, and it's coloured
-      the way reforce colours it.</p>
+    <p class="aside">The wall is the real layout of Peter's panels, read from the panels themselves, and it's colored
+      the way reforce colors it.</p>
   </div>
 </section>
 
@@ -784,17 +784,17 @@ footer .wordmark { font-size: 2.2rem; }
 /* ================= Shared audio: a tiny 124 BPM groove, synthesised ================= */
 const Audio = (() => {
   const BPM = 124, SPB = 60 / BPM;
-  let ctx = null, analyser, master, playing = false, timer = 0, nextT = 0, step = 0, noise, t0a = 0;
+  let ctx = null, analyzer, master, playing = false, timer = 0, nextT = 0, step = 0, noise, t0a = 0;
   const beats = [];               // audio-clock times of scheduled kicks
   const td = new Float32Array(2048), fd = new Uint8Array(1024);
   const listeners = new Set();
 
   function init() {
     ctx = new (window.AudioContext || window.webkitAudioContext)();
-    analyser = ctx.createAnalyser(); analyser.fftSize = 2048; analyser.smoothingTimeConstant = 0.6;
+    analyzer = ctx.createAnalyser(); analyzer.fftSize = 2048; analyzer.smoothingTimeConstant = 0.6;
     const comp = ctx.createDynamicsCompressor();
     master = ctx.createGain(); master.gain.value = 0.55;
-    master.connect(comp); comp.connect(analyser); analyser.connect(ctx.destination);
+    master.connect(comp); comp.connect(analyzer); analyzer.connect(ctx.destination);
     noise = ctx.createBuffer(1, ctx.sampleRate * 0.5, ctx.sampleRate);
     const d = noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   }
@@ -849,8 +849,8 @@ const Audio = (() => {
   function frame(N, out) {
     const now = performance.now() / 1000 - t0;
     if (playing) {
-      analyser.getFloatTimeDomainData(td);
-      analyser.getByteFrequencyData(fd);
+      analyzer.getFloatTimeDomainData(td);
+      analyzer.getByteFrequencyData(fd);
       let z = 0; for (let i = 1; i < 1024; i++) if (td[i - 1] < 0 && td[i] >= 0) { z = i; break; }
       for (let i = 0; i < N; i++) out[i] = td[z + i * 4] * 1.5;
       let lo = 0; for (let i = 1; i < 10; i++) lo += fd[i]; lo /= 9 * 255;
@@ -1094,7 +1094,7 @@ class Viz {
     if (o.wave !== false) gl.drawArrays(gl.TRIANGLE_STRIP, 0, verts);
     if (o.body) this.bodyPass(a, U);
     gl.disable(gl.BLEND);
-    // 3. ColorMap: brightness to colour, on screen
+    // 3. ColorMap: brightness to color, on screen
     const dpr = Math.min(window.devicePixelRatio || 1, 2), cw = Math.round(this.canvas.clientWidth * dpr), ch = Math.round(this.canvas.clientHeight * dpr);
     if (this.canvas.width !== cw || this.canvas.height !== ch) { this.canvas.width = cw; this.canvas.height = ch; }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, cw, ch);
@@ -1157,7 +1157,7 @@ Audio.on((on) => { for (const b of playBtns) b.textContent = on ? "■ Stop the 
 /* ================= More G-Force exact vs done right comparisons ================= */
 (() => {
   const vis = (c) => { let on = true; new IntersectionObserver((e) => { on = e[0].isIntersecting; }).observe(c); return () => on; };
-  // --- Thin lines: G-Force snaps points by truncation toward the centre and draws one pixel per column ---
+  // --- Thin lines: G-Force snaps points by truncation toward the center and draws one pixel per column ---
   const tl = document.getElementById("thinL"), tr = document.getElementById("thinR");
   const lx = tl.getContext("2d"), rx = tr.getContext("2d"), TW = tl.width, TH = tl.height;
   const tlOn = vis(tl), img = lx.createImageData(TW, TH);
@@ -1207,7 +1207,7 @@ Audio.on((on) => { for (const b of playBtns) b.textContent = on ? "■ Stop the 
       c.globalCompositeOperation = "source-over";
     });
   }
-  // --- Colour morphs: RGB vs OKLab ---
+  // --- Color morphs: RGB vs OKLab ---
   const lin = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4), gam = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
   function toLab([r, g, b]) {
     [r, g, b] = [r, g, b].map((v) => lin(v / 255));
@@ -1239,7 +1239,7 @@ Audio.on((on) => { for (const b of playBtns) b.textContent = on ? "■ Stop the 
   })();
 })();
 
-/* ================= Room lights: Peter's real panel layout, coloured the way reforce does it ================= */
+/* ================= Room lights: Peter's real panel layout, colored the way reforce does it ================= */
 (() => {
   // From the panels (GET panelLayout/layout): x, y (Nanoleaf: y up), rotation in degrees; triangles, side 150.
   const LAYOUT = [[449,43,180],[449,129,240],[524,173,180],[524,259,240],[599,303,60],[599,389,120],[674,433,60],
@@ -1288,7 +1288,7 @@ Audio.on((on) => { for (const b of playBtns) b.textContent = on ? "■ Stop the 
         }
       let c = [sr / sw, sg / sw, sb / sw];
       const m = Math.max(...c) || 1; c = c.map((v) => v / m);
-      const grey = (c[0] + c[1] + c[2]) / 3; c = c.map((v) => Math.min(1, Math.max(0, grey + (v - grey) * 1.3)));
+      const gray = (c[0] + c[1] + c[2]) / 3; c = c.map((v) => Math.min(1, Math.max(0, gray + (v - gray) * 1.3)));
       const level = Math.sqrt(n ? sl / n : 0);
       const st = state[i];
       for (let ch = 0; ch < 3; ch++) {

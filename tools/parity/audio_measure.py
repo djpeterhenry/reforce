@@ -40,7 +40,7 @@ import measure as M  # noqa: E402
 
 REPO = L.REPO
 THR = 12          # pixel threshold for "lit"
-RAIL_TOL = 1.6    # px: a run centred this close to a rail's expected row is the rail
+RAIL_TOL = 1.6    # px: a run centered this close to a rail's expected row is the rail
 MAX_AGE = 250
 
 

@@ -209,7 +209,7 @@ KNOWN_GAPS_5B = {
     (34, "run"):
         "G-Force loses 2 levels per frame on a pure 1-px translation (reforce 1): its source coordinate lands 1/1980 px "
         "short (pixel = (x + 1) / 2 x (W - 1), corner-aligned: probe finding #26), so the 1/16-px bilinear weights take 1/16 of the "
-        "older neighbour and the truncation drops a level every frame",
+        "older neighbor and the truncation drops a level every frame",
 }
 
 

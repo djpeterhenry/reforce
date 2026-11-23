@@ -85,7 +85,7 @@ shot).
 | 5 | 13.9 s | 0 dBFS | 151 | 75–232 |
 
 A steady 1 kHz tone first appears at the **low** end of the axis and its bump moves up and widens over ~10 s
-(and with level) until it is centred on its true bin. At each level step `fft(.05)` flashes (0.24–0.27 for a
+(and with level) until it is centered on its true bin. At each level step `fft(.05)` flashes (0.24–0.27 for a
 frame or two).
 
 | `sweep` (snapshot probe) audio t | sweep frequency | G-Force peak bin | that bin's frequency |
@@ -98,7 +98,7 @@ frame or two).
 | 12.5 s | 757 Hz | 254 | 5.5 kHz |
 | 13.0–22 s | 0.9–20 kHz | — | dark (max ≤ 0.15) |
 
-Strip run (run 8) agrees: `fft(.05)` peaks at 9.04 s (227 Hz; bin centre 145 Hz), `fft(.2)` at 9.82 s (298 Hz;
+Strip run (run 8) agrees: `fft(.05)` peaks at 9.04 s (227 Hz; bin center 145 Hz), `fft(.2)` at 9.82 s (298 Hz;
 258 Hz), `fft(.5)` at 10.71 s (405 Hz; 812 Hz), `fft(.8)` at 11.65 s (560 Hz; 2.56 kHz). `LEVEL` falls to 0 at
 11.9 s (605 Hz) and stays 0 for the remaining 10 s of the sweep, although `mag(s)` still shows the full 0.5
 sine. Below ~200 Hz (2–9 s) the curve is lit almost everywhere (`LEVEL` 0.38). So during a sweep the bump
@@ -156,8 +156,8 @@ against the decoded G-Force series (objective: RMS of `LEVEL` on runs 7, 9–12 
 
 | stage | model | fitted / G-Force constants |
 |---|---|---|
-| spectrum | Hann 2048-point FFT power each frame; vis bin j (centre 120 Hz × (5500/120)^(j/254)) = sqrt(Σ_k w_jk P_k) × (f_j / 1 kHz)^tilt, w = 1/(1 + \|log2(f_k/f_j)/bw\|^shape) | bw 0.428 oct, shape 2.20, tilt −1.19 |
-| normalization | 16 groups (`Envelopes`), group mean amplitude x → reference R: attack 0.040 s, release 7.4 s, R ≥ refMin, R₀ = refInitial / `InitialVolume`; v = gain × a / R (R interpolated between group centres) | gain 0.528, refMin 0.00122, refInitial 0.517 |
+| spectrum | Hann 2048-point FFT power each frame; vis bin j (center 120 Hz × (5500/120)^(j/254)) = sqrt(Σ_k w_jk P_k) × (f_j / 1 kHz)^tilt, w = 1/(1 + \|log2(f_k/f_j)/bw\|^shape) | bw 0.428 oct, shape 2.20, tilt −1.19 |
+| normalization | 16 groups (`Envelopes`), group mean amplitude x → reference R: attack 0.040 s, release 7.4 s, R ≥ refMin, R₀ = refInitial / `InitialVolume`; v = gain × a / R (R interpolated between group centers) | gain 0.528, refMin 0.00122, refInitial 0.517 |
 | smoothing | per bin: instant attack, release τ = `Audio.FFT.Smooth`/60 s × `PersistCoef` | Smooth 1 (default), 2 in the captures |
 | output | `fft` = min(v, 0.93) × `Audio.Response.Scale` | |
 | `LEVEL` | min(1, 1.343 × mean(`fft`)) | |
@@ -182,7 +182,7 @@ report). Registered in ctest as `reforce_audio_parity` (`--strict`; skipped with
 ## 7. Not reproduced (known gaps)
 
 1. The drift of a steady tone's bump over ~10 s, and the level-step flashes (§3.1). **Cause found (§9.1): the
-   adaptive fft() axis.** Not modelled in reforce yet (§9.2).
+   adaptive fft() axis.** Not modeled in reforce yet (§9.2).
 2. The sweep: the bump running ahead of the tone and G-Force going dark above ~0.8 kHz (runs 8 and 13). **Same
    cause (§9.1).**
 3. `mag()`: sines above ~5 kHz and high noise — **fixed** (7-point moving average, §9.3); still open: 400–2000 Hz

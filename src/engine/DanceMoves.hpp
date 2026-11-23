@@ -159,7 +159,7 @@ private:
     ChoreoOptions opts_;
     StyleFeel feel_;
     std::deque<Routine> routines_;  // past, current and the next one (scheduled a beat ahead), oldest first
-    static constexpr double kBlend = 1.0;  // half the crossfade between routines, beats (centred on the change)
+    static constexpr double kBlend = 1.0;  // half the crossfade between routines, beats (centered on the change)
     std::uint32_t rng_;
     std::uint32_t counter_ = 0;
     double lastDropBeat_ = -1e9;

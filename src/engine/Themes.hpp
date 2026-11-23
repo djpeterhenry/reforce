@@ -29,7 +29,10 @@ struct Category {
     std::string title;
     std::vector<std::string> includeList, excludeList;  // lower-case config names
     std::string includePattern, excludePattern;          // regex (ECMAScript), "" = none
-    bool matches(const std::string& configName) const;   // name = file stem
+    // reforce extension: Include.Id, a regex on the catalog id ("Model/..." for 3D model scenes), for groups whose
+    // members can't be listed by name.
+    std::string includeIdPattern;
+    bool matches(const std::string& configName, const std::string& id = {}) const;  // name = file stem
 };
 
 struct Theme {
@@ -71,9 +74,11 @@ public:
     // Names (file stems) of `names` that `theme` admits for `typeName`
     // ("WaveShape", "FlowField", ...). theme == nullptr: all of them.
     // `warnings` collects unknown categories.
+    // `ids` (optional, parallel to names): the catalog ids, for Include.Id groups.
     std::vector<std::string> filter(const Theme* theme, const std::string& typeName,
                                     const std::vector<std::string>& names,
-                                    std::vector<std::string>* warnings = nullptr) const;
+                                    std::vector<std::string>* warnings = nullptr,
+                                    const std::vector<std::string>* ids = nullptr) const;
 
 private:
     const Theme* findListed(const std::string& name) const;  // by listed name only

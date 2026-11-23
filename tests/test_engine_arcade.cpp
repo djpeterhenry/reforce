@@ -11,7 +11,7 @@ using namespace reforce::engine;
 
 namespace {
 
-// Rasterizes capsules onto a grid of pixel centres: covered = within radius of some segment.
+// Rasterizes capsules onto a grid of pixel centers: covered = within radius of some segment.
 std::vector<char> cover(const std::vector<LineSegment>& segs, int w, int h) {
     std::vector<char> g(std::size_t(w * h), 0);
     for (int y = 0; y < h; ++y)
@@ -39,7 +39,7 @@ TEST_CASE("arcade canvas: a filled rectangle covers its pixels with no gaps and 
     std::vector<LineSegment> out;
     OrganicCanvas c(map, style, out, 0, 0, 1, 0);
     CHECK(c.pixelsPerUnit() == doctest::Approx(100));
-    c.rect(0, 0, 0.6, 0.4, 0.7);  // 60 x 40 px around the centre (200, 100)
+    c.rect(0, 0, 0.6, 0.4, 0.7);  // 60 x 40 px around the center (200, 100)
     REQUIRE(!out.empty());
     for (const auto& s : out) CHECK(s.penA == doctest::Approx(0.7f));
     const auto g = cover(out, 400, 200);
@@ -60,7 +60,7 @@ TEST_CASE("arcade canvas: polygons (rotated, concave), thin shapes, bitmaps, pat
     LineStyle style;
     std::vector<LineSegment> out;
     {
-        // A diamond: the centre is covered, the corners of its bounding box are not.
+        // A diamond: the center is covered, the corners of its bounding box are not.
         OrganicCanvas c(map, style, out, 0, 0, 1, 0);
         const double xs[4] = {0, 0.5, 0, -0.5}, ys[4] = {-0.3, 0, 0.3, 0};
         c.fillPolygon(xs, ys, 4, 1);
@@ -76,7 +76,7 @@ TEST_CASE("arcade canvas: polygons (rotated, concave), thin shapes, bitmaps, pat
         const double ys[8] = {-0.3, -0.3, 0.3, 0.3, -0.1, -0.1, 0.3, 0.3};
         c.fillPolygon(xs, ys, 8, 1);
         const auto g = cover(out, 400, 200);
-        CHECK(!g[std::size_t(80 * 400 + 200)]);  // in the notch (y = +.2 is above the centre: row 80)
+        CHECK(!g[std::size_t(80 * 400 + 200)]);  // in the notch (y = +.2 is above the center: row 80)
         CHECK(g[std::size_t(120 * 400 + 200)]);  // the bottom bar
     }
     {

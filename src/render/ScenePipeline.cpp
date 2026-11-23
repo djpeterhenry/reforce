@@ -64,7 +64,7 @@ static float sample_prev(texture2d<float, access::read> prev, float2 s, uint2 si
     if (q == 3 || q == 4) {
         // Fixed-point source position (1/16 or 1/256 px), truncated. The small bias absorbs float32 error in
         // px: an exact pixel center (e.g. srcY = y) must not land 1 ulp low and pick up 15/16 of the row
-        // above (sweep: "Bits Between Bits" rows decayed into the neighbour every few rows).
+        // above (sweep: "Bits Between Bits" rows decayed into the neighbor every few rows).
         const float k = q == 3 ? 16.0f : 256.0f;
         const float2 fx = floor(px * k + 0.01f);
         f0 = floor(fx / k);
@@ -92,7 +92,7 @@ static float2 blend_polar(float2 p, float2 a, float2 b, float w, float aspect) {
     return float2(mag * cos(ang) / aspect, mag * sin(ang));
 }
 
-// Kick zoom (PLAN 5O.3): scale the source towards the centre by (1 - zoom) and turn it, in square units.
+// Kick zoom (PLAN 5O.3): scale the source towards the center by (1 - zoom) and turn it, in square units.
 static float2 kick_src(float2 s, constant FlowParams& P) {
     if (is_invalid(s)) return s;
     float2 q = float2(s.x * P.aspect, s.y) * (1.0f - P.kickZoom);
@@ -241,7 +241,7 @@ fragment float4 line_fs(LOut in [[stage_in]], constant LineParams& P [[buffer(0)
     const float r = max(abs(in.radius), 0.5f);
     float cov;
     // A negative radius is a hard-edged segment (organic cells): no in-between intensities at its rim, which the
-    // ColorMap would paint in unrelated colours (a speckled fringe on big dots).
+    // ColorMap would paint in unrelated colors (a speckled fringe on big dots).
     if (P.aa > 0.5f && in.radius >= 0.0f) cov = clamp(r + 0.5f - dist, 0.0f, 1.0f);
     else cov = dist <= r ? 1.0f : 0.0f;
     if (cov <= 0.0f) discard_fragment();
@@ -350,6 +350,22 @@ fragment MsaaOut line_msaa_fs(LOut in [[stage_in]], constant LineParams& P [[buf
     o.color = float4(mix(in.pen.x, in.pen.y, h), 0.0, 0.0, 1.0);
     o.mask = mask;
     return o;
+}
+
+// Color edges (reforce.LineEdges = color): this step's line coverage for the display. Premultiplied over (One,
+// OneMinusSourceAlpha), so each pixel ends with the topmost line's (pen x cov, cov); hard-edged segments have no
+// in-between edge to fix and are left out. The colorize pass mixes the ColorMap colors of the pen and of the
+// intensity under the line by the coverage, instead of looking up the blended intensity (which on a non-monotonic
+// ColorMap lands on unrelated colors: multi-colored fringes).
+fragment float4 line_cover_fs(LOut in [[stage_in]], constant LineParams& P [[buffer(0)]]) {
+    if (in.radius < 0.0f) discard_fragment();
+    float h;
+    const float dist = seg_dist(in.position.xy, in.a, in.b, h);
+    const float cov = P.aa > 3.5f ? min(1.0f, span_cov(in.position.xy, in.a, in.b, max(in.radius, 0.0f)))
+                    : P.aa > 1.5f ? line_cov_energy(dist, in.radius, all(in.a == in.b))
+                                  : clamp(max(in.radius, 0.5f) + 0.5f - dist, 0.0f, 1.0f);
+    if (cov <= 0.0f) discard_fragment();
+    return float4(mix(in.pen.x, in.pen.y, h) * cov, 0.0, 0.0, cov);
 }
 
 // ---- 2b. sprites ---------------------------------------------------------------
@@ -466,11 +482,11 @@ fragment float4 sprite_fetch_fs(SOut in [[stage_in]], float4 dst [[color(0)]], t
     return float4(saturate(o), 0.0, 0.0, 1.0);
 }
 
-// ---- 3c. full-colour movie sprites (PLAN 5K, reforce.MovieSprite.Colour = over) ---------------------------------
+// ---- 3c. full-color movie sprites (PLAN 5K, reforce.MovieSprite.Color = over) ---------------------------------
 // Drawn over the colorized frame (same pass) with a normal alpha-over (blend state; RGB only, alpha stays 1, or with
 // the Syphon alpha tracked and ColorKey = 0 also over on alpha: opaque there, see encodeSyphonAlpha):
-// the frame's colour through the movie's levels per channel, '~' inverted, alpha = P.opacity.
-fragment float4 colour_sprite_fs(SOut in [[stage_in]], texture2d<float> tex [[texture(0)]],
+// the frame's color through the movie's levels per channel, '~' inverted, alpha = P.opacity.
+fragment float4 color_sprite_fs(SOut in [[stage_in]], texture2d<float> tex [[texture(0)]],
                                  constant SpriteP& P [[buffer(0)]]) {
     constexpr sampler smp(filter::linear, mip_filter::linear, address::clamp_to_edge);
     float3 c = tex.sample(smp, in.uv).rgb;
@@ -481,7 +497,7 @@ fragment float4 colour_sprite_fs(SOut in [[stage_in]], texture2d<float> tex [[te
 
 // ---- 3c'. opaque solids (ColorKey = 0, docs/3d-design.md): with the Syphon alpha tracked, a 3D solid's coverage
 // (its RG8 target's alpha) times its opacity raises the frame's alpha (max blend, alpha only), so the whole solid,
-// dark colours and all, stays opaque in the Syphon output and over the camera backdrop.
+// dark colors and all, stays opaque in the Syphon output and over the camera backdrop.
 fragment float4 solid_opaque_fs(SOut in [[stage_in]], texture2d<float> tex [[texture(0)]],
                                 constant SpriteP& P [[buffer(0)]]) {
     constexpr sampler smp(filter::linear, address::clamp_to_edge);
@@ -489,7 +505,7 @@ fragment float4 solid_opaque_fs(SOut in [[stage_in]], texture2d<float> tex [[tex
 }
 
 // ---- 3. colorize ------------------------------------------------------------
-static float3 colour_of(float i, constant float4* pal, constant float* lut) {
+static float3 color_of(float i, constant float4* pal, constant float* lut) {
     const float x = saturate(i) * 255.0f;
     const int k0 = min(int(x), 254);
     const float m = saturate(mix(lut[k0], lut[k0 + 1], x - float(k0)));
@@ -498,13 +514,13 @@ static float3 colour_of(float i, constant float4* pal, constant float* lut) {
     return saturate(mix(pal[j0].rgb, pal[j0 + 1].rgb, y - float(j0)));
 }
 
-// ---- 3c''. the rubik in colour (docs/3d-design.md): drawn over the colorized frame from its solid target (resolved
+// ---- 3c''. the rubik in color (docs/3d-design.md): drawn over the colorized frame from its solid target (resolved
 // r = sticker share x sticker intensity, g = coverage, b = sticker share, a = coverage x shading; the plastic is
-// intensity 0). The colour is darkened by the shading (Shad), so faces shade without changing hue. Each pixel
-// mixes the ColorMap colours of its sticker and of the plastic by their shares, so the anti-aliased borders blend
-// the two colours instead of passing through the ColorMap's colours in between. Alpha = coverage x opacity (over;
+// intensity 0). The color is darkened by the shading (Shad), so faces shade without changing hue. Each pixel
+// mixes the ColorMap colors of its sticker and of the plastic by their shares, so the anti-aliased borders blend
+// the two colors instead of passing through the ColorMap's colors in between. Alpha = coverage x opacity (over;
 // on the tracked alpha too when the solid has ColorKey = 0).
-fragment float4 solid_colour_fs(SOut in [[stage_in]], texture2d<float> tex [[texture(0)]],
+fragment float4 solid_color_fs(SOut in [[stage_in]], texture2d<float> tex [[texture(0)]],
                                 constant SpriteP& P [[buffer(0)]], constant float4* pal [[buffer(1)]],
                                 constant float* lut [[buffer(2)]]) {
     constexpr sampler smp(filter::linear, address::clamp_to_edge);
@@ -513,17 +529,17 @@ fragment float4 solid_colour_fs(SOut in [[stage_in]], texture2d<float> tex [[tex
     if (c < 1.0f / 512.0f) discard_fragment();
     const float f = min(t.b, c);
     const float L = f > 1.0f / 512.0f ? t.r / f : 0.0f;
-    const float shade = saturate(t.a / c);  // the puzzle's shading (Shad), applied to the colour
+    const float shade = saturate(t.a / c);  // the puzzle's shading (Shad), applied to the color
     float3 col;
     if (P.mode == 1) {
         // fifteen: r = the tile intensity over the whole tile (numbers too), b = the share outside the numbers. The
-        // numbers are the tile's colour pushed far darker (the light tiles engine::TilePicker picks) or, on a map
-        // without good light colours, far lighter; P.threshold = 0 dark .. 1 light (faded when the choice changes).
-        const float3 tile = colour_of(t.r / c, pal, lut);
+        // numbers are the tile's color pushed far darker (the light tiles engine::TilePicker picks) or, on a map
+        // without good light colors, far lighter; P.threshold = 0 dark .. 1 light (faded when the choice changes).
+        const float3 tile = color_of(t.r / c, pal, lut);
         const float3 num = mix(tile * 0.15f, mix(tile, float3(1.0f), 0.8f), saturate(P.threshold));
         col = (f * tile + (c - f) * num) / c;
     } else {
-        col = (f * colour_of(L, pal, lut) + (c - f) * colour_of(0.0f, pal, lut)) / c;
+        col = (f * color_of(L, pal, lut) + (c - f) * color_of(0.0f, pal, lut)) / c;
     }
     col *= shade;
     return float4(col, saturate(c * P.opacity));
@@ -539,17 +555,37 @@ static float3 colorize_at(texture2d<float, access::read> inten, uint2 p, constan
     return saturate(mix(pal[j0].rgb, pal[j0 + 1].rgb, y - float(j0)));
 }
 
+// Color edges: where this step's lines partly cover the pixel (edge = (pen x cov, cov), line_cover_fs), the color is
+// cov x color(pen) + (1 - cov) x color(under), with the intensity under the line recovered from the blend
+// I = pen cov + under (1 - cov); nearly covered pixels take the pen's color.
+static float3 colorize_edges(texture2d<float, access::read> inten, texture2d<float, access::read> edge, uint2 p,
+                             constant float4* pal, constant float* lut, int edges) {
+    const float I = saturate(inten.read(p).r);
+    if (edges != 0) {
+        const float4 e = edge.read(p);
+        const float cov = saturate(e.a);
+        if (cov > 1.0f / 255.0f) {
+            const float pen = saturate(e.r / cov);
+            const float under = cov < 0.98f ? saturate((I - pen * cov) / (1.0f - cov)) : I;
+            return mix(color_of(under, pal, lut), color_of(pen, pal, lut), cov);
+        }
+    }
+    return color_of(I, pal, lut);
+}
+
 // Alpha: 1, or 0 while the Syphon alpha is tracked (the visuals are keyed; layers drawn on top raise it where they
 // must stay opaque, encodeSyphonAlpha).
 fragment float4 colorize_fs(VOut in [[stage_in]],
                             texture2d<float, access::read> inten [[texture(0)]],
+                            texture2d<float, access::read> edge [[texture(3)]],
                             constant float4* pal [[buffer(0)]],
                             constant float* lut [[buffer(1)]],
-                            constant float& alpha [[buffer(2)]]) {
-    return float4(colorize_at(inten, uint2(in.position.xy), pal, lut), alpha);
+                            constant float& alpha [[buffer(2)]],
+                            constant int& edges [[buffer(4)]]) {
+    return float4(colorize_edges(inten, edge, uint2(in.position.xy), pal, lut, edges), alpha);
 }
 
-// ---- 3b. colorize + colour video layer (Phase 5F) ---------------------------
+// ---- 3b. colorize + color video layer (Phase 5F) ---------------------------
 // Mirrors engine/VideoComposite.cpp (the CPU reference): fit, key, crossfade
 // A -> B (premultiplied), then blend over or under the colorized visualizer.
 struct VideoP { float4 uvA; float4 uvB; float4 key; float4 misc; int4 mode; int4 mode2; };
@@ -592,9 +628,11 @@ fragment float4 colorize_video_fs(VOut in [[stage_in]],
                                   constant float4* pal [[buffer(0)]],
                                   constant float* lut [[buffer(1)]],
                                   constant VideoP& V [[buffer(2)]],
-                                  constant float& outAlpha [[buffer(3)]]) {
+                                  constant float& outAlpha [[buffer(3)]],
+                                  texture2d<float, access::read> edge [[texture(3)]],
+                                  constant int& edges [[buffer(4)]]) {
     const uint2 p = uint2(in.position.xy);
-    const float3 v = colorize_at(inten, p, pal, lut);
+    const float3 v = colorize_edges(inten, edge, p, pal, lut, edges);
     const float2 uv = (float2(p) + 0.5f) / float2(inten.get_width(), inten.get_height());
     const float4 a = V.mode.x != 0 ? sample_video(vidA, uv, V.uvA, V) : float4(0.0f);
     const float4 b = V.mode.y != 0 ? sample_video(vidB, uv, V.uvB, V) : float4(0.0f);
@@ -616,7 +654,7 @@ fragment float4 colorize_video_fs(VOut in [[stage_in]],
 // ---- 3d. the Syphon output's alpha (reforce.Syphon.Alpha, docs/syphon-alpha.md) --------------------------------
 // The frame's alpha holds how much must stay opaque (dancers, ColorKey = 0 movies); everything else is keyed like
 // OBS's Color Key (v2) on black: alpha = clamp((distance from black - similarity) / smoothness), on the stored
-// (sRGB-encoded) values as OBS measures them. Colour unchanged (straight alpha) unless premultiplied.
+// (sRGB-encoded) values as OBS measures them. Color unchanged (straight alpha) unless premultiplied.
 struct KeyP { float similarity; float smoothness; int premultiply; int pad; };
 
 fragment float4 syphon_alpha_fs(VOut in [[stage_in]], texture2d<float, access::read> src [[texture(0)]],
@@ -759,7 +797,7 @@ struct SpriteP {
 };
 static_assert(sizeof(SpriteP) == 96, "SpriteP must match the MSL struct");
 
-// Colour video layer (Phase 5F, engine/VideoComposite.hpp).
+// Color video layer (Phase 5F, engine/VideoComposite.hpp).
 struct VideoP {
     float uvA[4];   // scale.xy, offset.zw
     float uvB[4];
@@ -826,7 +864,7 @@ MTL::RenderPipelineState* makePso(MTL::Device* device, MTL::Library* lib, const 
                 att->setDestinationRGBBlendFactor(MTL::BlendFactorOneMinusSourceAlpha);
                 break;
         }
-        if (blend == BlendOverRgb)  // over, but the target's alpha is kept (colour sprites on the BGRA output)
+        if (blend == BlendOverRgb)  // over, but the target's alpha is kept (color sprites on the BGRA output)
             att->setWriteMask(MTL::ColorWriteMaskRed | MTL::ColorWriteMaskGreen | MTL::ColorWriteMaskBlue);
         att->setAlphaBlendOperation(blend == BlendAlphaMax ? MTL::BlendOperationMax : MTL::BlendOperationAdd);
         att->setSourceAlphaBlendFactor(MTL::BlendFactorOne);
@@ -996,16 +1034,18 @@ ScenePipeline::ScenePipeline(MTL::Device* device, uint32_t width, uint32_t heigh
     bakePso_ = makePso(device, lib, "scene_fullscreen_vs", "bake_fs", MTL::PixelFormatRG32Float, false, "field bake");
     colorizePso_ = makePso(device, lib, "scene_fullscreen_vs", "colorize_fs", MTL::PixelFormatBGRA8Unorm, false,
                            "colorize");
+    lineCoverPso_ = makePso(device, lib, "line_vs", "line_cover_fs", MTL::PixelFormatRGBA8Unorm, BlendPremul,
+                            "line coverage (color edges)");
     colorizeVideoPso_ = makePso(device, lib, "scene_fullscreen_vs", "colorize_video_fs", MTL::PixelFormatBGRA8Unorm,
                                 false, "colorize + video");
-    colourSpritePso_ = makePso(device, lib, "sprite_vs", "colour_sprite_fs", MTL::PixelFormatBGRA8Unorm, BlendOverRgb,
-                               "colour sprite");
-    colourSpriteOpaquePso_ = makePso(device, lib, "sprite_vs", "colour_sprite_fs", MTL::PixelFormatBGRA8Unorm,
-                                     BlendOverAll, "colour sprite (opaque in the Syphon alpha)");
-    solidColourPso_ = makePso(device, lib, "sprite_vs", "solid_colour_fs", MTL::PixelFormatBGRA8Unorm, BlendOverRgb,
-                              "solid in colour");
-    solidColourOpaquePso_ = makePso(device, lib, "sprite_vs", "solid_colour_fs", MTL::PixelFormatBGRA8Unorm,
-                                    BlendOverAll, "solid in colour (opaque in the Syphon alpha)");
+    colorSpritePso_ = makePso(device, lib, "sprite_vs", "color_sprite_fs", MTL::PixelFormatBGRA8Unorm, BlendOverRgb,
+                               "color sprite");
+    colorSpriteOpaquePso_ = makePso(device, lib, "sprite_vs", "color_sprite_fs", MTL::PixelFormatBGRA8Unorm,
+                                     BlendOverAll, "color sprite (opaque in the Syphon alpha)");
+    solidColorPso_ = makePso(device, lib, "sprite_vs", "solid_color_fs", MTL::PixelFormatBGRA8Unorm, BlendOverRgb,
+                              "solid in color");
+    solidColorOpaquePso_ = makePso(device, lib, "sprite_vs", "solid_color_fs", MTL::PixelFormatBGRA8Unorm,
+                                    BlendOverAll, "solid in color (opaque in the Syphon alpha)");
     solidOpaquePso_ = makePso(device, lib, "sprite_vs", "solid_opaque_fs", MTL::PixelFormatBGRA8Unorm, BlendAlphaMax,
                               "opaque solids (Syphon alpha)");
     syphonAlphaPso_ = makePso(device, lib, "scene_fullscreen_vs", "syphon_alpha_fs", MTL::PixelFormatBGRA8Unorm,
@@ -1050,7 +1090,7 @@ ScenePipeline::~ScenePipeline() {
     }
     for (auto& fs : sets_) fs.release();
     for (auto& c : converts_) c.from->release();
-    for (auto* p : {colorizePso_, colorizeVideoPso_, colourSpritePso_, colourSpriteOpaquePso_, solidOpaquePso_, solidColourPso_, solidColourOpaquePso_, syphonAlphaPso_, backdropPso_, bakePso_,
+    for (auto* p : {colorizePso_, colorizeVideoPso_, colorSpritePso_, colorSpriteOpaquePso_, solidOpaquePso_, solidColorPso_, solidColorOpaquePso_, syphonAlphaPso_, backdropPso_, bakePso_,
                     tileLinePso_})
         if (p) p->release();
     if (lib_) lib_->release();
@@ -1058,6 +1098,8 @@ ScenePipeline::~ScenePipeline() {
     for (auto& [h, st] : spriteTex_)
         if (st.tex && !st.video) st.tex->release();
     if (display_) display_->release();
+    if (edge_) edge_->release();
+    if (lineCoverPso_) lineCoverPso_->release();
     for (auto* t : intensity_)
         if (t) t->release();
     bakes_.clear();
@@ -1530,6 +1572,38 @@ void ScenePipeline::encodeStep(MTL::CommandBuffer* cmd, const engine::LineSegmen
     }
     enc->endEncoding();
 
+    // 2a. Color edges (reforce.LineEdges = color): this step's line coverage for the colorize pass.
+    edgeValid_ = false;
+    if (opts_.colorEdges && aa && segmentCount > 0) {
+        if (!edge_) {
+            MTL::TextureDescriptor* td =
+                MTL::TextureDescriptor::texture2DDescriptor(MTL::PixelFormatRGBA8Unorm, width_, height_, false);
+            td->setUsage(MTL::TextureUsageRenderTarget | MTL::TextureUsageShaderRead);
+            td->setStorageMode(MTL::StorageModePrivate);
+            perf::countRenderAlloc();  // once, when the option is first used
+            edge_ = device_->newTexture(td);
+            if (!edge_) throw std::runtime_error("line coverage texture allocation failed");
+            edge_->setLabel(NS::String::string("line coverage", NS::UTF8StringEncoding));
+        }
+        MTL::RenderPassDescriptor* ep = MTL::RenderPassDescriptor::renderPassDescriptor();
+        auto* ea = ep->colorAttachments()->object(0);
+        ea->setTexture(edge_);
+        ea->setLoadAction(MTL::LoadActionClear);
+        ea->setClearColor(MTL::ClearColor(0, 0, 0, 0));
+        ea->setStoreAction(MTL::StoreActionStore);
+        MTL::RenderCommandEncoder* ee = cmd->renderCommandEncoder(ep);
+        ee->setLabel(NS::String::string("line coverage", NS::UTF8StringEncoding));
+        const float mode = pathAa ? (opts_.thinLines == ThinLines::GForce ? 4.f : 2.f) : 1.f;
+        LineParams lp{{float(width_), float(height_)}, mode, 0.f, {}};
+        ee->setRenderPipelineState(lineCoverPso_);
+        ee->setVertexBuffer(lineBuffer(cmd, segments, segmentCount * sizeof(engine::LineSegment)), 0, 0);
+        ee->setVertexBytes(&lp, sizeof(lp), 1);
+        ee->setFragmentBytes(&lp, sizeof(lp), 0);
+        ee->drawPrimitives(MTL::PrimitiveTypeTriangleStrip, NS::UInteger(0), NS::UInteger(4), NS::UInteger(segmentCount));
+        ee->endEncoding();
+        edgeValid_ = true;
+    }
+
     // 2b. sprites. MSAA lines can't split their pass: the feedback stamps go after the lines there.
     if (feedbackCount > 0 && feedbackBeforeLines && !split)
         encodeSprites(cmd, next, feedbackQuads, feedbackCount, "sprites (feedback)");
@@ -1558,9 +1632,9 @@ void ScenePipeline::encodeStep(MTL::CommandBuffer* cmd, const engine::LineSegmen
 
 void ScenePipeline::encodeColorize(MTL::CommandBuffer* cmd, const engine::Palette& palette,
                                    const engine::MapLut& lut, MTL::Texture* output, const VideoLayerDraw* video,
-                                const SpriteQuad* colourQuads, std::size_t colourCount, bool trackAlpha,
+                                const SpriteQuad* colorQuads, std::size_t colorCount, bool trackAlpha,
                                 const SpriteQuad* opaqueSolids, std::size_t opaqueCount,
-                                const SpriteQuad* colourSolids, std::size_t colourSolidCount) {
+                                const SpriteQuad* colorSolids, std::size_t colorSolidCount) {
     flushConverts(cmd);
     const float outAlpha = trackAlpha ? 0.0f : 1.0f;
     if (!initialized_) encodeClear(cmd);
@@ -1572,6 +1646,9 @@ void ScenePipeline::encodeColorize(MTL::CommandBuffer* cmd, const engine::Palett
     enc->setFragmentBytes(palette.data(), sizeof(engine::Palette), 0);
     enc->setFragmentBytes(lut.data(), sizeof(engine::MapLut), 1);
     enc->setFragmentBytes(&outAlpha, sizeof(outAlpha), withVideo ? 3 : 2);
+    const int32_t edges = edgeValid_ && edge_ && opts_.colorEdges ? 1 : 0;
+    enc->setFragmentTexture(edges ? edge_ : dummyMask_, 3);
+    enc->setFragmentBytes(&edges, sizeof(edges), 4);
     if (withVideo) {
         const engine::VideoLayerParams& p = video->params;
         VideoP vp{};
@@ -1601,8 +1678,8 @@ void ScenePipeline::encodeColorize(MTL::CommandBuffer* cmd, const engine::Palett
         enc->setFragmentBytes(&vp, sizeof(vp), 2);
     }
     enc->drawPrimitives(MTL::PrimitiveTypeTriangle, NS::UInteger(0), NS::UInteger(3));
-    for (std::size_t i = 0; i < colourCount; ++i) {
-        const SpriteQuad& q = colourQuads[i];
+    for (std::size_t i = 0; i < colorCount; ++i) {
+        const SpriteQuad& q = colorQuads[i];
         auto it = spriteTex_.find(q.texture);
         if (it == spriteTex_.end() || !it->second.tex || !it->second.video || q.w <= 0 || q.h <= 0 || !(q.opacity > 0))
             continue;
@@ -1610,19 +1687,19 @@ void ScenePipeline::encodeColorize(MTL::CommandBuffer* cmd, const engine::Palett
         SpriteP sp{{float(width_), float(height_)}, {q.cx, q.cy}, {q.w * 0.5f, q.h * 0.5f}, 1.0f, q.opacity, 0, 0, 0.0f,
                    1, it->second.invert ? 1 : 0, 0, 0.0f, lv.identity() ? 0 : 1, lv.black, lv.white, lv.gamma, 0,
                    {q.u0, q.v0, q.u1, q.v1}};
-        enc->setRenderPipelineState(trackAlpha && q.opaque ? colourSpriteOpaquePso_ : colourSpritePso_);
+        enc->setRenderPipelineState(trackAlpha && q.opaque ? colorSpriteOpaquePso_ : colorSpritePso_);
         enc->setVertexBytes(&sp, sizeof(sp), 0);
         enc->setFragmentBytes(&sp, sizeof(sp), 0);
         enc->setFragmentTexture(it->second.tex, 0);
         enc->drawPrimitives(MTL::PrimitiveTypeTriangleStrip, NS::UInteger(0), NS::UInteger(4));
     }
-    for (std::size_t i = 0; i < colourSolidCount; ++i) {
-        const SpriteQuad& q = colourSolids[i];
+    for (std::size_t i = 0; i < colorSolidCount; ++i) {
+        const SpriteQuad& q = colorSolids[i];
         auto it = spriteTex_.find(q.texture);
         if (it == spriteTex_.end() || !it->second.tex || q.w <= 0 || q.h <= 0 || !(q.opacity > 0)) continue;
         SpriteP sp{{float(width_), float(height_)}, {q.cx, q.cy}, {q.w * 0.5f, q.h * 0.5f}, 1.0f, q.opacity,
                    q.puzzle, 0, q.numeral, 0, 0, 0, 0.0f, 0, 0.0f, 1.0f, 1.0f, 0, {q.u0, q.v0, q.u1, q.v1}};
-        enc->setRenderPipelineState(trackAlpha && q.opaque ? solidColourOpaquePso_ : solidColourPso_);
+        enc->setRenderPipelineState(trackAlpha && q.opaque ? solidColorOpaquePso_ : solidColorPso_);
         enc->setVertexBytes(&sp, sizeof(sp), 0);
         enc->setFragmentBytes(&sp, sizeof(sp), 0);
         enc->setFragmentBytes(palette.data(), sizeof(engine::Palette), 1);

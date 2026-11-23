@@ -95,7 +95,7 @@ private:
     scene::OrganicInstance& inst_;
 };
 
-// Grid layout shared by the cellular automata: cols x rows cells, centred, at most 3.3 x 1.85 tree units.
+// Grid layout shared by the cellular automata: cols x rows cells, centered, at most 3.3 x 1.85 tree units.
 struct Grid {
     int cols = 1, rows = 1;
     double cell = 0.05, x0 = 0, y0 = 0;
@@ -494,10 +494,10 @@ void OrganicCanvas::fillPolygon(const double* xs, const double* ys, int n, doubl
         y1 = std::max(y1, py[i]);
     }
     const float pf = float(pen);
-    // Hard-edged strokes (negative radius; a soft rim's in-between intensities take unrelated ColorMap colours),
+    // Hard-edged strokes (negative radius; a soft rim's in-between intensities take unrelated ColorMap colors),
     // laid on the pixel grid so the edges are clean: one stroke per pair of pixel rows (radius 1 on the line between
-    // them covers both rows' centres and nothing else), each ending on the first and last pixel centre inside the
-    // span, whose round cap then reaches no further pixel (square corners). Pixel centres are at k + .5.
+    // them covers both rows' centers and nothing else), each ending on the first and last pixel center inside the
+    // span, whose round cap then reaches no further pixel (square corners). Pixel centers are at k + .5.
     const auto spans = [&](float y, float rad) {
         float hits[64];
         int k = 0;

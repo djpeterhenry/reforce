@@ -110,6 +110,17 @@ bool isNativeVar(SceneType type, Var v) {
 }
 
 namespace {
+// Literal (text) keys of model solids (docs/model-design.md): the model file, the camera move, the front / up axes.
+bool isSolidLiteral(const std::string& key) {
+    if (key == "FILE" || key == "MOVE" || key == "FRONT" || key == "UP") return true;
+    // Camera path keyframes and options (engine/CameraMoves.hpp): K1, K2, ..., Ease, Step, Rand, Push.
+    if (key == "EASE" || key == "STEP" || key == "RAND" || key == "PUSH") return true;
+    return key.size() >= 2 && key[0] == 'K' &&
+           key.find_first_not_of("0123456789", 1) == std::string::npos;
+}
+}  // namespace
+
+namespace {
 
 bool isPathKey(const std::string& k) {
     if (k.size() < 2 || (k[0] != 'X' && k[0] != 'Y')) return false;
@@ -144,7 +155,7 @@ Tier tierFor(SceneType type, const std::string& key, int& family, int& index, bo
     }
     family = index = -1;
     if (key == "VERS" || key == "META") return Tier::Ignored;
-    if (type == SceneType::Dancer) return Tier::Ignored;  // every key is a literal (colours, names, numbers)
+    if (type == SceneType::Dancer) return Tier::Ignored;  // every key is a literal (colors, names, numbers)
     if (key == "ASPC") return Tier::Pre;
     if (isWave(type)) {
         if (key == "NUM" || key == "STPS" || key == "PDUR" || key == "CONB") return Tier::Pre;
@@ -166,7 +177,15 @@ Tier tierFor(SceneType type, const std::string& key, int& family, int& index, bo
             key == "TURN" || key == "SEED" || key == "SHUF" ||
             key == "FROS" || key == "TINT" || key == "BEND")
             return Tier::FrameOutput;
+        // Model solids (docs/model-design.md): the camera and the look, per frame.
+        if (key == "DIST" || key == "HITE" || key == "SIDE" || key == "ROLL" || key == "FOV" ||
+            key == "CUTB" || key == "CAMX" || key == "CAMY" || key == "CAMZ" || key == "AIMX" || key == "AIMY" ||
+            key == "AIMZ" || key == "SPIN" || key == "BANK" || key == "GLOW" || key == "BLOM" ||
+            key == "EXPO" || key == "LTX" || key == "LTY" || key == "LTZ")
+            return Tier::FrameOutput;
         if (key == "MESH") return Tier::Ignored;  // a literal name (CompiledKey::text), not an expression
+        if (isSolidLiteral(key)) return Tier::Ignored;  // model File / Move / Front / Up, camera keyframes
+        if (key == "LOOK" || key == "MDUR" || key == "MBAR" || key == "LOOP") return Tier::Pre;
         if (key == "TEXT" || key == "FLAG" || key == "PDUR" || key == "PERS" || key == "OVER" || key == "COLORKEY" || key == "GLAS" ||
             key == "MOVES")
             return Tier::Pre;
@@ -266,7 +285,7 @@ CompiledConfig compileConfig(const SceneFile& file, SceneType type, const Compil
         CompiledKey& k = cfg.keys[i];
         const SceneEntry& e = *effective[i];
         if (k.key == "META") continue;  // metadata string, not an expression
-        if (type == SceneType::Solid && k.key == "MESH") continue;  // literal mesh name
+        if (type == SceneType::Solid && (k.key == "MESH" || isSolidLiteral(k.key))) continue;  // literal names
         if (type == SceneType::Dancer) continue;  // literal keys (engine/Dancers.cpp dancerSpec)
         if (type == SceneType::Organic && (k.key == "KIND" || k.key == "AXM" || k.key == "R1" || k.key == "R2" ||
                                            k.key == "R3" || k.key == "R4"))

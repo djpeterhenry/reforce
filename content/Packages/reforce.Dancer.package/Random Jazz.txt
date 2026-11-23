@@ -1,4 +1,4 @@
 Vers=100
-Meta="reforce dancer: someone new every time: a jazz dancer (street jazz: sharp hits, body lines and poses), dressed to match (body, colours, outfit, prints, fabrics, sunglasses, face)."
+Meta="reforce dancer: someone new every time: a jazz dancer (street jazz: sharp hits, body lines and poses), dressed to match (body, colors, outfit, prints, fabrics, sunglasses, face)."
 Style="jazz"
 Random="1"

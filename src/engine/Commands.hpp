@@ -33,9 +33,9 @@ enum class CommandType {
     ReleaseCrossfader,      // layer
     Kill,                   // Particle / Sprite / Solid layer: fade every live one out over Transition.Duration.Quick;
                             // Union: clear (Director::clearUnion)
-    // Video (Phase 5F). `videoTarget` = the colour layer or a sprite.
+    // Video (Phase 5F). `videoTarget` = the color layer or a sprite.
     VideoStart,             // text = source ("file:PATH", "camera[:ID]", "syphon:NAME", or a video library name)
-    VideoStop,              // colour layer: fade out over its crossfade; sprites: fade every video sprite out
+    VideoStop,              // color layer: fade out over its crossfade; sprites: fade every video sprite out
     VideoSet,               // text = key (engine::applyVideoSetting), arg = value
     VideoHold,              // movie sprites: loop until stopped (session only)
     // Look (engine/Look.hpp): text = look key ("thinlines", ...) with arg = value, or an
@@ -130,7 +130,7 @@ std::string validateLook(const Command& c);
 //   starts the next of the playlist (quick), kill:particle|sprite fades all out
 //   over Transition.Duration.Quick. Solids (PLAN 5L.4) work like particles:
 //   switch:object:NAME, next:object, kill:object (Objects: solids and organics).
-//   Video (Phase 5F): video:layer:SOURCE plays SOURCE on the colour video layer
+//   Video (Phase 5F): video:layer:SOURCE plays SOURCE on the color video layer
 //   (crossfade), video:sprite:SOURCE starts it as a movie/live sprite;
 //   SOURCE = file:PATH | camera[:ID] | syphon:NAME | a name from the video
 //   library. videostop:layer|sprite. videohold (movie sprites loop until stopped). videoset:KEY:VALUE (opacity, blend, fit,
@@ -214,7 +214,7 @@ struct AudioState {
     double linkBpm = 0, linkBeat = 0, linkPhase = 0, linkQuantum = 4;
 };
 
-// Video (Phase 5F) for the web UI: the colour layer and the video sprites.
+// Video (Phase 5F) for the web UI: the color layer and the video sprites.
 struct VideoState {
     bool layerActive = false;         // a source is shown (or fading in/out)
     std::string layerSource;          // label of the current (or outgoing) source
@@ -234,7 +234,7 @@ struct VideoState {
     std::vector<std::string> sprites;  // video sprites alive (movie + live)
     bool spritesHeld = false;          // "loop until stopped" active
     bool beatSync = true;              // reforce.Video.BeatSync (videoset beatsync)
-    std::string spriteColour = "off";  // reforce.MovieSprite.Colour: off | over (videoset spritecolour)
+    std::string spriteColor = "off";  // reforce.MovieSprite.Color: off | over (videoset spritecolor)
     bool syphonAlpha = true;           // reforce.Syphon.Alpha (videoset syphonalpha)
     bool windowVisuals = false;        // reforce.Window.VisualsOnly (videoset windowvisuals)
     // Room lights (reforce.Lights.*, docs/lights.md; videoset lights / lightsbrightness / ...).
@@ -249,7 +249,7 @@ struct VideoState {
     bool lightsPulsing = false;        // live: the pulse runs (on, beat clock confident)
     double lightsSide = 150;           // the panels' side length (layout units)
     std::vector<double> lightsLayout;  // per panel x, y, o (layout units, y up; degrees)
-    std::string lightsColours;         // live: per panel "rrggbb", as last sent
+    std::string lightsColors;         // live: per panel "rrggbb", as last sent
     double keySimilarity = 80, keySmoothness = 50;  // reforce.Syphon.KeySimilarity / KeySmoothness (OBS units)
     // Camera backdrop (reforce.Backdrop.*, docs/backdrop.md; videoset backdrop / backdropmirror / backdropfit /
     // backdropopacity).

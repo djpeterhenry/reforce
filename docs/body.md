@@ -46,7 +46,7 @@ with the camera image.
 | Panel | Setting | What it does |
 |---|---|---|
 | Person in front | `reforce.Body.Front` 0..1 | The mask cuts through the visuals on the backdrop pass: the camera shows the person in front of the visuals, behind the dancers, their floor and the now-playing text. |
-| Silhouette in visuals | `reforce.Body.Burn` off / fill / outline / motion, `reforce.Body.BurnAmount` 0..1 | Drawn into the trail buffer every step (I = max(I, amount × x)), so the flow field carries and colours it: the whole silhouette, its edge, or only where it moved since the previous mask. |
+| Silhouette in visuals | `reforce.Body.Burn` off / fill / outline / motion, `reforce.Body.BurnAmount` 0..1 | Drawn into the trail buffer every step (I = max(I, amount × x)), so the flow field carries and colors it: the whole silhouette, its edge, or only where it moved since the previous mask. |
 | Hand trails | `reforce.Body.Trails` 0..1 (0 = off), `reforce.Body.TrailWidth` px at 1080 | A line from where each wrist was to where it is now, each step, into the trail buffer (light painting; the flow smears it). |
 | Show tracking | `reforce.Body.Show` | Tints the mask red and marks the joints green on the output, to check the tracking. |
 | Track / Quality | `reforce.Body.Track`, `reforce.Body.Quality` balanced / fast | |

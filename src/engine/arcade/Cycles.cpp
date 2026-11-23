@@ -49,7 +49,7 @@ CyclesSim::CyclesSim(const CyclesConfig& c, std::uint64_t seed) : cfg_(c), rng_(
     stamp_.assign(n, 0);
     queue_.reserve(n);
     cycles_.resize(std::size_t(cfg_.num));
-    // Levels spread over .62 .. 1 (dimmer reads as black in many ColorMaps), partners far from their leaders so a mirrored pair still reads as two colours.
+    // Levels spread over .62 .. 1 (dimmer reads as black in many ColorMaps), partners far from their leaders so a mirrored pair still reads as two colors.
     const int pairs = cfg_.num / 2;
     for (int i = 0; i < cfg_.num; ++i) {
         const int slot = i < 2 * pairs ? (i % 2 == 0 ? i / 2 : pairs + i / 2) : i;
@@ -164,7 +164,7 @@ void CyclesSim::startRound(double beat, bool sparks) {
     roundBeat_ = beat;
     ++stats_.rounds;
 
-    // A formation: each pair placed as mirror images (left-right, up-down or about the centre), the leader's slot
+    // A formation: each pair placed as mirror images (left-right, up-down or about the center), the leader's slot
     // in fractions of the arena.
     struct Slot {
         double fx, fy;

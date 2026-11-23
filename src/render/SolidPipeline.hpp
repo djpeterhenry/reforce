@@ -8,7 +8,7 @@
 //
 //   - Startup (constructor, no render-thread allocations): one vertex buffer with every engine::makeMesh mesh
 //     (offsets per MeshKind), the pipeline and depth states, `maxLive` RGBA8 targets at the full render size
-//     (registered as sprite textures with premultiplied luminance), and one memoryless 4x MSAA colour + Depth32Float
+//     (registered as sprite textures with premultiplied luminance), and one memoryless 4x MSAA color + Depth32Float
 //     pair shared by all slots (memoryless: no memory; private storage on GPUs without memoryless support).
 //   - encode(): the solid is drawn only over its screen bounding box (engine::projectBounds, snapped out to whole
 //     pixels plus a 1 px margin). The clip-space position is shifted so that box lands at the target's top-left
@@ -25,7 +25,7 @@
 //     square [-1, 1]^2 in authored units fills the tile, so circles stay round for Aspc = 0 and 1) and the lines
 //     are drawn by ScenePipeline::encodeTileLines (the analytic line shader), then the mips are generated.
 //   - Text=1, the frame (encodeFrameTile): the previous intensity frame (ScenePipeline::previousIntensity, the
-//     buffer this step's flow pass reads), its centred square crop (aspect kept; the full height of a landscape
+//     buffer this step's flow pass reads), its centered square crop (aspect kept; the full height of a landscape
 //     frame) downsampled into a second mipmapped tile with a 4-tap filter. Recursive (Droste-like): the faces show
 //     the frame that contains the solid.
 //   - Text=2: flat (tex = 1), the phase-2 look.
@@ -35,16 +35,16 @@
 //   lum = fill + (1 - fill) * tex                                     tex = the face source above, 0..1
 //   lum *= mix(1, max(0, dot(n, light)), shade)                       n = world-space normal, light = unit vector
 //   lum = max(lum, edge * (1 - smoothstep(0, edgeWidth, e)))         e = the mesh's interpolated edge value (0 on a
-//                                                                     face border, 1 at its centre; smooth meshes 1)
+//                                                                     face border, 1 at its center; smooth meshes 1)
 //   out = (saturate(lum), 1)
 //
 // rubik_fs (MeshKind::Rubik, drawn once per cubie: the whole cube's model x the turning layer's rotation x the
-// cubie's position): lum = the sticker colour's intensity on an outer sticker, else the plastic's (body), times the
+// cubie's position): lum = the sticker color's intensity on an outer sticker, else the plastic's (body), times the
 // same shading term; the cube's circumradius is Scal.
 //
-// fifteen_fs (MeshKind::Fifteen, drawn once per tile; no tray): r = the tile's row-colour intensity everywhere on the
-// tile, b = the share outside its number's seven-segment strokes (analytic, anti-aliased). The colour pass draws the
-// strokes in a contrasting shade of the tile's colour (dark on light tiles, light on dark ones).
+// fifteen_fs (MeshKind::Fifteen, drawn once per tile; no tray): r = the tile's row-color intensity everywhere on the
+// tile, b = the share outside its number's seven-segment strokes (analytic, anti-aliased). The color pass draws the
+// strokes in a contrasting shade of the tile's color (dark on light tiles, light on dark ones).
 //
 // Solids come from scene files (engine/Solids.hpp SolidRun, reforce.Solid.package; app/Visualizer startSolid), or
 // from the test hook `--solid-test SPEC` (app/main.cpp), parsed by parseSolidTest below.
@@ -82,7 +82,7 @@ struct SolidShading {
     float fill = 0.15f;       // Fill: floor of the face texture (phase 2: flat, so faces are 1 before shading)
     float shade = 0.6f;       // Shad: 0 = flat, 1 = full Lambert
     float edge = 0.8f;        // Edge: brightness of the face-border highlight (0 = none)
-    float edgeWidth = 0.08f;  // in edge units (0 = border, 1 = face centre)
+    float edgeWidth = 0.08f;  // in edge units (0 = border, 1 = face center)
     std::array<float, 3> light{0.4f, 0.6f, 1.0f};  // direction towards the light (normalized when used)
 };
 
@@ -94,27 +94,27 @@ struct SolidDraw {
     double fovDegrees = 40.0;
     SolidText text = SolidText::Flat;  // the test hook's default; scene files default to Wave
     SolidShading shading;
-    // mesh == Rubik (engine/Rubik.hpp): the cube's state and turn in progress, the intensity of each sticker colour
+    // mesh == Rubik (engine/Rubik.hpp): the cube's state and turn in progress, the intensity of each sticker color
     // (engine::StickerPicker) and of the plastic. Text, Fill and Edge are not used; Shad is (best 0: shading changes
-    // a sticker's intensity and so its colour).
+    // a sticker's intensity and so its color).
     engine::rubik::Frame rubik = engine::rubik::frameAt(0, 0, 0);
     std::array<float, 6> stickers{0.3f, 0.44f, 0.58f, 0.72f, 0.86f, 1.0f};
     float body = 0.0f;
     // mesh == Fifteen (engine/Fifteen.hpp): the tiles' places; row r of the solved board (tiles 4r+1..4r+4) takes
-    // stickers[kFifteenRowColour[r]]; the numbers get a contrasting shade of it in the colour pass.
+    // stickers[kFifteenRowColor[r]]; the numbers get a contrasting shade of it in the color pass.
     engine::fifteen::Frame fifteen = engine::fifteen::frameAt(0, 0, 0);
 };
 // The 15 puzzle as glass (scene key Glas = 1; docs/3d-design.md "Glass"): drawn over the colorized frame
 // (encodeGlass), not into the visuals, so the WaveShape and flow keep running under it. Each tile is a 3D glass
 // button (engine::makeGlassButton: rounded square, walls, rounded top edge) drawn with 4x MSAA and depth into its
-// slot target, showing the frame blurred (Fros) and bent by its surface (Bend), tinted with its row colour (Tint),
+// slot target, showing the frame blurred (Fros) and bent by its surface (Bend), tinted with its row color (Tint),
 // with a highlight, a Fresnel sheen and its number; the resolved target is then laid over the frame.
 struct GlassDraw {
     engine::SolidPose pose;
     bool perspective = true;
     engine::fifteen::Frame fifteen = engine::fifteen::frameAt(0, 0, 0);
     std::array<std::array<float, 3>, 4> tint{};     // per row of the solved board, sRGB 0..1
-    std::array<std::array<float, 3>, 4> numeral{};  // the numbers' colour per row
+    std::array<std::array<float, 3>, 4> numeral{};  // the numbers' color per row
     float frost = 12.0f;  // blur sigma in pixels at 1080p
     float tintAmount = 0.35f;
     float bend = 1.0f;    // refraction at the rim
@@ -124,8 +124,8 @@ struct GlassDraw {
     int slot = -1;        // the solid slot whose target holds the buttons (MSAA resolve) before the composite
 };
 
-// The sticker colours the 15 puzzle's rows use: one of each opposite-face pair first (those are the farthest apart).
-inline constexpr int kFifteenRowColour[4] = {0, 2, 4, 1};
+// The sticker colors the 15 puzzle's rows use: one of each opposite-face pair first (those are the farthest apart).
+inline constexpr int kFifteenRowColor[4] = {0, 2, 4, 1};
 
 // Where a drawn solid landed: the sprite quad (render pixels, origin top-left) and the target sub-rectangle.
 struct SolidQuad {
@@ -140,8 +140,8 @@ struct SolidReference {
     float x0 = 0, y0 = 0, x1 = 0, y1 = 0;  // projected vertex extent, render pixels (origin top-left, +y down)
     double area = 0;                       // area of the 2D convex hull of the projected vertices, pixels^2
     struct Face {
-        float x = 0, y = 0;  // projected face centre, render pixels
-        float lum = 0;       // expected solid_fs luminance at the centre (no edge highlight there; flat source)
+        float x = 0, y = 0;  // projected face center, render pixels
+        float lum = 0;       // expected solid_fs luminance at the center (no edge highlight there; flat source)
         float facing = 0;    // cos of the angle between the normal and the direction to the camera
     };
     std::vector<Face> faces;  // front faces of polyhedra (hull faces), most camera-facing first
@@ -190,6 +190,10 @@ public:
     MTL::Texture* target(int slot) const { return slots_[std::size_t(slot)].tex; }
     int spriteTexture(int slot) const { return slots_[std::size_t(slot)].handle; }
 
+    // Shared with render/ModelPipeline (3D models draw into the same slots, one pass at a time).
+    MTL::Texture* msaaColorTexture() const { return msaaColor_; }  // null when msaa() == 1
+    MTL::Texture* depthTexture() const { return depthTex_; }
+
     int tileSize() const { return tileSize_; }
     MTL::Texture* waveTile() const { return waveTile_; }
     MTL::Texture* frameTile() const { return frameTile_; }
@@ -197,7 +201,7 @@ public:
     // Face sources for this step (call once per step, before encode(), only when a live solid uses them):
     // Text=0: draws `segments` (tile pixels, origin top-left) into the WaveShape tile and builds its mips.
     void encodeWaveTile(MTL::CommandBuffer* cmd, const engine::LineSegment* segments, std::size_t count);
-    // Text=1: the centred square crop of the previous intensity frame into the frame tile, with mips.
+    // Text=1: the centered square crop of the previous intensity frame into the frame tile, with mips.
     void encodeFrameTile(MTL::CommandBuffer* cmd);
 
     // Draws `d` into slot's target (clear + mesh) on `cmd`; encode before the ScenePipeline step that composites

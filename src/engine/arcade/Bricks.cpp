@@ -4,7 +4,7 @@
 // Our own design, inspired by the paddle-and-ball brick games' mechanics. The cycle is planned volley by volley (Game,
 // Bricks.hpp): at a constant speed, legs between paddle and brick hits of a whole number of ticks, so every hit is on
 // a tick line (the angle, and side-wall bounces, make the lengths fit); per hit, how many bricks it breaks (the target
-// and its nearest neighbours) so that the remainder lands on the final hits, which all end on the cycle line. The
+// and its nearest neighbors) so that the remainder lands on the final hits, which all end on the cycle line. The
 // paddle glides to where the ball will land. Drawing is a pure function of the plan and the beat, so a step that
 // jumps many beats costs at most a new plan.
 #include "engine/arcade/Bricks.hpp"
@@ -130,7 +130,7 @@ void Game::layoutWall(long k) {
         for (int r = 0; r < R; ++r)
             for (int c = 0; c < C; ++c) {
                 if (!has(c, r)) continue;
-                // Rows at different intensities, so the ColorMap gives them different colours.
+                // Rows at different intensities, so the ColorMap gives them different colors.
                 const double f = R > 1 ? double(r) / (R - 1) : 0;
                 double pen = 0.7;
                 switch (scheme) {
@@ -152,7 +152,7 @@ void Game::layoutWall(long k) {
     }
     claimBall_.assign(bricks_.size(), -1);
     // The brick the wall is eaten away towards: hits steer clear of it, so the last few left on the line are
-    // neighbours (one burst there, not scattered ones), high in the wall.
+    // neighbors (one burst there, not scattered ones), high in the wall.
     finale_ = 0;
     double best = -1;
     for (std::size_t b = 0; b < bricks_.size(); ++b) {
@@ -176,7 +176,7 @@ void Game::lowest(double t, std::vector<int>& low) const {
         if (bricks_[i].broken > t + kEps) low[std::size_t(col_[i])] = int(i);
 }
 
-// Whether the ball (centre path a -> b) passes below every brick present: within a column's span, the path stays under
+// Whether the ball (center path a -> b) passes below every brick present: within a column's span, the path stays under
 // that column's lowest brick. (Bricks only ever hang above their column's lowest one.)
 bool Game::clear(double ax, double ay, double bx, double by, const std::vector<int>& low) const {
     const double r = 0.5 * p_.ball;
@@ -374,7 +374,7 @@ double Game::fastVolley() const {
     return 2 * g * std::max(1.0, std::ceil(std::hypot(typical_, 0.6) / (p_.speed * g) - 0.2));
 }
 
-// Commits ball i's hit of `target` at t1 breaking n bricks: the target (when free) and its nearest free neighbours,
+// Commits ball i's hit of `target` at t1 breaking n bricks: the target (when free) and its nearest free neighbors,
 // leaning upwards (a tunnel into the wall). n = 0: the ball just knocks on it. Returns the bricks broken.
 int Game::claim(int i, int target, double t1, int n, bool final) {
     if (n <= 0 || target < 0) return 0;
@@ -409,14 +409,14 @@ int Game::legMin() const {
     return std::max(1, int(std::ceil((top_ - padContact_) / (p_.speed * tick()) - 1e-9)));
 }
 
-// The paddle (ball 0) meets the ball off-centre, on the side that sends it along the path's first piece.
+// The paddle (ball 0) meets the ball off-center, on the side that sends it along the path's first piece.
 void Game::paddleKey(double t, double px, double nx, double ny) {
     const double r = 0.5 * p_.ball, W = p_.halfW;
     const double lean = std::clamp((nx - px) / std::max(0.2, ny - padContact_) * 0.5, -1.0, 1.0);
     const double half = 0.5 * p_.paddle, reach = std::max(0.0, half - 0.5 * r);
-    double centre = std::clamp(px - lean * 0.6 * half, -W + half, W - half);
-    centre = std::clamp(centre, px - reach, px + reach);
-    padKeys_.push_back({t, centre});
+    double center = std::clamp(px - lean * 0.6 * half, -W + half, W - half);
+    center = std::clamp(center, px - reach, px + reach);
+    padKeys_.push_back({t, center});
 }
 
 namespace {

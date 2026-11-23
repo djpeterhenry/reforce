@@ -1,6 +1,6 @@
 """Probe run 32 sprite set: the keying threshold during fades and at fractional pens (stdlib only).
 
-Writes build/probe-sprites32/. 660x420 gray images, 11 columns of 60 px, native size (Flag 0 / 1024) in the frame centre:
+Writes build/probe-sprites32/. 660x420 gray images, 11 columns of 60 px, native size (Flag 0 / 1024) in the frame center:
   K1 fade ramp     10 12 14 16 18 20 23 26 30 35 255   (the 255 column gives the envelope in each shot)
   K2 fine ramp     26 28 29 30 31 32 33 34 35 36 255   (x .3 = 7.8 ... 10.8 levels)
   K3 dark image     0  4  8 10 12 14 16 18 20 20 20   (no bright pixel at all: auto-levelled?)

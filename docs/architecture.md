@@ -248,7 +248,7 @@ kinds of source, used by two consumers:
    render thread: frameAt(source time) picks a frame (never decodes; try_lock, keeps the last one on contention)
         ├─ (a) movie / live sprite: sprite pass samples the frame, luminance in the shader (Rec. 601, like
         │      toLumaAlpha; `~`/Invt/Flag 16 invert there) → intensity buffer → ColorMap
-        └─ (b) colour layer: colorize_video_fs = colorize + fit + key + crossfade A→B + blend over/under,
+        └─ (b) color layer: colorize_video_fs = colorize + fit + key + crossfade A→B + blend over/under,
                one pass into the output texture (window + Syphon)
 ```
 

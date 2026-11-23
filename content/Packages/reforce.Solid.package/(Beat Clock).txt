@@ -1,5 +1,5 @@
 Vers=100
-Meta="reforce debug solid: shows the beat clock. Locked: a white cube steps through four places left to right, one per beat (with Link the leftmost is the bar line), and flashes big and bright for the first quarter of each beat. Not locked: small and dim in the centre. Parenthesized: never in a slideshow; start it from the Solids card, Clear removes it."
+Meta="reforce debug solid: shows the beat clock. Locked: a white cube steps through four places left to right, one per beat (with Link the leftmost is the bar line), and flashes big and bright for the first quarter of each beat. Not locked: small and dim in the center. Parenthesized: never in a slideshow; start it from the Solids card, Clear removes it."
 Mesh="cube"
 Text="2"
 PDur="3600"

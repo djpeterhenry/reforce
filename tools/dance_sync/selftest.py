@@ -98,7 +98,7 @@ CASES = [  # renderer, bpm, first beat, output fps, seconds, cut, phase toleranc
     (render, 97.5, 0.40, 23.976, 45, 20.0, 12),
     (render, 140.0, 0.05, 25.0, 30, None, 12),
     (render, 110.3, 0.33, 30.0, 50, 31.0, 12),
-    # content timing is quantised to 15 fps and shown up to a frame late, so allow a frame of phase error
+    # content timing is quantized to 15 fps and shown up to a frame late, so allow a frame of phase error
     (render_bouncer, 90.0, 0.30, 2997 / 125, 60, None, 45),
     (render_bouncer, 113.0, 0.12, 2997 / 125, 60, 33.0, 45),
 ]
@@ -115,7 +115,7 @@ def main() -> int:
     for n, (rend, bpm, t0, fps, dur, cut, tol) in enumerate(CASES):
         p = OUT / f"synthetic_{n}.mp4"
         rend(p, bpm, t0, fps, dur, seed=n, cut_at=cut)
-        r = db.analyse(p, args)
+        r = db.analyze(p, args)
         period = 60 / bpm
         phase_ms = ((r["beat_start"] - t0) / period + 0.5) % 1.0 - 0.5
         phase_ms *= period * 1000

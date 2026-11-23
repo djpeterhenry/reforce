@@ -78,6 +78,8 @@ Visualizer::Visualizer(MTL::Device* device, const VisualizerOptions& opts)
         static const char* const kRounding[] = {"nearest", "floor", "point", "fixed16", "fixed256"};
         cur[engine::LookKey::FlowRounding] = kRounding[std::clamp(int(po.flowRounding), 0, 4)];
         cur[engine::LookKey::Antialias] = po.antialias ? "on" : "off";
+        cur[engine::LookKey::LineEdges] = po.colorEdges ? "color" : "gforce";
+        cur[engine::LookKey::Supersample] = opts.supersample > 1 ? "2x" : "1x";
         look_ = engine::LookControl(cur, engine::lookFromSettings(opts.prefs));
         opts_.prefs.flowPrecision = cur[engine::LookKey::FlowPrecision];
     }
@@ -94,6 +96,16 @@ Visualizer::Visualizer(MTL::Device* device, const VisualizerOptions& opts)
             solids_ = std::make_unique<render::SolidPipeline>(*pipeline_, so);
         } catch (const std::exception& e) {
             rlog("[reforce] 3D solids unavailable: %s\n", e.what());
+        }
+        if (solids_) {
+            try {
+                models_ = std::make_unique<render::ModelPipeline>(*solids_);
+                modelLoader_ = std::make_unique<ModelLoader>(*models_, opts.prefs.modelMaxTexture, opts.prefs.modelCache);
+                preloadModels();
+            } catch (const std::exception& e) {
+                rlog("[reforce] 3D models unavailable: %s\n", e.what());
+                models_.reset();
+            }
         }
         try {
             render::FieldPipelineOptions fo;
@@ -165,7 +177,7 @@ Visualizer::Visualizer(MTL::Device* device, const VisualizerOptions& opts)
     spriteLayering_ = engine::parseSpriteLayering(opts.prefs.spriteLayering).value_or(engine::SpriteLayering::GForce);
     spriteTrails_ = std::clamp(opts.prefs.spriteTrails, 0.0, 1.0);
     spriteIgnoreAlpha_ = opts.prefs.spriteAlpha == "ignore";
-    movieColourOver_ = opts.prefs.movieSpriteColour == "over";
+    movieColorOver_ = opts.prefs.movieSpriteColor == "over";
     syphonAlpha_ = opts.prefs.syphonAlpha;
     syphonPremultiplied_ = opts.prefs.syphonAlphaPremultiplied;
     windowVisualsOnly_ = opts.prefs.windowVisualsOnly;
@@ -180,9 +192,9 @@ Visualizer::Visualizer(MTL::Device* device, const VisualizerOptions& opts)
     bdFit_ = engine::parseVideoFit(opts.prefs.backdropFit).value_or(engine::VideoFit::Cover);
     bdOpacity_ = std::clamp(opts.prefs.backdropOpacity, 0.0, 1.0);
     body_ = opts.prefs.body;
-    if (opts.prefs.movieSpriteColour != "over" && opts.prefs.movieSpriteColour != "off")
-        rlog("[reforce] reforce.MovieSprite.Colour \"%s\": expected off or over (using off)\n",
-             opts.prefs.movieSpriteColour.c_str());
+    if (opts.prefs.movieSpriteColor != "over" && opts.prefs.movieSpriteColor != "off")
+        rlog("[reforce] reforce.MovieSprite.Color \"%s\": expected off or over (using off)\n",
+             opts.prefs.movieSpriteColor.c_str());
     setSpriteMix(false, opts.prefs.spriteMix);
     setSpriteMix(true, opts.prefs.movieSpriteMix);
     if (opts.prefs.spriteAlpha != "ignore" && opts.prefs.spriteAlpha != "black")
@@ -364,6 +376,10 @@ void Visualizer::applyLook(unsigned changed, std::string& note) {
         pipeline_->setIntensityFormat(v[LookKey::Intensity] == "hq" ? render::IntensityFormat::Half16
                                                                     : render::IntensityFormat::GForce8);
     }
+    if (has(LookKey::LineEdges)) pipeline_->setColorEdges(v[LookKey::LineEdges] == "color");
+    if (has(LookKey::Supersample))
+        note = ": Supersample " + v[LookKey::Supersample] + " applies the next time reforce starts (Save as default to keep "
+               "it; now running at " + std::string(opts_.supersample > 1 ? "2x" : "1x") + ")";
     if (has(LookKey::FlowPrecision)) {
         opts_.prefs.flowPrecision = v[LookKey::FlowPrecision];
         // A preloaded field was built with the old precision: drop it, so the
@@ -550,16 +566,19 @@ void Visualizer::colorize(MTL::CommandBuffer* cmd, MTL::Texture* output, double 
             holdFrames(cmd, keep);
         }
     }
-    if (!colourQuads_.empty() && !colourFrames_.empty()) {
-        colourHold_ = colourFrames_;
-        holdFrames(cmd, colourHold_);
+    if (!colorQuads_.empty() && !colorFrames_.empty()) {
+        colorHold_ = colorFrames_;
+        holdFrames(cmd, colorHold_);
     }
-    pipeline_->encodeColorize(cmd, palette_, lut_, output, layer, colourQuads_.data(), colourQuads_.size(),
+    pipeline_->encodeColorize(cmd, palette_, lut_, output, layer, colorQuads_.data(), colorQuads_.size(),
                               trackAlpha || backdrop, opaqueSolids_.data(), opaqueSolids_.size(),
-                              colourSolids_.data(), colourSolids_.size());
+                              colorSolids_.data(), colorSolids_.size());
     // Glass puzzles (Glas = 1) over the colorized frame, before anything else goes on top.
     if (solids_)
         for (const auto& g : glassDraws_) solids_->encodeGlass(cmd, output, g, trackAlpha || backdrop);
+    // 3D models in color (look B) over the colorized frame, likewise.
+    if (models_)
+        for (const auto& d : modelColorDraws_) models_->encodeColor(cmd, output, d, trackAlpha || backdrop);
     // The visuals alone (reforce.Window.VisualsOnly): copied before anything goes on top. Its alpha may hold the
     // Syphon key; the window ignores alpha.
     if (visualsCopy) {
@@ -567,13 +586,13 @@ void Visualizer::colorize(MTL::CommandBuffer* cmd, MTL::Texture* output, double 
         blit->copyFromTexture(output, visualsCopy);
         blit->endEncoding();
     }
-    // Room lights: the visuals alone, from the pass that has the colour video layer (docs/lights.md).
+    // Room lights: the visuals alone, from the pass that has the color video layer (docs/lights.md).
     if (withVideo && lightsOut_ && lightsOut_->wantsFrames()) captureLights(cmd, output);
     if (!overlays) return;
     // Camera backdrop (docs/backdrop.md): under the visuals, before the dancers (the person in front of the visuals
     // stays behind the dancers); the frame is opaque from here on.
     if (backdrop) encodeBackdrop(cmd, output);
-    // Dancers (PLAN 5P): in full colour over the finished frame, lit by it.
+    // Dancers (PLAN 5P): in full color over the finished frame, lit by it.
     if (dancers_ && (stage_.bodyCount > 0 || stage_.floor > 0.001f) && stage_.opacity > 0.001f)
         dancers_->encode(cmd, output, stage_, trackAlpha && !backdrop);
     encodeNameTags(cmd, output);

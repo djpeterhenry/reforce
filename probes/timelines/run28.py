@@ -1,9 +1,9 @@
 # reforce black-box probe run 28 (G-Force script, Python 2.7): sprite blend flags, alpha, keying threshold,
-# EPen scaling, colour weights, and the Pen / Pen+EPen / EPen fade envelopes. Follow-up to runs 26/27 (#40/#41).
+# EPen scaling, color weights, and the Pen / Pen+EPen / EPen fade envelopes. Follow-up to runs 26/27 (#40/#41).
 # Sprites from build/probe-sprites28 (tools/parity/make_sprite28.py) via G-Force.ExternalSprites.Path; run with
 # PROBE_PREFS Sprite.Transition.Duration=2, deviation 0 (StartSprite(name, 1): in 0-2 s, hold 2-3, out 3-5).
 #  A. identity field, WaveShape one dot, a full-frame flat-96 Pen sprite ('zz bg') restamped every frame, so every
-#     test sprite (native 660x420 lum x alpha grid in the centre) draws over F = 96; one shot each at full.
+#     test sprite (native 660x420 lum x alpha grid in the center) draws over F = 96; one shot each at full.
 #  B. void field (nothing fed back): fade-in 1.0 / 1.5 s, full, 1.0 s into the fade-out for Pen .5, Pen .5 +
 #     EPen 1, and EPen 1 alone.
 def ws( name, morph = 0 ):  vis.StartConfig( 'WaveShape', name, morph )

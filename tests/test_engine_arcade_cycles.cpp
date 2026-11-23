@@ -25,11 +25,11 @@ void play(CyclesSim& sim, double b0, double b1, double drop = 0, double build = 
     for (double b = b0; b <= b1 + 1e-9; b += 2.0 / 60.0) sim.advance(b, b / 4.0, drop, build);
 }
 
-bool onCentre(double v) { return std::abs(v - std::round(v)) < 1e-9; }
+bool onCenter(double v) { return std::abs(v - std::round(v)) < 1e-9; }
 
 }  // namespace
 
-TEST_CASE("arcade cycles: turns only on turn lines, heads on cell centres on every beat line") {
+TEST_CASE("arcade cycles: turns only on turn lines, heads on cell centers on every beat line") {
     for (int turn : {1, 2}) {
         for (double build : {0.0, 1.0}) {
             CAPTURE(turn);
@@ -49,8 +49,8 @@ TEST_CASE("arcade cycles: turns only on turn lines, heads on cell centres on eve
                     CHECK(turnLine);
                     // Turn lines: beats, or (Turn 2, or through a breakdown) 8ths.
                     const int div = std::min(4, turn * (build >= 0.5 ? 2 : 1));
-                    CHECK(onCentre(t * div));
-                    if (!onCentre(t)) ++offBeatTurns;
+                    CHECK(onCenter(t * div));
+                    if (!onCenter(t)) ++offBeatTurns;
                 }
             };
             for (int b = 0; b < 200; ++b) {
@@ -60,8 +60,8 @@ TEST_CASE("arcade cycles: turns only on turn lines, heads on cell centres on eve
                     if (!sim.cycles()[std::size_t(i)].alive) continue;
                     double x, y, a;
                     sim.head(i, b + 1, x, y, a);
-                    CHECK(onCentre(x));
-                    CHECK(onCentre(y));
+                    CHECK(onCenter(x));
+                    CHECK(onCenter(y));
                     CHECK(x >= 0);
                     CHECK(y >= 0);
                     CHECK(x <= cfg.cols - 1);
@@ -117,7 +117,7 @@ struct Watch {
                     // started.
                     ++rezzes;
                     CHECK(c.spawnBeat == t);
-                    CHECK(onCentre(t / 4.0));
+                    CHECK(onCenter(t / 4.0));
                     if (t != s.roundBeat()) {
                         CHECK(t >= c.outSince + 4.0 * s.config().out - 1e-9);
                         const auto& p = c.trail.front();

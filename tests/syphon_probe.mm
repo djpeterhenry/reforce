@@ -4,7 +4,7 @@
 //   reforce-syphon-probe [--name reforce] [--timeout 5] [--alpha]
 //
 // --alpha: also prints the frame's alpha (reforce.Syphon.Alpha): shares and a coarse map.
-// --save PATH: writes one received frame as a PNG (colour only, top row first).
+// --save PATH: writes one received frame as a PNG (color only, top row first).
 //
 // Exit code 0 = server found and >= 1 frame received; 1 = not found / no frames.
 

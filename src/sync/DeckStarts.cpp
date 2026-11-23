@@ -58,7 +58,7 @@ void DeckStarts::frame(double now, double T, const DeckFrame& f) {
     const int i = f.deck;
     Deck& d = d_[std::size_t(i)];
     if (!std::isfinite(f.gridBeat) || !std::isfinite(f.position) || !std::isfinite(T)) {
-        // No beatgrid (nothing loaded, or not analysed): nothing to place a start on.
+        // No beatgrid (nothing loaded, or not analyzed): nothing to place a start on.
         const double fader = d.fader, pad = d.lastPad;
         const int side = d.side;
         d = Deck{};

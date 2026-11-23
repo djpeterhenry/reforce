@@ -113,7 +113,7 @@ TEST_CASE("arcade invaders: a new wave descends in 8th-note steps over its first
     for (int k : ticks) CHECK(k % 2 == 0);
 }
 
-TEST_CASE("arcade invaders: the march hurries through a build, quantised to 8ths then 16ths") {
+TEST_CASE("arcade invaders: the march hurries through a build, quantized to 8ths then 16ths") {
     for (const auto& [build, every] : {std::pair{0.0, 4}, std::pair{0.5, 2}, std::pair{0.9, 1}}) {
         CAPTURE(build);
         arcade_test::Run r(kMarchOnly);

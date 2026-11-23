@@ -1,0 +1,17 @@
+// reforce camera preset (docs/model-design.md "The camera"): a slow half orbit from the front three-quarter view, tilted up at the model, rising a little mid-way.
+// Copy these lines into a model scene to change them; a scene's own K lines win over its Move preset.
+//      t     eye x  eye y  eye z    aim x aim y aim z   fov  [roll]
+K1="     0    2.295   0.45  1.933       0     0     0    40"
+K2="0.08333    2.717 0.5147  1.273       0     0     0    40  0.03"
+K3="0.1667    2.953  0.575 0.5265       0     0     0    40  0.05196"
+K4="  0.25    2.989 0.6268 -0.2559       0     0     0    40  0.06"
+K5="0.3333    2.821 0.6665 -1.021       0     0     0    40  0.05196"
+K6="0.4167    2.461 0.6915 -1.716       0     0     0    40  0.03"
+K7="   0.5    1.933    0.7 -2.295       0     0     0    40"
+K8="0.5833    1.273 0.6915 -2.717       0     0     0    40  -0.03"
+K9="0.6667   0.5265 0.6665 -2.953       0     0     0    40  -0.05196"
+K10="  0.75   -0.2559 0.6268 -2.989       0     0     0    40  -0.06"
+K11="0.8333   -1.021  0.575 -2.821       0     0     0    40  -0.05196"
+K12="0.9167   -1.716 0.5147 -2.461       0     0     0    40  -0.03"
+K13="     1   -2.295   0.45 -1.933       0     0     0    40"
+Ease=".3"

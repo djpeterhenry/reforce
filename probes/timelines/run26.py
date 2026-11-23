@@ -4,7 +4,7 @@
 # The grid WaveShape is redrawn every frame (so decay doesn't confound, unlike run 25).
 #  1. identity field: is the grid drawn over the sprite or hidden under it? Crossfade or per-frame stamp? Does
 #     anything of the sprite remain after it ends?
-#  2. zoom-in field (content shrinks toward the centre): does the sprite stream inward with the flow (stamped into
+#  2. zoom-in field (content shrinks toward the center): does the sprite stream inward with the flow (stamped into
 #     the feedback) or stay a clean layer?
 #  3. Pen / Pen+EPen / EPen-only (sibling .txt, X=.2 marks that it was read), full envelope then an instant kill:
 #     which part is displayed, which part feeds back (trail after the kill)?

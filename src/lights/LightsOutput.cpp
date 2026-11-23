@@ -455,7 +455,7 @@ void LightsOutput::pair() {
         std::unique_lock<std::mutex> lk(m_);
         cv_.wait_for(lk, std::chrono::seconds(2), [&] { return quit_ || pairCancel_; });
     }
-    setStatus("off", stopped() ? "pairing cancelled" : "pairing timed out (" + err + ")");
+    setStatus("off", stopped() ? "pairing canceled" : "pairing timed out (" + err + ")");
 }
 
 void LightsOutput::run() {
@@ -554,21 +554,21 @@ void LightsOutput::run() {
         if (fresh) {
             const double dt = std::chrono::duration<double>(now - lastUpdate).count();
             lastUpdate = now;
-            mapper_.update(work_.data(), w, h, row, std::min(dt, 0.5), s, colours_);
+            mapper_.update(work_.data(), w, h, row, std::min(dt, 0.5), s, colors_);
         }
-        if (!colours_.empty()) {
+        if (!colors_.empty()) {
             // Every tick (the pulse moves even when no new capture came in), after smoothing: the flash stays sharp.
-            sent_.resize(colours_.size());
-            for (std::size_t i = 0; i < colours_.size(); ++i)
-                sent_[i] = Rgb{std::uint8_t(std::lround(colours_[i].r * pulse)), std::uint8_t(std::lround(colours_[i].g * pulse)),
-                               std::uint8_t(std::lround(colours_[i].b * pulse))};
+            sent_.resize(colors_.size());
+            for (std::size_t i = 0; i < colors_.size(); ++i)
+                sent_[i] = Rgb{std::uint8_t(std::lround(colors_[i].r * pulse)), std::uint8_t(std::lround(colors_[i].g * pulse)),
+                               std::uint8_t(std::lround(colors_[i].b * pulse))};
             // The flash itself is instant; everything else fades over 100 ms.
             encodeStreamV2(ids_, sent_, beatTick ? 0 : kTransition, packet_);
             ::sendto(sock_, packet_.data(), packet_.size(), 0, reinterpret_cast<const sockaddr*>(addr_.data()),
                      socklen_t(addr_.size()));
             ++sentSinceHz;
             std::lock_guard<std::mutex> vl(viewM_);
-            for (std::size_t i = 0; i < view_.size() && i < sent_.size(); ++i) view_[i].colour = sent_[i];
+            for (std::size_t i = 0; i < view_.size() && i < sent_.size(); ++i) view_[i].color = sent_[i];
             status_.pulsing = pulsing;
         }
         if (now - hzStart >= std::chrono::seconds(1)) {

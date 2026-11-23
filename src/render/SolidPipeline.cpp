@@ -61,8 +61,8 @@ fragment float4 rubik_fs(SolidOut in [[stage_in]], constant RubikF& U [[buffer(0
     const float lv = d < 4 ? U.lv0[d] : U.lv1[d - 4];
     const bool sticker = in.uv.y > 0.5f && lv >= 0.0f;
     const float lum = sticker ? lv : U.body;
-    // Shading would change the intensity and so the colour: it goes to a instead, and the colour pass darkens the
-    // colour by it. b: sticker share, so the colour pass anti-aliases sticker / plastic borders in colour (after the
+    // Shading would change the intensity and so the color: it goes to a instead, and the color pass darkens the
+    // color by it. b: sticker share, so the color pass anti-aliases sticker / plastic borders in color (after the
     // resolve, r = sticker share x sticker intensity + plastic share x body, g = coverage, b = sticker share,
     // a = coverage x shading).
     const float shade = mix(1.0f, max(0.0f, dot(normalize(in.n), U.light.xyz)), U.shade);
@@ -77,7 +77,7 @@ static float segment(float2 p, float2 a, float2 b) {
     const float h = saturate(dot(pa, ba) / dot(ba, ba));
     return length(pa - ba * h);
 }
-// Seven-segment digit `d` centred at the origin, height 1 (y up); distance to its nearest lit segment's axis.
+// Seven-segment digit `d` centered at the origin, height 1 (y up); distance to its nearest lit segment's axis.
 static float digit_dist(float2 p, int d) {
     // a b c d e f g
     const int masks[10] = {0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F};
@@ -98,13 +98,13 @@ static float digit_dist(float2 p, int d) {
 static float2 digit_span(int d) { return d == 1 ? float2(0.24f, 0.24f) : float2(-0.24f, 0.24f); }
 
 fragment float4 fifteen_fs(SolidOut in [[stage_in]], constant FifteenF& U [[buffer(0)]]) {
-    float share = 0.0f;  // tile colour (vs plastic)
-    if (U.number > 0 && in.uv.x < 0.0f) share = 1.0f;  // a tile's sides: its colour all the way down to the tray
+    float share = 0.0f;  // tile color (vs plastic)
+    if (U.number > 0 && in.uv.x < 0.0f) share = 1.0f;  // a tile's sides: its color all the way down to the tray
     if (U.number > 0 && in.uv.x >= 0.0f) {
         // The number, about half the tile high, digits side by side.
         const float2 p = (in.uv - 0.5f) / 0.5f;
         float d;
-        // Centred on the tile by the lit segments' extent (so "1", "11" and "17" sit in the middle too).
+        // Centered on the tile by the lit segments' extent (so "1", "11" and "17" sit in the middle too).
         if (U.number < 10) {
             const float2 s = digit_span(U.number);
             d = digit_dist(p + float2(0.5f * (s.x + s.y), 0.0f), U.number);
@@ -112,7 +112,7 @@ fragment float4 fifteen_fs(SolidOut in [[stage_in]], constant FifteenF& U [[buff
             const int a = U.number / 10, b = U.number % 10;
             const float k = 0.9f, gap = 0.3f;  // two digits a little smaller, `gap` between their extents
             const float2 sa = digit_span(a), sb = digit_span(b);
-            // Left digit at offset oa, right at ob (glyph units before the scale), the pair centred on the lit
+            // Left digit at offset oa, right at ob (glyph units before the scale), the pair centered on the lit
             // strokes. For spacing a right-hand "1" counts as half a digit wide (its stroke alone would sit as close
             // to the digit before as two strokes of any other digit: "11" looked cramped).
             const float bLeft = b == 1 ? 0.0f : sb.x;
@@ -125,10 +125,10 @@ fragment float4 fifteen_fs(SolidOut in [[stage_in]], constant FifteenF& U [[buff
         const float aa = max(fwidth(d), 1e-4f);
         share = smoothstep(w - aa, w + aa, d);  // 0 on the stroke, 1 on the tile
     }
-    // r: the tile's intensity under its number too, so the colour pass knows the tile colour in every pixel (it draws
+    // r: the tile's intensity under its number too, so the color pass knows the tile color in every pixel (it draws
     // the number in a contrasting shade of it); b: the share outside the number's strokes.
     const float lum = U.number > 0 ? U.level : U.body;
-    const float shade = mix(1.0f, max(0.0f, dot(normalize(in.n), U.light.xyz)), U.shade);  // applied in colour (a)
+    const float shade = mix(1.0f, max(0.0f, dot(normalize(in.n), U.light.xyz)), U.shade);  // applied in color (a)
     return float4(saturate(lum), 1.0f, share, saturate(shade));
 }
 
@@ -244,8 +244,8 @@ fragment float4 glass_composite_fs(FullOut in [[stage_in]], texture2d<float> src
     return c * opacity;
 }
 
-// Text=1: the previous intensity frame's centred square crop into the frame tile. A full-screen triangle; crop =
-// (scale x, scale y) of the source UV around the centre. 4 bilinear taps half a tile texel apart (a ~4x4 source
+// Text=1: the previous intensity frame's centered square crop into the frame tile. A full-screen triangle; crop =
+// (scale x, scale y) of the source UV around the center. 4 bilinear taps half a tile texel apart (a ~4x4 source
 // footprint) against aliasing when a 1080-px crop shrinks to 512.
 struct FrameTileOut { float4 position [[position]]; float2 uv; };
 struct FrameTileP { float2 crop; float2 texel; };
@@ -304,7 +304,7 @@ struct FrameTileP {
     float texel[2];  // source pixels per tile pixel, in source UV
 };
 
-constexpr int kMeshKinds = int(engine::MeshKind::Fifteen) + 1;
+constexpr int kMeshKinds = int(engine::MeshKind::Model) + 1;  // Model: empty (render/ModelPipeline draws it)
 
 // Right-handed rotation about `axis` (as engine::solidModel's).
 engine::Mat4 axisRotation(int axis, double a) {
@@ -777,7 +777,7 @@ SolidPipeline::SolidPipeline(ScenePipeline& scene, const SolidPipelineOptions& o
         t->setLabel(NS::String::string(label, NS::UTF8StringEncoding));
         return t;
     };
-    if (msaa_ > 1) msaaColor_ = scratch(MTL::PixelFormatRGBA8Unorm, "solid MSAA colour");
+    if (msaa_ > 1) msaaColor_ = scratch(MTL::PixelFormatRGBA8Unorm, "solid MSAA color");
     depthTex_ = scratch(MTL::PixelFormatDepth32Float, "solid depth");
 
     const int n = std::clamp(opts.maxLive, 0, 16);
@@ -828,7 +828,7 @@ void SolidPipeline::encodeWaveTile(MTL::CommandBuffer* cmd, const engine::LineSe
 
 void SolidPipeline::encodeFrameTile(MTL::CommandBuffer* cmd) {
     MTL::Texture* src = scene_.previousIntensity(cmd);
-    // Centred square crop: the short side of the frame fills the tile.
+    // Centered square crop: the short side of the frame fills the tile.
     const float W = float(width_), H = float(height_);
     FrameTileP p{{W > H ? H / W : 1.0f, H > W ? W / H : 1.0f},
                  {std::min(W, H) / float(tileSize_) / W, std::min(W, H) / float(tileSize_) / H}};
@@ -1042,7 +1042,7 @@ SolidQuad SolidPipeline::encode(MTL::CommandBuffer* cmd, int slot, const SolidDr
         for (const engine::fifteen::Tile& t : d.fifteen.tiles) {
             if (t.number <= 0) continue;
             const int row = std::clamp((t.number - 1) / engine::fifteen::kSize, 0, 3);
-            const float level = std::clamp(d.stickers[std::size_t(kFifteenRowColour[row])], 0.0f, 1.0f);
+            const float level = std::clamp(d.stickers[std::size_t(kFifteenRowColor[row])], 0.0f, 1.0f);
             draw(translation(t.x, t.y, kTileThick * 0.5f + t.z) * boxScale(kTileSize, kTileSize, kTileThick),
                  t.number, level);
         }
@@ -1153,7 +1153,7 @@ void SolidPipeline::encodeGlass(MTL::CommandBuffer* cmd, MTL::Texture* output, c
             float pad0, pad1;
         };
         static_assert(sizeof(GlassT) == 80, "GlassT must match the MSL struct");
-        // Pixels per board unit at the board's centre (for the refraction's reach).
+        // Pixels per board unit at the board's center (for the refraction's reach).
         const engine::Mat4 bmvp = vp * board;
         auto px = [&](float x, float y) {
             const auto c = engine::transform(bmvp, {x, y, 0.0f, 1.0f});

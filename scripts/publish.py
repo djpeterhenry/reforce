@@ -110,7 +110,7 @@ def personal_patterns() -> list[re.Pattern]:
 
 
 def gforce_blob_ids() -> set[str]:
-    """Git blob ids of every file in the local G-Force install (so a byte-identical copy is recognised)."""
+    """Git blob ids of every file in the local G-Force install (so a byte-identical copy is recognized)."""
     ids: set[str] = set()
     if not GFORCE_DIR.is_dir():
         return ids

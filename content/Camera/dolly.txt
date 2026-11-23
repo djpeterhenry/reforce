@@ -1,0 +1,9 @@
+// reforce camera preset (docs/model-design.md "The camera"): low over the hull from the back, gliding forward, then rising and pulling back to the whole model.
+// Copy these lines into a model scene to change them; a scene's own K lines win over its Move preset.
+//      t     eye x  eye y  eye z    aim x aim y aim z   fov  [roll]
+K1="    0     0.35    0.3    1.3       0  0.06  -0.3    50"
+K2=" 0.25     0.28   0.26   0.55       0  0.03    -1    50"
+K3="  0.5     0.26   0.28  -0.25       0     0  -1.5    50"
+K4=" 0.75     0.55    0.5  -1.35       0     0  -0.9    50"
+K5="    1     1.45   0.95  -2.55       0     0     0    50"
+Ease=".6"

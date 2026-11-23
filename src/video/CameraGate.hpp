@@ -6,7 +6,7 @@
 // `request` shows the system prompt (requestAccessForMediaType: returns at
 // once and calls back later on an arbitrary queue, possibly never if the user
 // ignores the prompt). The gate coalesces concurrent requests (a camera on
-// the colour layer and as a sprite ask once) and never blocks its caller, so
+// the color layer and as a sprite ask once) and never blocks its caller, so
 // opening a camera source on the render thread can not hitch or hang.
 // systemCameraGate() (VideoSourceMac.mm) is the AVFoundation-backed instance.
 

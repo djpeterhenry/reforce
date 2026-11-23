@@ -42,7 +42,7 @@ TEST_CASE("media options: beat keys") {
 TEST_CASE("media options: ColorKey (Syphon alpha)") {
     CHECK(!parseMediaOptions("BPM = 90").colorKey);
     CHECK(parseMediaOptions("ColorKey = 0").colorKey == std::optional<bool>(false));
-    CHECK(parseMediaOptions("colourkey = off // opaque").colorKey == std::optional<bool>(false));
+    CHECK(parseMediaOptions("colorkey = off // opaque").colorKey == std::optional<bool>(false));
     CHECK(parseMediaOptions("ColorKey = 1").colorKey == std::optional<bool>(true));
     CHECK(!parseMediaOptions("ColorKey = maybe").colorKey);
     CHECK(parseMediaOptions("Loop = yes").loop == std::optional<bool>(true));

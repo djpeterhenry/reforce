@@ -150,7 +150,7 @@ Moved from PLAN.md 5J.12; newest last.
   - Found: real kicks score 0.1-0.25 kick-band share (synthetic: 0.4), so off-beat locks (hats, bass) never escaped.
     New onset kick-ness (30-120 Hz flux vs recent peak; BeatTracker::lastOnsetKickness), default in the clock.
   - Held-out (599 songs, 55.8 h): TEMPO right 77.5 % (2/3: 5.9 %, other 12.7 %, 0: 3.8 %); clock on the beat
-    42.2 -> 45.4 %, off-beat 9.9 %. Old non-steady behaviour on train: TEMPO 68.5 %, on the beat 32.2 %.
+    42.2 -> 45.4 %, off-beat 9.9 %. Old non-steady behavior on train: TEMPO 68.5 %, on the beat 32.2 %.
   - Scoring: MP3 grids sit ~29 ms later than Apple's decoding (encoder padding; AIFF/FLAC/WAV ~0), corrected by
     25 ms (`--mp3-offset-ms`); "aligned" = on the beat after the song's own constant offset (the Beat offset's job).
   - Kick-band phase (BeatTracker::kickPhase, flux^2 on a TEMPO-rate circle): too spread (+-0.15 beat) to steer the
@@ -216,7 +216,7 @@ Moved from PLAN.md 5J.12; newest last.
     joint bar / downbeat tracking. Licenses: BTrack, aubio, qm-dsp GPL; madmom models non-commercial; Beat This!
     MIT (offline); BeatNet CC-BY-4.0.
   - Round 8 (research idea 2): the beat fold. The tracker folds band flux + band level (9 + 9) into 16 bins per beat
-    at TEMPO (decay 12 s); a linear score of the normalised profile at each of the 16 rotations, softmax, trained as
+    at TEMPO (decay 12 s); a linear score of the normalized profile at each of the 16 rotations, softmax, trained as
     a conditional logit on the grids (`train_fold.py`, `--dump-folds`): right half 92.7 % held out (kick-band flux
     peak 88.2 %), confident (>= 0.8) 79 % of the time and then right 98.4 %. The clock's rescue uses it first
     (confidence >= 0.6; slides when > 0.1 beat away, kick playing). Recent 2,000: on the beat 83.4 -> 88.6 %,

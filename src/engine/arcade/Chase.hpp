@@ -7,7 +7,7 @@
 // bursting), a low fast angle with speed lines on a drop, an orbit round the explosion when its cycle crashes.
 //
 // World coordinates are cell units: X along the grid's columns, Z along its rows (row 0 nearest Z = 0), Y up; a cell
-// centre (gx, gy) of the game is (gx, 0, gy).
+// center (gx, gy) of the game is (gx, 0, gy).
 #include <cmath>
 #include <cstdint>
 #include <functional>

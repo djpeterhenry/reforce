@@ -626,7 +626,7 @@ Image or movie particles. Documented in [DS] and [FAQ].
 |---|---|---|
 | `A#` | load | |
 | `B#` | per frame | |
-| `X`, `Y` | per frame | Center of the image rectangle, in frame coordinates (±1 corners). For example, (1,−1) is the bottom-right corner. **Measured (probe #41):** the centre lands at X · max(0, 1 − sprite width / frame width) (Y likewise), so ±1 puts the sprite's edge on the frame's edge and a sprite that fills an axis stays centred on it. |
+| `X`, `Y` | per frame | Center of the image rectangle, in frame coordinates (±1 corners). For example, (1,−1) is the bottom-right corner. **Measured (probe #41):** the center lands at X · max(0, 1 − sprite width / frame width) (Y likewise), so ±1 puts the sprite's edge on the frame's edge and a sprite that fills an axis stays centered on it. |
 | `Sped` | once, after the A vars | Speed of the built-in bouncing `XPOS`/`YPOS`. Only used by those. |
 | `Pen` | expression | Drawn intensity. Omit it for a "background-only" sprite. **Measured (probe #40):** the non-black pixels are copied at Pen × luminance into the feedback buffer, so they flow with the FlowField and leave trails; each frame's stamp replaces (fade × Pen × lum, #41) where that reaches ~10 levels, so Pen 0 draws nothing (#42). |
 | `EPen` | expression | "Erase pen". Each frame, G-Force redraws the sprite at this intensity to erase what it drew, so EPen controls the trail. Should be ≤ Pen. `EPen=0` leaves no trail. Example: `EPen="dt ^ 1.5"`. **Measured (probe #40), contrary to this wording:** EPen is drawn on the displayed frame only and never changes the trail. Without Pen: out = F + ½·max(0, envelope·EPen·lum − F) (a half-way lighten, no trail, #42); with Pen: EPen is drawn on the display like Pen (default: envelope × EPen × lum replaces where it reaches ~10 levels; EPen 0: nothing drawn, #41). |
@@ -657,7 +657,7 @@ FADER" for sprite and particle fade in/out, so it is a 0..1 fade envelope).
 **Measured (probe #42)**, with x = envelope × pen × luminance and F the target: default and ThresholdCopy = replace
 with x where x ≥ ~10 levels (an EPen-only default draw is the half-way lighten F + ½·max(0, x − F) instead);
 SelectiveBlend = that half-way lighten; AdditiveBlend = min(1, F + x); AlphaMask = F·(1 − x); AlphaBlend =
-F + x·(1 − F). The image's alpha channel is ignored (luminance of the straight colour, Rec. 601). With several
+F + x·(1 − F). The image's alpha channel is ignored (luminance of the straight color, Rec. 601). With several
 sprites the one started first draws on top.
 
 Default `Flag=7` per [DS], but a sprite .txt without `Flag` gets 0 (native size; probe #46: a sprite's own .txt
@@ -678,11 +678,11 @@ from the Sprite package (and `reforce.ExternalSpritesDir`) with the same rules a
 package defaults, flags/fit (the movie's frame size is the "image" size), Pen/EPen, fades and lifetime, `~`
 inversion, script-only parentheses, Themes. The texture is the movie frame at the sprite's age (looping by
 default), converted to Rec. 601 luminance, with no alpha channel (luminance doubles as alpha for AlphaBlend).
-GUESS: G-Force's movie frame timing and colour handling were not probed (PLAN 5F.6).
+GUESS: G-Force's movie frame timing and color handling were not probed (PLAN 5F.6).
 reforce-only options (PLAN 5K, all off by default): a sprite Mix per kind (`reforce.Sprite.Mix`,
 `reforce.MovieSprite.Mix`) that dims the target under the sprite and raises the half-way lighten, movie luminance
-levels (`reforce.MovieSprite.Gamma`, per-movie Black / White / Gamma), and full-colour movie sprites drawn over the
-colorized frame (`reforce.MovieSprite.Colour = over`); see usage.md, "Sprite visibility".
+levels (`reforce.MovieSprite.Gamma`, per-movie Black / White / Gamma), and full-color movie sprites drawn over the
+colorized frame (`reforce.MovieSprite.Color = over`); see usage.md, "Sprite visibility".
 
 ---
 
@@ -706,7 +706,7 @@ folder `reforce.Solid.Dir`). Solids are Objects, a spawn layer like Particles: `
 | `PBar` | Pre | Bars at full strength instead (wins over `PDur`). With the beat clock the fade-out starts on the bar line nearest to that many bars after the fade-in, or on the nearest phrase line when it is a whole number of phrases (never under half of it); without it, bars at 120 BPM. The tempo at the start counts. |
 | `A#` | Load | Once at start. |
 | `B#` | Frame | Per frame, persisting (like sprites). `C#`/`D#` are not evaluated. |
-| `X`, `Y`, `Z` | FrameOutput | Centre. Sprite convention: ±1 = the frame edges at z = 0; +z comes towards the viewer (stay below ~2). Default 0. |
+| `X`, `Y`, `Z` | FrameOutput | Center. Sprite convention: ±1 = the frame edges at z = 0; +z comes towards the viewer (stay below ~2). Default 0. |
 | `Scal` | FrameOutput | Circumradius in frame half-heights (default .5). |
 | `RotX`, `RotY`, `RotZ` | FrameOutput | Radians, applied X, then Y, then Z (default 0). |
 | `Fill` | FrameOutput | Floor of the face texture, 0..1 (default .15): faces stay visible where the wave is sparse. |
@@ -724,8 +724,8 @@ folder `reforce.Solid.Dir`). Solids are Objects, a spawn layer like Particles: `
 
 **Rubik** (`Mesh="rubik"`): 26 cubies, their state a pure function of `Seed`, `Moves` and `Turn`
 (engine/Rubik.hpp), so any jump of the clock simply shows the right cube. `Text`, `Fill` and `Edge` are not used;
-`Shad` shades the puzzles in colour (the colour pass darkens each colour by it), so it never changes a sticker's
-colour. The six sticker intensities are picked
+`Shad` shades the puzzles in color (the color pass darkens each color by it), so it never changes a sticker's
+color. The six sticker intensities are picked
 for the current ColorMap (engine/StickerColors.hpp, docs/3d-design.md); the plastic is intensity 0. Use
 `Over="1"`, so the stickers keep their exact intensities and the dark plastic is drawn rather than keyed out (no
 `Flag` does that: AlphaBlend is a screen blend that pushes a cube redrawn over its own trail towards white), and
@@ -740,9 +740,9 @@ Seed="SYNC_ON * floor(SYNC_BAR / 8) + (1 - SYNC_ON) * floor(B1 / 32)"
 
 **Fifteen** (`Mesh="fifteen"`): a 15 puzzle on a tray (engine/Fifteen.hpp). `Turn` runs from `0` (scrambled) to
 `Moves` (solved), one tile slide per whole turn; the scramble is a walk of the blank from `Seed`. Each row of the
-solved board takes its own colour, picked for the current ColorMap: the tiles are coloured cuboids down to the
+solved board takes its own color, picked for the current ColorMap: the tiles are colored cuboids down to the
 board (there is no tray: the gaps show the visuals), shaded by `Shad` (content: .5); the numbers are a dark
-shade of their tile's colour on four light row colours (or, on a ColorMap without good light colours, a light
+shade of their tile's color on four light row colors (or, on a ColorMap without good light colors, a light
 shade on four dark ones: one choice for the whole board). Use
 `Over="1"` and `ColorKey="0"` as for the rubik. Content's Fifteen Glass (with `Glas="1"` instead of `Over`): `Shuf="clamp(B2 / .75)"`,
 `Turn="floor(B4) + clamp((wrap(B4) - .55) / .45) ^ 2"` with `B4="max(0, B2 - 1)"` (B2 = beats into the 8-bar cycle).
@@ -755,6 +755,37 @@ Mesh="icosahedron"  Text="0"
 B0="t - START_TIME"
 X=".45 * sin(.31 * B0)"  Y=".22 * sin(.47 * B0)"  Z=".7 * sin(.19 * B0)"
 RotX=".35"  RotY=".5 * B0"
+```
+
+**Model** (`Mesh="model"`, PLAN 5R, docs/model-design.md): your own textured 3D model (a `.glb`) seen from a moving
+camera. Model scenes live with the models in `reforce.Model.Dir` (default `~/Library/Application Support/reforce/Models`;
+ids `Model/...`) and are left out when their model file is missing. Units: the model is centered and scaled to a
+bounding sphere of radius 1, front along -z, top along +y. `X Y Z Scal Rot*` and `Text` don't apply; `Fill`, `Shad`,
+`Pen`, `EPen`, `Flag`, `Over`, `ColorKey`, `PDur`, `PBar` and `Seed` do.
+
+| Key | Tier | Meaning |
+|---|---|---|
+| `File` | literal | The model, relative to the model folder (or absolute). |
+| `Look` | Pre | `0` = into the visuals as luminance (palette colors, trails; default). `1` = the model's own colors over the visuals; add `Pen` for palette trails behind it. |
+| `Front`, `Up` | literal | The model's forward and top axes in the file: `+x`, `-z`, ... (default `-z`, `+y`; the prep script prints the Front line). |
+| `Move` | literal | A camera preset: `dolly`, `pass`, `orbit` (default), `under`, `flyby`, `cuts` (content/Camera), or your own in the model folder's `Camera/`; `free` = expressions only (`CamX..AimZ`). |
+| `K1`, `K2`, ... | literal | Camera keyframes, `"t eyeX eyeY eyeZ aimX aimY aimZ [fov [roll]]"`, t 0..1 over the move; they win over the Move preset (docs/model-design.md "Camera paths"). |
+| `Ease`, `Step`, `Rand`, `Push` | literal | Smoothstep the timeline (0..1); beat cuts holding each keyframe `CutB` beats; shuffled order; push in while held. They override the preset's. |
+| `MDur` / `MBar` | Pre | The move's length in seconds (24) / in bars on the beat clock (wins while the clock runs). Without `PDur` / `PBar` the scene lasts one move. |
+| `Loop` | Pre | `1` = repeat the move (default), `0` = hold its last frame. |
+| `Dist`, `Hite`, `Side` | frame | Camera distance scale (1), height offset (0), `-1` mirrors the path left / right. |
+| `Roll`, `Fov` | frame | Extra camera roll (radians); a fixed field of view in degrees (0 = the path's own). |
+| `CutB` | frame | Beat cuts (`Step`): beats per keyframe (4). |
+| `CamX..CamZ`, `AimX..AimZ` | frame | `free`: the camera position and aim point; otherwise offsets added to the path. |
+| `Spin`, `Bank` | frame | The model turning about its up axis (rad/s) and rolling (radians). |
+| `Glow` | frame | Emissive (window / engine) brightness (1); e.g. `Glow="1 + .5 * BEAT"`. |
+| `Blom`, `Expo`, `Tint` | frame | Look B: bloom on the emissive light (.6; 0 = off), exposure (1), pull towards a palette color (0..1, 0). |
+| `LtX..LtZ` | frame | Towards the key light in camera space (-.45, .6, .65: upper left, from the camera's side). |
+
+```
+Mesh="model"  File="my-model.glb"  Look="1"
+Move="orbit"  MBar="16"  Hite=".2"
+Glow="1 + .4 * BEAT"
 ```
 
 ### 5.8 Organic (reforce extension, PLAN 5N)
@@ -781,7 +812,7 @@ grows from each root until it reaches the points.
 | `Pts`, `Rts` | Pre | Attraction points (300; 10..4000) and roots (1; 1..64). |
 | `C#` | per point / root | Before each point's and each root's keys, ascending (with `s` = k / (count - 1) and `rnd`). |
 | `PX`, `PY` | per point | A point's position. Default: an ellipse .9 x .55 at (0, .3). |
-| `RtX`, `RtY`, `RtA` | per root | A root's position and initial direction in radians (0, -1, PI/2 = bottom centre, up). |
+| `RtX`, `RtY`, `RtA` | per root | A root's position and initial direction in radians (0, -1, PI/2 = bottom center, up). |
 | `Seg`, `Infl`, `Kill`, `Jitr` | Pre | Segment length (.02), influence radius (.3), kill distance (2 × Seg), direction jitter (.15). |
 | `Wdth`, `Tip`, `BudW` | Pre | Trunk width, tip width, bud diameter in LWdt units (8, 1, 4). Widths follow the pipe model. |
 | `Wthr` | Pre | 1 (default): ungrow during the fade-out; 0: dim with `FADER`. |
@@ -856,29 +887,29 @@ expressions); unknown values keep the default and are logged.
 | Key | Default | Meaning |
 |---|---|---|
 | `Style` | `pop` | `disco`, `hiphop`, `house`, `pop`, `robot`, `rave`, `retro`, `chill` (also `popping`, `shuffle`, `funk`, `60s`) |
-| `Skin`, `Hair`, `Eyes`, `Top`, `Bottom`, `Shoes`, `Accent` | a sample look | colours `"#rrggbb"` (`Accent`: hat, headphones, tie, hair tie) |
+| `Skin`, `Hair`, `Eyes`, `Top`, `Bottom`, `Shoes`, `Accent` | a sample look | colors `"#rrggbb"` (`Accent`: hat, headphones, tie, hair tie) |
 | `HairStyle` | `short` | `short` (`crew`, `crop`), `buzz`, `shaved`, `sidepart`, `quiff`, `pompadour`, `slickback`, `undercut`, `coils` (`twists`, `hightop`), `waves` (360 waves), `curtains` (a middle part), `balding`, `manbun`, `mullet`, `bowl`, `spiky`, `mohawk`, `anime` (`messy`), `curly` (`longcurls`), `afro`, `bob` (`lob`), `long` (`wavy`, `locs`), `layers`, `bangs` (long with a fringe), `shag`, `halfup`, `pixie`, `ponytail` (`lowbun`), `sidepony`, `braid` (a side braid), `pigtails`, `bun`, `topknot`, `spacebuns`, `bald` |
-| `Outfit` | `tee` | `tee`, `tank`, `hoodie`, `dress`, `suit`, `skirt` (a top over a skirt in the Bottom colour), `croptop` (a bare midriff), `jumpsuit` (top and trousers in the Top colour, an Accent belt), `longdress` (to the ankles) |
+| `Outfit` | `tee` | `tee`, `tank`, `hoodie`, `dress`, `suit`, `skirt` (a top over a skirt in the Bottom color), `croptop` (a bare midriff), `jumpsuit` (top and trousers in the Top color, an Accent belt), `longdress` (to the ankles) |
 | `Hat` | `none` | `none`, `cap`, `beanie`, `top`, `headphones` |
 | `Build`, `Tall` | 1, 1 | width .75..1.3, height .8..1.2 |
 | `Head`, `Legs`, `Torso`, `Shoulders`, `Limbs` | 1 | proportions: head size .75..1.35 (big cartoon head > 1), leg length .75..1.25, torso length .8..1.2, shoulder width .8..1.25, arm and leg thickness .75..1.35 |
 | `Belly` | 0 | 0..1, a rounder middle |
 | `TopPattern`, `BottomPattern` | `none` | print: `none`, `stripes`, `dots`, `plaid`, `gradient`, `zigzag` (a dress is the top) |
-| `Ink` | `#ffffff` | the print's colour |
+| `Ink` | `#ffffff` | the print's color |
 | `TopFabric`, `BottomFabric` | `matte` | `matte`, `shiny` (lame: reflects the visuals), `sequins` (sparkle on the beat), `velvet` (sheen at the edges), `neon` (glows by itself, pulses on the beat) |
 | `Glasses` | `none` | glasses or sunglasses (see Lens): `none`, `round`, `aviator`, `visor`, `heart`, `star`, `cateye`, `square` |
-| `Lens`, `Frame` | dark, black | the lens colour (sunglasses), or `Lens="clear"` for ordinary glasses (just the frame, the eyes show through); the frame colour; `Mirrored="1"` makes dark lenses mirrors (they reflect the visuals) |
-| `GlowSticks` | `none` | a colour: a neon glow stick in each hand |
+| `Lens`, `Frame` | dark, black | the lens color (sunglasses), or `Lens="clear"` for ordinary glasses (just the frame, the eyes show through); the frame color; `Mirrored="1"` makes dark lenses mirrors (they reflect the visuals) |
+| `GlowSticks` | `none` | a color: a neon glow stick in each hand |
 | `EyeShape` | `oval` | `oval`, `round`, `sleepy`, `happy` (^ ^), `big`, `dot` |
 | `Brows` | `normal` | `normal`, `thick`, `thin`, `arched` |
 | `Mouth` | `smile` | `smile`, `grin`, `small`, `smirk` |
-| `Beard` | `none` | `none`, `stubble`, `moustache`, `handlebar`, `goatee`, `circle` (moustache and goatee), `short` (`chinstrap`), `full`, `long` (hair colour; all but stubble 3D) |
+| `Beard` | `none` | `none`, `stubble`, `moustache`, `handlebar`, `goatee`, `circle` (moustache and goatee), `short` (`chinstrap`), `full`, `long` (hair color; all but stubble 3D) |
 | `Lashes`, `Freckles` | 0 | `1` to add them |
 | `Name` | none | A name tag over the dancer's head (a stream guest's name), shown with `reforce.Dancer.NameTags` = named (default) or all |
 | `Blush` | .35 | 0..1 |
-| `Lips` | none | lipstick colour |
-| `Random` | 0 | `1`: a new character each time it starts, generated for `Style` (body, colours, outfit, prints, fabrics, sunglasses, glow sticks, face; the look keys above are ignored). The package has one per style: `Random Disco`, `Random Hip-Hop`, ... |
-| `Moves` | none | favourite moves, picked 4x as often (names from engine/DanceMoves.cpp, e.g. `dab,floss,discoPoint`) |
+| `Lips` | none | lipstick color |
+| `Random` | 0 | `1`: a new character each time it starts, generated for `Style` (body, colors, outfit, prints, fabrics, sunglasses, glow sticks, face; the look keys above are ignored). The package has one per style: `Random Disco`, `Random Hip-Hop`, ... |
+| `Moves` | none | favorite moves, picked 4x as often (names from engine/DanceMoves.cpp, e.g. `dab,floss,discoPoint`) |
 | `Snap` | the style's | 0 loose .. 2 snappy |
 | `PDur` | `Dancer.Duration` | seconds on stage |
 

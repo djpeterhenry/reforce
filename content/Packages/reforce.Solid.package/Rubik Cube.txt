@@ -1,5 +1,5 @@
 Vers=100
-Meta="reforce solid: a Rubik's cube that is solved on every 8-bar line. On the line it scrambles itself in two beats (30 turns, speeding up, while it spins once), then undoes those turns one per beat, each landing on the beat, so the last one lands on the next 8-bar line (bar lines from the phrase clock while the beat clock is locked, else 120 BPM from the start). The six sticker colours are picked from the current ColorMap so they read as six colours; Over 1 draws it opaque (exact sticker colours, the plastic covering what is behind); ColorKey 0 keeps the whole cube opaque over the camera."
+Meta="reforce solid: a Rubik's cube that is solved on every 8-bar line. On the line it scrambles itself in two beats (30 turns, speeding up, while it spins once), then undoes those turns one per beat, each landing on the beat, so the last one lands on the next 8-bar line (bar lines from the phrase clock while the beat clock is locked, else 120 BPM from the start). The six sticker colors are picked from the current ColorMap so they read as six colors; Over 1 draws it opaque (exact sticker colors, the plastic covering what is behind); ColorKey 0 keeps the whole cube opaque over the camera."
 Mesh="rubik"
 Text="2"
 Over="1"

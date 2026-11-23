@@ -111,7 +111,7 @@ int main(int argc, char** argv) {
 
     AnalyzerConfig cfg;
     const std::string unknown = applyGForceFftParams(cfg, fftParams);
-    if (!unknown.empty()) std::fprintf(stderr, "note: unrecognised FFT params: %s\n", unknown.c_str());
+    if (!unknown.empty()) std::fprintf(stderr, "note: unrecognized FFT params: %s\n", unknown.c_str());
 
     if (!file.empty()) {
         AudioFileSource src;

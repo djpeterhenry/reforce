@@ -16,7 +16,7 @@
 //
 // Tempo (TEMPO, BPM): every tempoUpdateSeconds the autocorrelation of the
 // mean-removed onset strength over the last tempoWindowSeconds is evaluated for
-// lags between 60/maxBpm and 60/minBpm (only with >= minOnsets onsets in the window), weighted by a log-normal prior centred on
+// lags between 60/maxBpm and 60/minBpm (only with >= minOnsets onsets in the window), weighted by a log-normal prior centered on
 // priorBpm (priorOctaves wide; picks 120 rather than 60 or 240 for a 4/4 kick)
 // and peak-refined. Confidence = normalized autocorrelation at that lag. A
 // candidate with confidence >= minConfidence moves the estimate (one-pole,
@@ -43,7 +43,7 @@
 //     kickLevelSeconds) is compared with its own recent peak (decaying over
 //     kickRefSeconds). Below kickPresentRatio of it there is no kick (a breakdown): the tempo is frozen, no drift,
 //     no switching, no hold timeout (silence still ends it). Tempo changes need the kick.
-// steady = false: the quick-reacting behaviour above (two agreeing updates switch, holdSeconds).
+// steady = false: the quick-reacting behavior above (two agreeing updates switch, holdSeconds).
 //
 // Single-threaded (the analyzer's thread). push() allocates nothing.
 
@@ -122,11 +122,11 @@ struct BeatConfig {
     double halfBias = -2.2169;
     double bandMeanSeconds = 4.0;      // the band features' reference (recent mean flux)
     double kickPhaseSeconds = 4.0;     // kick phase average decay
-    double kickPhasePower = 2.0;       // flux exponent (emphasises the strongest transients: the kick)
+    double kickPhasePower = 2.0;       // flux exponent (emphasizes the strongest transients: the kick)
     // Beat fold (PLAN 5J.12, "which half is the beat"): per hop, the band flux (hop band features) and band level
     // (mean log magnitude) are added into kFoldBins bins of the beat at TEMPO (phi as for the kick phase), decaying
     // over foldSeconds. A learnt linear score (foldW, kFoldBins x kFoldFeat, bin-major, beat at bin 0) is evaluated at
-    // every rotation of the normalised profile; the best is the learnt beat (foldPhase). All-zero foldW: off.
+    // every rotation of the normalized profile; the best is the learnt beat (foldPhase). All-zero foldW: off.
     // Phase filter (PLAN 5J.12, research idea 1: a forward filter over the beat's place in the beat, at TEMPO):
     // kPhaseStates states on phi's circle; per hop a random walk (pfDiffusion, beats per sqrt(s)), and while a kick
     // plays the hop's on-beat activation (onset strength x on-beat probability, relative to its recent mean, minus
@@ -141,7 +141,7 @@ struct BeatConfig {
     // confident while a wrong trim slid the beat. Not kept.)
     double pfDiffusionMoving = 0.04, pfMovingBand = 0.002, pfMovingSeconds = 4.0, pfFoldGainMoving = 0.0;
     // The filter's tempo dimension (PLAN 5J.12, Peter's quick 1-3 BPM nudges): pfTempoRows rows of absolute tempi
-    // pfTempoStep apart, centred on TEMPO (re-centred as TEMPO moves). Each row's beat drifts along phi's circle at
+    // pfTempoStep apart, centered on TEMPO (re-centered as TEMPO moves). Each row's beat drifts along phi's circle at
     // its tempo minus TEMPO, so the filter can follow a nudge's beat from the onsets while TEMPO still lags. Rows
     // mix as a random walk while a kick plays (frozen in breakdowns): pfTempoDiffusion (relative per sqrt(s)) for
     // pfOpenHoldSeconds after the autocorrelation's local peak (confidence >= pfOpenMinConfidence) reads a move of
@@ -285,7 +285,7 @@ private:
     double foldBeatPhi_ = -1.0, foldConf_ = 0.0, nextFoldScore_ = 0.0;  // the learnt beat on phi's circle
     void scoreFold();
     // Phase filter belief, row-major (tempo row x phase state; sums to 1), each row's sub-state drift, the tempo row
-    // 0 is defined against (pfRef_ * (1 + (k - centre) * step)), and the estimated offset from pfRef_.
+    // 0 is defined against (pfRef_ * (1 + (k - center) * step)), and the estimated offset from pfRef_.
     std::array<double, BeatConfig::kPhaseStates * BeatConfig::kMaxTempoRows> pf_{}, pfNext_{};
     std::array<double, BeatConfig::kMaxTempoRows> pfAcc_{};
     double pfRef_ = 0.0, pfTempoOff_ = 0.0;

@@ -331,8 +331,8 @@ SpriteDrawSpec SpriteRun::evaluate(double t, double frameW, double frameH, const
     const scene::SpriteFrame f = inst_->evaluateFrame(in);
     SpriteDrawSpec d;
     auto finite = [](double v, double fb) { return std::isfinite(v) ? v : fb; };
-    // Probe #41: X/Y = +-1 put the sprite's edge on the frame's edge (centre = X * (1 - size / frame) per
-    // axis); a sprite as large as the frame or larger on an axis stays centred on it.
+    // Probe #41: X/Y = +-1 put the sprite's edge on the frame's edge (center = X * (1 - size / frame) per
+    // axis); a sprite as large as the frame or larger on an axis stays centered on it.
     const double kx = frameW > 0 ? std::max(0.0, 1.0 - size_.w / frameW) : 0.0;
     const double ky = frameH > 0 ? std::max(0.0, 1.0 - size_.h / frameH) : 0.0;
     d.cx = (finite(f.x, 0.0) * kx + 1.0) * 0.5 * frameW;

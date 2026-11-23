@@ -3,9 +3,9 @@
 
 Input: NAME.folds.bin + NAME.tsv from `beat_eval.py --dump-folds` (tuning-split songs): every second while TEMPO is
 right, the tracker's fold (16 bins per beat x 18 features: band flux, band level) and where the grid's beat sits on
-the fold's circle. Model: a linear score of the normalised profile rotated so that a candidate beat is at bin 0;
+the fold's circle. Model: a linear score of the normalized profile rotated so that a candidate beat is at bin 0;
 softmax over the 16 rotations, the true one is the target (conditional logit, Adam). Checked on 20 % of the songs
-held out by name. Prints the C++ initialiser for BeatConfig::foldW.
+held out by name. Prints the C++ initializer for BeatConfig::foldW.
 
   python3.11 -I tools/beat_eval/train_fold.py build/beat-eval/fold1k
 """
@@ -26,7 +26,7 @@ def load(prefix):
     return rec, np.array(ids)
 
 
-def normalise(p):
+def normalize(p):
     """As BeatTracker::scoreFold: per feature minus its mean over the bins; each group divided by its RMS."""
     p = p - p.mean(axis=1, keepdims=True)
     for g in (slice(0, NB), slice(NB, F)):
@@ -107,7 +107,7 @@ def main():
     rec = rec[ok]
     names = ids[rec["i"]]
     hold = np.array([hashlib.sha1(n.encode()).digest()[1] % 5 == 0 for n in names])
-    p = normalise(rec["p"].astype(np.float64))
+    p = normalize(rec["p"].astype(np.float64))
     theta = rec["theta"].astype(np.float64)
     print("%d folds from %d songs (%d held out)" % (len(p), len(set(names)), hold.sum()))
     # Baselines: the strongest kick-band (30-120 Hz) flux, and the strongest overall flux, at the beat.

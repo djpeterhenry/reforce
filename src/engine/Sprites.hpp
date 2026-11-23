@@ -18,7 +18,7 @@
 // direction from the instance RNG).
 //
 // Drawing (measured, probes #40-#42; reforce.SpriteLayering = gforce / trails):
-//   - x = envelope * pen * L, L = Rec. 601 luminance of the straight colour (inverted per Invert / '~').
+//   - x = envelope * pen * L, L = Rec. 601 luminance of the straight color (inverted per Invert / '~').
 //     pen is Pen for the feedback draw, EPen for the display draw (see SpriteLayering below).
 //   - Blend by flags, first match wins (F = the target):
 //       AlphaBlend     F + x * (1 - F)              (a screen: luminance is the alpha, image alpha ignored)

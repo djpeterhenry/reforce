@@ -1,7 +1,7 @@
 # Dancers: 3D cartoon characters dancing to the beat (PLAN 5P)
 
 Peter's decisions (2026-11-18):
-- **Full colour on top** of the visualizer (composited after colorize, like the colour movie sprites), so skin,
+- **Full color on top** of the visualizer (composited after colorize, like the color movie sprites), so skin,
   clothes and later friends' faces read as themselves.
 - **Procedural, built in**: our own chibi cartoon style (big round head, pill body, mitten hands, rounded shoes)
   made from rounded primitives; dance moves written as poses on the beat phase, so hits land exactly on the beat.
@@ -29,33 +29,33 @@ Peter's decisions (2026-11-18):
 
 ## Rendering (render/DancerPipeline)
 
-One pass per sim step into one frame-size premultiplied BGRA8 target (4x MSAA memoryless colour + depth), then
+One pass per sim step into one frame-size premultiplied BGRA8 target (4x MSAA memoryless color + depth), then
 alpha-over onto the colorized frame inside `Visualizer::colorize`, so the window, Syphon and the split-video window
 all get it. Nothing is encoded while no dancer is live (goldens unchanged).
 
 - **Geometry**: every body part is an instance of one "capsule" mesh: a unit sphere split at the equator, the top
   half moved to one end and the bottom half to the other, with tapered radii r0, r1. That one mesh gives spheres
   (length 0), ellipsoids (non-uniform scale), limbs (capsules) and cones (r1 ~ 0, hair spikes). Instances carry a
-  model matrix, length, radii, colour, a material id and a clip plane (hair shells cut open at the face).
+  model matrix, length, radii, color, a material id and a clip plane (hair shells cut open at the face).
   Hair: close styles (short, spiky, ponytail, bun) are shells just larger than the head, cut open at the face (a
   smooth per-pixel hairline; the inside seen through the cut is shaded as solid hair). Fuller styles (bob, long,
   pigtails, afro) are solid masses set up and back so the face pokes out in front: a shell standing off the head
   shows its hollow inside as a hood or bowl around the face (2026-11-19). A mass must cross the head steeply or the
   mesh steps along the hairline.
 - **Look**: soft toon shading (wrapped Lambert through a soft two-band ramp), a sky/ground hemisphere ambient, a
-  plastic specular highlight, a rim light tinted by the current palette (so they sit in the scene's colours), and a
+  plastic specular highlight, a rim light tinted by the current palette (so they sit in the scene's colors), and a
   thin dark outline (inverted hull, width in pixels). Settings `reforce.Dancer.Outline` (px, 0 = none).
 - **The visuals are the lighting** (Peter, 2026-11-18): the dancers are drawn after colorize, each display frame, and
   light themselves from a small blurred, mipmapped copy of the finished frame. A surface takes light from the visuals
   in the direction its normal faces (a red flash on the left lights their left side red), a rim light comes from the
-  frame behind them, and the floor reflects the visuals and its tiles take their colours.
+  frame behind them, and the floor reflects the visuals and its tiles take their colors.
   `reforce.Dancer.Lighting` (0..1, default .75) mixes a studio key light (0) with lighting from the visuals only (1),
   so they stay readable when the screen is dark.
 - **Face**: drawn in the head's fragment shader from the head-local direction: eyes (with highlights; blink),
   brows, mouth (smile; opens on the beat / on drops), blush. Later: `Face="faces/name.png"` maps a portrait image on
   the face area instead (friends' faces) — the key is reserved now.
 - **Floor** (`reforce.Dancer.Floor` on/off, default on; no panel button (Peter, 2026-11-20: always wanted)): a perspective grid of tiles in the stage plane that light
-  up in palette colours on the beat (patterns change each bar: checker, chase, ripple from the centre, random),
+  up in palette colors on the beat (patterns change each bar: checker, chase, ripple from the center, random),
   fading out towards the back and the sides so it melts into the visualizer, with a soft blob shadow under each
   dancer. It fades in when the first dancer arrives and out after the last leaves.
 - **Name tags** (2026-11-20, for stream guests): `Name="Sam"` in a dancer file puts the name over the dancer's
@@ -78,15 +78,15 @@ all get it. Nothing is encoded while no dancer is live (goldens unchanged).
 - **Guest messages** (2026-11-20): a guest types a message on the page ("Say something", up to 140 characters, no
   filter, no rate limit: Peter's choice); the service keeps it (`/api/say`, also a check-in) and hands it out with the
   check-ins for 2 minutes. reforce shows it in a speech bubble above the guest's name tag for 30 s (a new one replaces
-  it): white bold text wrapped to at most 5 lines, emoji in colour, on a dark rounded box with a light outline and a
-  tail (render/TextOverlay `bubble`: drawn by Core Text into a colour image). It pops in and fades over the last
+  it): white bold text wrapped to at most 5 lines, emoji in color, on a dark rounded box with a light outline and a
+  tail (render/TextOverlay `bubble`: drawn by Core Text into a color image). It pops in and fades over the last
   second. `beatset dancesay NAME=TEXT` gives any dancer a bubble (tests, or by hand).
 - **Hide dancers** (2026-11-20): the panel's Hide dancers (`beatset dancehide on|off`, session only) fades the whole
   stage and the name tags out over half a second; everything keeps running behind it (hold times count down, guests
   still arrive), so showing it again brings back whoever is still due.
 - **More looks for stream guests** (2026-11-20, Peter: "match people's appearance"): hairstyles pixie, bangs, wavy,
   braid, side pony, space buns, top knot and locs; outfits skirt, crop top, jumpsuit and long dress (random
-  characters use them too); clear lenses (`Lens="clear"`: only the frame is drawn, in its `Frame` colour). No gender
+  characters use them too); clear lenses (`Lens="clear"`: only the frame is drawn, in its `Frame` color). No gender
   setting (Peter: just make the clothes and hair available).
 - **Web preview** (`tools/dancer_web`): the dancer code (DancerRig, DanceMoves, Dancers, DancerInstances, Meshes)
   compiled to WebAssembly with Emscripten, drawn by a WebGL2 port of the body and outline passes with the studio
@@ -128,7 +128,7 @@ Every key is a literal (no expressions; nothing in a character needs per-frame m
 
 | Key | Default | Meaning |
 |---|---|---|
-| `Skin`, `Hair`, `Top`, `Bottom`, `Shoes`, `Eyes` | various | Colours, `"#rrggbb"`. |
+| `Skin`, `Hair`, `Top`, `Bottom`, `Shoes`, `Eyes` | various | Colors, `"#rrggbb"`. |
 | `HairStyle` | `short` | `short` (`crew`, `crop`), `buzz`, `shaved`, `sidepart`, `quiff`, `pompadour`, `slickback`, `undercut`, `coils` (`twists`, `hightop`), `waves` (360 waves), `curtains` (a middle part), `balding`, `manbun`, `mullet`, `bowl`, `spiky`, `mohawk`, `anime` (`messy`), `curly` (`longcurls`), `afro`, `bob` (`lob`), `long` (`wavy`, `locs`), `layers`, `bangs` (long with a fringe), `shag`, `halfup`, `pixie`, `ponytail` (`lowbun`), `sidepony`, `braid` (a side braid), `pigtails`, `bun`, `topknot`, `spacebuns`, `bald`. |
 | `Outfit` | `tee` | `tee`, `tank`, `hoodie`, `dress`, `suit` (sleeve length, skirt, collar). |
 | `Hat` | `none` | `none`, `cap`, `beanie`, `top`, `headphones`. |
@@ -185,7 +185,7 @@ dancers".
   now keyframed footwork (each foot moves spot to spot with a lift), side swaps are eased (`sideWeight`), held poses
   (freeze, dab, spin) release before the cycle ends. Test: every move, every variant, < 0.14 units a frame at 60 fps
   / 120 BPM, also across the wrap (the robot's deliberate snaps are the fastest).
-- **Routine changes**: the next routine is scheduled a beat ahead and crossfades over two beats centred on the bar
+- **Routine changes**: the next routine is scheduled a beat ahead and crossfades over two beats centered on the bar
   line (smootherstep), the incoming one playing the end of its cycle so it arrives in motion; a drop's jump still
   cuts in. Turns blend the short way round.
 - **Source changes** (own -> a partner's routine -> watching): inertial blending (the offset from the last pose and
@@ -212,7 +212,7 @@ per-frame jitter), so it reads as personality, not shake:
     monotonic.
 - **Size of the moves**: per-dancer gains on the arms (0.82-1.15), hips and chest (0.8-1.25), knee bend and foot lift
   (0.85-1.15) and head (0.7-1.3), one hand livelier than the other (+-10 %), an effort level that drifts +-12 % over
-  a few bars, and hands that never hit the same spot twice (a slow wander of a centimetre or two).
+  a few bars, and hands that never hit the same spot twice (a slow wander of a centimeter or two).
 - **Posture**: a slouch or an upright chest, a head tilt, a nod, weight on one leg, a narrower or wider stance;
   breathing (a 3-4.6 s chest rise); the head looks around slowly.
 - **Follow-through**: the hands and head trail the body through a spring (damping 0.75, ~40-55 / 22-30 rad/s, stiffer
@@ -265,11 +265,11 @@ variety), glow sticks, and faces.
 
 - **Generated characters** (engine::generateDancer; `Random="1"` scene files, one per style): a first name (86),
   a body type (stocky / lanky / in between, head size .85..1.3), skin (ten natural tones from light to dark, chosen independently of gender, style and hair),
-  hair (natural, or dyed: often for rave / pop / robot), a colour scheme (a base hue and a harmony: complementary,
-  analogous, triad or mono, with the style's saturation and brightness: neon rave, candy pop, muted chill, greys
+  hair (natural, or dyed: often for rave / pop / robot), a color scheme (a base hue and a harmony: complementary,
+  analogous, triad or mono, with the style's saturation and brightness: neon rave, candy pop, muted chill, grays
   and one accent for robot, reds / black / gold for latin, 70s oranges / teal for retro), the style's wardrobe
   (weighted outfits, hats, hair, prints and fabrics; metallic tops are often gold or silver), sunglasses (each
-  style its favourite shapes; mirrored lenses), glow sticks (rave mostly) and a face. Tall hair never meets a hat;
+  style its favorite shapes; mirrored lenses), glow sticks (rave mostly) and a face. Tall hair never meets a hat;
   beards only with natural hair. The same seed gives the same character; each slideshow start is a new seed.
 - **Proportions** (Head, Legs, Torso, Shoulders, Belly, Limbs): the skeleton and the part radii scale; hair, hats,
   ears, nose and glasses follow the head size.
@@ -277,12 +277,12 @@ variety), glow sticks, and faces.
   (around and along it), antialiased; a dress takes the top's print.
 - **Fabrics**: shiny (a tinted reflection of the visuals: the light texture sampled along the reflected view;
   a studio sky on a dark frame), sequins (facets of the print grid, each sparkling on its own beat), velvet (dark
-  face-on, a sheen in its own colour at the edges), neon (unlit, saturated, pulsing on the beat: glow sticks too).
+  face-on, a sheen in its own color at the edges), neon (unlit, saturated, pulsing on the beat: glow sticks too).
 - **Sunglasses**: flat lens discs in front of the eyes cut to their shape in the shader (round, aviator, visor:
   one wide lens, heart, star, cat-eye: the outer corner swept up, square), a frame rim drawn on the edge, a bridge
   and arms to the ears; dark, tinted or mirrored lenses.
 - **Faces**: eye shapes (oval, round, sleepy with a lid line, happy arcs, big with two highlights, dot), lashes,
-  brows (normal, thick in the hair colour, thin, arched), mouths (smile, grin with teeth, small, smirk), lipstick,
+  brows (normal, thick in the hair color, thin, arched), mouths (smile, grin with teeth, small, smirk), lipstick,
   freckles, blush, beards (stubble, moustache, goatee, full; 3D and more since 2026-11-21, below).
 - The 12 named characters keep their looks and gain a signature touch each (Coco sequins and lipstick, Gus a
   moustache, Ozzie a mirrored visor and glow sticks, Kiko heart shades, Moss square shades and dot eyes, ...).
@@ -299,7 +299,7 @@ variety), glow sticks, and faces.
 - **Pompadour**: tight short sides and a big roll (a wide capsule) rising up and forward over the forehead.
 - **Side part**: short hair under a second layer cut by a tilted plane, so the hairline runs from high over one
   brow down over the other brow and the outer corner of that eye. (Strands laid along the head looked beaded.)
-- **Undercut**: the sides and back a thin shell in a fade colour (hair over skin), a thick cap on top (its cut edge
+- **Undercut**: the sides and back a thin shell in a fade color (hair over skin), a thick cap on top (its cut edge
   shows as a solid slab) and a flick at the front.
 - **High top**: a tall flat-topped block (a capsule clipped flat, its inside shaded as solid hair), faded sides.
 - **Bowl**: a shell cut level all round just above the brows.
@@ -323,7 +323,7 @@ teeth, locs sticks).
   value noise, faded where they would alias), a sheen band across them (Kajiya-Kay, broken up strand by strand)
   and, per part (`BodyPart::strands`), which way they run: along the axis (from the crown down a shell, down a lock),
   parted (combed sideways from a front-to-back parting, with the parting drawn as a line of scalp), combed back,
-  360-wave rings, coils (a nubbly texture, no lines); a wavy flag. Very dark hair colours now read on the dark stage. A second
+  360-wave rings, coils (a nubbly texture, no lines); a wavy flag. Very dark hair colors now read on the dark stage. A second
   clip plane (`clip2`) per hair part. Packed into slots only the head reads (face.w, eyes.w, the lips); ported to
   the WebGL preview.
 - **Long hair** (bob, lob, long, layers, wavy, long curls, bangs, shag, half-up): a close top (parted) over a
@@ -331,7 +331,7 @@ teeth, locs sticks).
   level at the hem by `clip2`, swinging with the dance. Layers: the hem slants up to the front. Wavy, shag and long
   curls flare out towards the ends (curls: coils and a ring of ringlet ends).
 - **Lifts** (side part, quiff, pompadour, slick back, undercut, pixie's fringe, messy): a layer like the head's
-  ball, off-centre, so it stands off the head where it should (the front, the top) and sinks into the hair under it
+  ball, off-center, so it stands off the head where it should (the front, the top) and sinks into the hair under it
   elsewhere, cut by planes across the forehead (and along the parting).
 - **Merged / reworked**: crew is short (`crew` still parses); side part is now a classic short side part (the
   emo sweep is gone); pompadour and the new quiff rise from the forehead; balding is a smooth band round the back and
@@ -340,7 +340,7 @@ teeth, locs sticks).
   of the ears.
 - **New** (41 styles): quiff, messy, coils, waves (360), lob, long curls, layers, half-up, low bun. `quiff` and
   `waves` now name their own styles (they were aliases of pompadour and wavy).
-- **Generated characters**: every dance style draws on everyday hair, each with a small flavour of its own; any
+- **Generated characters**: every dance style draws on everyday hair, each with a small flavor of its own; any
   hairstyle can turn up on any style and any skin tone.
 - **Cut the same day** (Peter, from the contact sheets): locs, low bun, long curls, wavy, lob, crop and messy. Their
   names still read, as the closest style left (wavy, locs: long; lob: bob; crop: short; long curls: curly; low bun:
@@ -392,7 +392,7 @@ files combine hair, outfit, beard and face freely):
   coil texture read as a cap). 36 styles.
 - **Every style draws from the same everyday hair** (long, bob, ponytail, layers, half-up, bangs, bun, braid, pixie,
   side pony, pigtails, top knot; short, side part, quiff, buzz, undercut, shaved, slick back, waves, balding, man
-  bun, bald, mullet, bowl; curly, coils, afro, curtains, shag, anime, spiky, mohawk, high top), plus a small flavour
+  bun, bald, mullet, bowl; curly, coils, afro, curtains, shag, anime, spiky, mohawk, high top), plus a small flavor
   of its own on top (engine `generateDancer`); every hairstyle stays possible for every style, independent of skin
   tone.
 - **The hat comes first**; under a cap, beanie or top hat tall hair is simply not picked (it used to become long or
@@ -406,16 +406,16 @@ files combine hair, outfit, beard and face freely):
 A third of generated dancers wore sunglasses (and nobody wore ordinary glasses), hiding a lot of faces on a dark
 stage. Now about 19 % wear sunglasses (most in popping 35 %, disco 30 % and rave 40 %; everyday styles 8 %) and about
 9 % ordinary glasses (clear lenses, just the frame: round and square mostly, cat-eye on feminine characters now and
-then, an aviator rarely; black, tortoiseshell, gold, silver or the scheme's second colour; a little more often for
+then, an aviator rarely; black, tortoiseshell, gold, silver or the scheme's second color; a little more often for
 lock and chill), the same for feminine and masculine characters.
 
 ## 3D beards (Peter, 2026-11-21)
 
 "Broadly make beards look better": hair material, 3D structure, more options, aligned with the mouth, ears and hair.
 They were painted on the face; now all but stubble are built (DancerRig buildBody, after the hats), in the hair
-colour, drawn with strands (Material::Strands), laid out in the face's own angles (drawFace: u around, v up):
+color, drawn with strands (Material::Strands), laid out in the face's own angles (drawFace: u around, v up):
 
-- **Moustache**: a centre piece under the nose and a tapering, drooping piece each side to the mouth's corners,
+- **Moustache**: a center piece under the nose and a tapering, drooping piece each side to the mouth's corners,
   flat against the face and tall enough to read as hair. **Handlebar**: slimmer, the ends curled up.
 - **Goatee**: a rounded tuft set into the chin, a little pointed below. **Circle**: moustache and goatee joined
   down the sides of the mouth.
@@ -430,7 +430,7 @@ colour, drawn with strands (Material::Strands), laid out in the face's own angle
   a full beard's line.
 - **No sideburns**: strips stood off the head like sticks, a slice of a shell made a big patch in profile, and a
   band round the head would show over a bald crown; a beard ends at the jaw in front of the ear.
-- Pieces on the face (moustache, goatee, circle, handlebar) are centred on the face's surface (flat against it), so
+- Pieces on the face (moustache, goatee, circle, handlebar) are centered on the face's surface (flat against it), so
   their edges meet the skin.
 - Glow sticks: generated house dancers only, about 1 in 5 (40 % in rave gear, 11 % otherwise); guests can't choose
   anything to hold yet.
@@ -450,17 +450,17 @@ but not in scene files) poked through caps, beanies and top hats; headphones are
 - Then fitHairUnderHat (every frame, after the hair swings; stateless, no allocation): each hair part without a clip
   of its own is cut at the hat's band; a part mostly above the band (a spike, a bun, the pompadour roll) is left out;
   a part whose surface at or above the band would still be outside the hat shrinks until it fits (a shell towards
-  the head centre, a mass or lock towards its lowest point), or is dropped if it would have to shrink by over 55 %.
+  the head center, a mass or lock towards its lowest point), or is dropped if it would have to shrink by over 55 %.
   Top hats keep the usual shapes (hair shows round and below the brim) through the same fitting.
 - Test: every hairstyle under cap, beanie and top hat, at rest and through 5 s of dancing with swinging hair: no hair
   point outside the hat as built (its dome above its cut, or its crown above the brim). Without the fitting it fails
   84 checks.
 - Cost: buildBody 1 us without a hat, about 12 us with a cap or beanie, 6.5 us with a top hat.
 
-## Hair colours (Peter, 2026-11-20)
+## Hair colors (Peter, 2026-11-20)
 
-Natural hair: 12 colours, equally likely: black, soft black, dark brown, brown, chestnut, auburn, copper, dark blond,
-blond, grey, silver, platinum (silver and platinum moved here from dyed). Dyed hair is a bright colour of any hue and
+Natural hair: 12 colors, equally likely: black, soft black, dark brown, brown, chestnut, auburn, copper, dark blond,
+blond, gray, silver, platinum (silver and platinum moved here from dyed). Dyed hair is a bright color of any hue and
 only rave (50 %), robot (30 %) and house (20 %) dancers get it; pop, hip-hop, disco, retro and chill are always
 natural. Beards still come only with natural hair.
 
@@ -607,7 +607,7 @@ same rig: the IK still places hands and feet, so feet stay planted and the carto
 - Result: 543 moves: 376 basic (4 bars), 123 routines of 16 bars and 44 of 8. Basic / 16-bar / 8-bar per genre:
   house 60 / 13 / 4, pop 40 / 20 / 0, lock 40 / 16 / 4, break 20 / 1 / 6, middle hip-hop 39 / 17 / 3, LA hip-hop
   40 / 21 / 0, krump 37 / 9 / 8, waack 35 / 14 / 5, street jazz 36 / 3 / 12, ballet jazz 29 / 9 / 2. Recorded at
-  120-130 BPM: 438. content/Moves/aist.moves, 11 MB: channels quantised to 8 bits over their range within a move
+  120-130 BPM: 438. content/Moves/aist.moves, 11 MB: channels quantized to 8 bits over their range within a move
   (about 2 mm on a character, half a degree), the body's heading 16 (spins).
 - **Bend hints** (`DancePose::elbowL/R`, `kneeL/R`): the direction the elbow (chest frame) or knee (body frame) bends,
   its length how clear the bend is (0 straight .. 1). The rig turns its own pole (elbows back and out, knees forward)
@@ -713,7 +713,7 @@ the Names menu (named / all / off, `reforce.Dancer.NameTags`) is gone.
 "Choosing a dance move genre should be the top-level thing, and then choosing an appearance to go with it should be
 secondary." The dancer styles are now the AIST++ genres, two pairs combined and two renamed (Peter: "I'm at least not
 familiar with those terms"): **house**, **pop** (popping), **lock** (locking), **break** (breaking; toprock only, the
-floor work is left out), **disco** (waack), **stomp** (krump), **hip-hop** (middle hip-hop, labelled "party hip-hop",
+floor work is left out), **disco** (waack), **stomp** (krump), **hip-hop** (middle hip-hop, labeled "party hip-hop",
 and LA hip-hop) and **jazz** (street and ballet jazz). `Style` in engine/DanceMoves: House, Pop, Lock, Break, Disco,
 Stomp, HipHop, Jazz (+ Ballet, below).
 
@@ -722,7 +722,7 @@ Stomp, HipHop, Jazz (+ Ballet, below).
   40 / 20 / 0, lock 40 / 16 / 4, break 20 / 1 / 6, disco 35 / 14 / 5, stomp 37 / 9 / 8, hip-hop 79 / 38 / 3, jazz
   65 / 12 / 14 (tested: every style has at least 20 basic moves and 5 routines).
 - **Looks**: `generateDancer` keeps the wardrobes written for the old styles and dresses each new one from the closest:
-  house from house (30 % rave gear: neon, glow sticks, dyed hair), pop from robot (greys and one bright accent,
+  house from house (30 % rave gear: neon, glow sticks, dyed hair), pop from robot (grays and one bright accent,
   visors), lock from retro (70s: stripes, pompadours, moustaches, aviators), break and hip-hop from hip-hop (hoodies,
   caps), stomp from hip-hop in a hard, dark palette, disco from disco (sequins, suits, afros), jazz from pop (60 %) or
   chill (40 %).

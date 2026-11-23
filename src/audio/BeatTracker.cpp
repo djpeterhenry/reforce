@@ -195,7 +195,7 @@ std::array<float, BeatConfig::kFoldBins * BeatConfig::kFoldFeat> BeatTracker::fo
     return out;
 }
 
-// Normalised profile (as tools/beat_eval/train_fold.py): per feature, the bin means minus their mean over the beat,
+// Normalized profile (as tools/beat_eval/train_fold.py): per feature, the bin means minus their mean over the beat,
 // each group (flux, level) divided by its RMS. Scores every rotation r (beat at bin r) with foldW; softmax.
 void BeatTracker::scoreFold() {
     constexpr int B = BeatConfig::kFoldBins, F = BeatConfig::kFoldFeat;
@@ -272,7 +272,7 @@ void BeatTracker::stepFilter(double act, double phiAct, double hopSeconds) {
     }
     pfTempo_ = tempo_;
     if (R == 1) pfRef_ = tempo_;
-    // Re-centre the rows on TEMPO (row k's tempo stays where it is; the edge row is repeated).
+    // Re-center the rows on TEMPO (row k's tempo stays where it is; the edge row is repeated).
     while (tempo_ > pfRef_ * (1.0 + 0.5 * step)) {
         std::copy(row(pf_, 1), row(pf_, R), row(pf_, 0));
         std::copy(pfAcc_.begin() + 1, pfAcc_.begin() + R, pfAcc_.begin());
@@ -332,7 +332,7 @@ void BeatTracker::stepFilter(double act, double phiAct, double hopSeconds) {
         any = true;
     }
     const double foldGain = moving ? cfg_.pfFoldGainMoving : cfg_.pfFoldGain;
-    if (foldFresh_ && foldGain > 0.0) {  // the fold's softmax (bin r's centre at (r + .5) / B), interpolated
+    if (foldFresh_ && foldGain > 0.0) {  // the fold's softmax (bin r's center at (r + .5) / B), interpolated
         foldFresh_ = false;
         for (int j = 0; j < M; ++j) {
             const double pos = (j + 0.5) * B / M - 0.5, fl = std::floor(pos), fr = pos - fl;
@@ -518,7 +518,7 @@ void BeatTracker::processHop() {
         kpRe_ = kpRe_ * keep + w * std::cos(kTwoPi * kpPhi_);
         kpIm_ = kpIm_ * keep + w * std::sin(kTwoPi * kpPhi_);
         kpW_ = kpW_ * keep + w;
-        // Beat fold: this hop's band flux and level into the two bins around phi (bin b's centre: (b + .5) / B).
+        // Beat fold: this hop's band flux and level into the two bins around phi (bin b's center: (b + .5) / B).
         constexpr int B = BeatConfig::kFoldBins, F = BeatConfig::kFoldFeat;
         const double fk = std::exp(-m.hopSeconds / std::max(1e-3, cfg_.foldSeconds));
         for (double& v : fold_) v *= fk;

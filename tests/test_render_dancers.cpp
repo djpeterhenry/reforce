@@ -172,7 +172,7 @@ TEST_CASE("dancers: reflections in the floor: under the dancer only, by the Refl
     q->release();
 }
 
-TEST_CASE("dancers: the Syphon alpha: bodies and floor opaque, shadows partly, the rest untouched; colour the same") {
+TEST_CASE("dancers: the Syphon alpha: bodies and floor opaque, shadows partly, the rest untouched; color the same") {
     if (!device()) return;
     const int W = 640, H = 360;
     render::DancerPipeline p(device(), W, H, {});
@@ -187,7 +187,7 @@ TEST_CASE("dancers: the Syphon alpha: bodies and floor opaque, shadows partly, t
     fill(out, 10, 20, 30);
     encodeOnce(p, q, out, one);
     const auto plain = read(out);
-    // Tracked (the frame's alpha starts at 0): the colour is the same, the alpha says what stays opaque.
+    // Tracked (the frame's alpha starts at 0): the color is the same, the alpha says what stays opaque.
     fill(out, 10, 20, 30, 0);
     encodeOnce(p, q, out, one, nullptr, true);
     const auto tracked = read(out);
