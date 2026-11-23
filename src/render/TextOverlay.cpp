@@ -449,7 +449,10 @@ void TextOverlay::encode(MTL::CommandBuffer* cmd, MTL::Texture* output, const Dr
             MTL::RenderPassDescriptor* lp = MTL::RenderPassDescriptor::renderPassDescriptor();
             auto* la = lp->colorAttachments()->object(0);
             la->setTexture(lum_);
-            la->setLoadAction(lumFresh_ ? MTL::LoadActionDontCare : MTL::LoadActionLoad);
+            // Fresh: cleared, not DontCare. The blend still reads the old value (times 0), and 0 * NaN from leftover
+            // memory is NaN, which would then stay in the average and leave that patch without a shadow.
+            la->setLoadAction(lumFresh_ ? MTL::LoadActionClear : MTL::LoadActionLoad);
+            la->setClearColor(MTL::ClearColor(0, 0, 0, 1));
             la->setStoreAction(MTL::StoreActionStore);
             MTL::RenderCommandEncoder* le = cmd->renderCommandEncoder(lp);
             le->setLabel(NS::String::string("text shadow luminance", NS::UTF8StringEncoding));
