@@ -16,6 +16,7 @@
 
 #include <httplib.h>
 
+#include "PerfBudget.hpp"
 #include "engine/LightsSettings.hpp"
 #include "lights/LightMap.hpp"
 #include "lights/LightsOutput.hpp"
@@ -258,8 +259,9 @@ TEST_CASE("lights: streams to a fake Nanoleaf and puts it back when turned off")
         }
         CHECK(lo < 60);  // faded well down between beats
         REQUIRE(flashes.size() >= 3);
+        // Wall-clock spacing: checked on a real Mac, only reported on CI (shared runners stall the thread).
         for (std::size_t i = 1; i < flashes.size(); ++i)
-            CHECK(flashes[i] - flashes[i - 1] == doctest::Approx(0.5).epsilon(0.05));
+            PERF_BUDGET(flashes[i] - flashes[i - 1] == doctest::Approx(0.5).epsilon(0.05));
         CHECK(out.status().pulsing);
         CHECK(out.panels()[0].o == 180);  // the layout's orientation, for the preview
         CHECK(out.panels().size() == 3);

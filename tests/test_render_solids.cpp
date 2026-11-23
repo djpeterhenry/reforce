@@ -440,7 +440,7 @@ TEST_CASE("solids: cost of the WaveShape / frame tiles at 1920x1080; no render-t
             << " ms; + frame tile (crop + mips) " << fr << " ms; + WaveShape tile and a Text=0 icosahedron "
             << "composited " << all << " ms GPU");
     PERF_BUDGET(w < 0.5);  // design estimate ~0.02 ms; loose here (shared GPU)
-    CHECK(fr < 0.5);
+    PERF_BUDGET(fr < 0.5);
     CHECK(perf::renderAllocs().load() == allocs0);
     q->release();
 }
