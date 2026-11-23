@@ -136,15 +136,10 @@ void ThemeLibrary::addTheme(const std::string& text) {
     for (const auto& [k, v] : kv)
         if (k.size() > suffix.size() && k.compare(k.size() - suffix.size(), suffix.size(), suffix) == 0)
             t.categoryExpr[k.substr(0, k.size() - suffix.size())] = v;
-    if ((it = kv.find("solid.slideshow.interval.duration")) != kv.end()) {
+    if ((it = kv.find("object.slideshow.interval.duration")) != kv.end()) {
         char* end = nullptr;
         const double v = std::strtod(it->second.c_str(), &end);
-        if (end != it->second.c_str() && v >= 0 && v < 1e6) t.solidInterval = v;
-    }
-    if ((it = kv.find("organic.slideshow.interval.duration")) != kv.end()) {
-        char* end = nullptr;
-        const double v = std::strtod(it->second.c_str(), &end);
-        if (end != it->second.c_str() && v >= 0 && v < 1e6) t.organicInterval = v;
+        if (end != it->second.c_str() && v >= 0 && v < 1e6) t.objectInterval = v;
     }
     if ((it = kv.find("dancer.slideshow.interval.duration")) != kv.end()) {
         char* end = nullptr;

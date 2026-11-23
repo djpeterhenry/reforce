@@ -345,12 +345,12 @@ void App::stress(double now) {
     }
     q.push(engine::Command::next(engine::Layer::Particle));
     q.push(engine::Command::next(engine::Layer::Sprite));
-    if (stressTick_ % 2 == 1) q.push(engine::Command::next(engine::Layer::Solid));  // all slots full: oldest makes way
+    if (stressTick_ % 2 == 1) q.push(engine::Command::next(engine::Layer::Object));  // all slots full: oldest makes way
     if (stressTick_ % 4 == 0) {
         q.push(engine::Command::kill(engine::Layer::Particle));
         q.push(engine::Command::kill(engine::Layer::Sprite));
     }
-    if (stressTick_ % 6 == 0) q.push(engine::Command::kill(engine::Layer::Solid));
+    if (stressTick_ % 6 == 0) q.push(engine::Command::kill(engine::Layer::Object));
     // Phase 5F: video start/stop on the colour layer (crossfades interrupted
     // now and then), movie sprites, blend changes.
     const auto& videos = director_->videoFiles();

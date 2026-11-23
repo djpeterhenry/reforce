@@ -788,7 +788,7 @@ TEST_CASE("slideshow settings from the panel map to settings.json keys") {
     CHECK(slideshowSaveEntries(Command::videoSet("spritecolour", "under")).entries().empty());
     // Dancer Duration 0 = forever (∞ on the card): saved; 0 for other layers is not.
     CHECK(one(slideshowSaveEntries(Command::spawnDuration(Layer::Dancer, 0)), "Dancer.Duration") == "0");
-    CHECK(slideshowSaveEntries(Command::spawnDuration(Layer::Solid, 0)).entries().empty());
+    CHECK(slideshowSaveEntries(Command::spawnDuration(Layer::Object, 0)).entries().empty());
     // Syphon alpha (docs/syphon-alpha.md).
     CHECK(one(slideshowSaveEntries(Command::videoSet("syphonalpha", "on")), "reforce.Syphon.Alpha") == "1");
     CHECK(one(slideshowSaveEntries(Command::videoSet("syphonalpha", "off")), "reforce.Syphon.Alpha") == "0");

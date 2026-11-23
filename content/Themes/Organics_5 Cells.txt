@@ -1,4 +1,0 @@
-ThemeName = "Organics: Cells"
-About = "reforce: everything as in (Standard), plus a cellular automaton stepping on the beat (Rule 30, Sierpinski, Game of Life) every 30 seconds or so."
-Organic.CategoryExpr = "+Cells"
-Organic.Slideshow.Interval.Duration = 30

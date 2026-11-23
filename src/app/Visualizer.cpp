@@ -86,7 +86,8 @@ Visualizer::Visualizer(MTL::Device* device, const VisualizerOptions& opts)
     if (!opts.syncBuilds) pipeline_->prewarmOtherFormat();
     {
         render::SolidPipelineOptions so;
-        so.maxLive = opts.prefs.solidMaxLive;
+        // One target more than MaxLive: a replaced solid fades out under the one replacing it.
+        so.maxLive = opts.prefs.objectMaxLive + 1;
         so.msaa = opts.prefs.solidMsaa;
         so.tileSize = opts.prefs.solidTileSize;
         try {
@@ -96,10 +97,10 @@ Visualizer::Visualizer(MTL::Device* device, const VisualizerOptions& opts)
         }
         try {
             render::FieldPipelineOptions fo;
-            fo.maxLive = std::max(1, opts.prefs.organicMaxLive);
+            fo.maxLive = std::max(1, opts.prefs.objectMaxLive) + 1;  // + 1: see the solids
             fields_ = std::make_unique<render::FieldPipeline>(*pipeline_, fo);
         } catch (const std::exception& e) {
-            rlog("[reforce] ripples / Julia sets unavailable: %s\n", e.what());
+            rlog("[reforce] ripples / Julia / Mandelbrot sets unavailable: %s\n", e.what());
         }
         try {
             text_ = std::make_unique<render::TextOverlay>(pipeline_->device());
@@ -147,10 +148,10 @@ Visualizer::Visualizer(MTL::Device* device, const VisualizerOptions& opts)
         danceMocap_ = opts.prefs.dancerMocap;
         danceMaxLive_ = opts.prefs.dancerMaxLive;
         dancerTestsPending_ = opts.dancerTests;
-        // Test hook (--solid-test): one target slot each, up to reforce.Solid.MaxLive.
+        // Test hook (--solid-test): one target slot each, up to reforce.Object.MaxLive + 1.
         for (const auto& spec : opts.solidTests) {
             if (!solids_ || int(solidTests_.size()) >= solids_->maxLive()) {
-                rlog("[reforce] solid test \"%s\" skipped: no free solid slot (reforce.Solid.MaxLive)\n",
+                rlog("[reforce] solid test \"%s\" skipped: no free solid slot (reforce.Object.MaxLive + 1)\n",
                      spec.text.c_str());
                 continue;
             }
@@ -449,10 +450,10 @@ LayerStatus Visualizer::status(Layer layer, double t) const {
             break;
         case Layer::Particle:
         case Layer::Sprite:
-        case Layer::Solid: {
+        case Layer::Object: {
             const auto names = layer == Layer::Particle ? particleNames()
                                : layer == Layer::Sprite ? spriteNames()
-                                                        : solidNames();
+                                                        : objectNames();
             for (const auto& n : names) s.current += (s.current.empty() ? "" : ", ") + n;
             break;
         }

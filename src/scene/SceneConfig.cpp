@@ -176,7 +176,8 @@ Tier tierFor(SceneType type, const std::string& key, int& family, int& index, bo
             key == "PHAS" || key == "ANG" || key == "FX" || key == "FY" || key == "PHX" || key == "PHY" ||
             key == "AX" || key == "AY" || key == "DAMP" || key == "PA" || key == "PB" || key == "PC" || key == "PD" ||
             key == "DX" || key == "DY" || key == "RAIN" || key == "GAIN" || key == "CRE" || key == "CIM" ||
-            key == "BAND")
+            key == "BAND" || key == "VIB" || key == "PULS" || key == "PALL" || key == "TGT" || key == "GLOW" ||
+            key == "LEAF" || key == "LFLT")
             return Tier::FrameOutput;
         // L-system axiom and rules: literal text ("F=F[+F]F"), not expressions (PLAN 5O.4).
         if (key == "AXM" || key == "R1" || key == "R2" || key == "R3" || key == "R4") return Tier::Ignored;

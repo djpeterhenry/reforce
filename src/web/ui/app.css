@@ -264,7 +264,6 @@ details.library[open] > * + * { margin-top: 8px; }
 .fold > summary .vsum-note { color: var(--faint); margin-left: 6px; }
 .fold > summary .vsum-note.on { color: var(--ok); }
 .fold[open] > summary { margin-bottom: 8px; }
-.liverow select { flex: 1; min-width: 0; max-width: none; }
 .video .card { display: flex; flex-direction: column; gap: 10px; }
 .video #vSource, .video #bdSource { flex: 1; min-width: 0; }
 .video .vmeta { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }

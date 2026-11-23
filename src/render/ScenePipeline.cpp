@@ -212,7 +212,7 @@ vertex LOut line_vs(uint vid [[vertex_id]], uint iid [[instance_id]],
     const float len = length(d);
     const float2 dir = len > 1e-4f ? d / len : float2(1.0, 0.0);
     const float2 n = float2(-dir.y, dir.x);
-    const float R = max(s.radius, 0.5f) + 1.5f;  // room for the AA fringe
+    const float R = max(abs(s.radius), 0.5f) + 1.5f;  // room for the AA fringe (radius < 0: hard edge, below)
     float2 c = (vid & 1) ? s.b + dir * R : s.a - dir * R;
     c += ((vid & 2) ? 1.0f : -1.0f) * n * R;
     LOut o;
@@ -238,9 +238,11 @@ static float seg_dist(float2 p, float2 a, float2 b, thread float& h) {
 fragment float4 line_fs(LOut in [[stage_in]], constant LineParams& P [[buffer(0)]]) {
     float h;
     const float dist = seg_dist(in.position.xy, in.a, in.b, h);  // pixel center, origin top-left
-    const float r = max(in.radius, 0.5f);
+    const float r = max(abs(in.radius), 0.5f);
     float cov;
-    if (P.aa > 0.5f) cov = clamp(r + 0.5f - dist, 0.0f, 1.0f);
+    // A negative radius is a hard-edged segment (organic cells): no in-between intensities at its rim, which the
+    // ColorMap would paint in unrelated colours (a speckled fringe on big dots).
+    if (P.aa > 0.5f && in.radius >= 0.0f) cov = clamp(r + 0.5f - dist, 0.0f, 1.0f);
     else cov = dist <= r ? 1.0f : 0.0f;
     if (cov <= 0.0f) discard_fragment();
     // Blend: out = pen * cov + dst * (1 - cov)  -> overwrite where cov == 1.
@@ -315,8 +317,9 @@ fragment PathOut line_path_fs(LOut in [[stage_in]], float4 dst [[color(0)]], flo
                               constant LineParams& P [[buffer(0)]]) {
     float h;
     const float dist = seg_dist(in.position.xy, in.a, in.b, h);
-    const float cov = P.aa > 3.5f ? span_cov(in.position.xy, in.a, in.b, max(in.radius, 0.0f))
-                                  : line_cov_energy(dist, in.radius, all(in.a == in.b));
+    const float cov = in.radius < 0.0f ? (dist <= -in.radius ? 1.0f : 0.0f)  // hard edge (see line_fs)
+                      : P.aa > 3.5f ? span_cov(in.position.xy, in.a, in.b, max(in.radius, 0.0f))
+                                    : line_cov_energy(dist, in.radius, all(in.a == in.b));
     if (cov <= 0.0f) discard_fragment();
     const bool same = st.x == in.path;
     const float base = same ? st.y : dst.r;
@@ -334,7 +337,7 @@ struct MsaaOut { float4 color [[color(0)]]; uint mask [[sample_mask]]; };
 
 fragment MsaaOut line_msaa_fs(LOut in [[stage_in]], constant LineParams& P [[buffer(0)]]) {
     const float2 px = floor(in.position.xy);
-    const float r = max(in.radius, 0.5f);
+    const float r = max(abs(in.radius), 0.5f);
     uint mask = 0;
     for (uint i = 0; i < 4; ++i) {
         float hs;

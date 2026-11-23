@@ -3,7 +3,10 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <map>
+
+#include "engine/arcade/Arcade.hpp"
 
 #include "expr/Rng.hpp"
 
@@ -131,7 +134,7 @@ public:
             if (row < -0.5) continue;
             const double pen = s.pen * (0.3 + 0.7 * double(j + 1) / double(n));
             for (int i = 0; i < cols_; ++i)
-                if (rowsData_[std::size_t(j)][std::size_t(i)]) c.dotUnits(g.x(i), g.y(row), g.cell * dotw_, pen);
+                if (rowsData_[std::size_t(j)][std::size_t(i)]) c.dotUnits(g.x(i), g.y(row), g.cell * dotw_, pen, true);
         }
     }
     std::string summary() const override {
@@ -199,7 +202,7 @@ public:
                 const std::size_t i = std::size_t(r * cols_ + q);
                 if (!cells_[i]) continue;
                 const double pen = s.pen * (age_[i] <= 1 ? 1.0 : 0.65);  // newborns brightest
-                c.dotUnits(g.x(q), g.y(r), g.cell * dotw_, pen);
+                c.dotUnits(g.x(q), g.y(r), g.cell * dotw_, pen, true);
             }
     }
     std::string summary() const override {
@@ -363,16 +366,22 @@ public:
         : num_(count(in, "NUM", 6000, 100, 30000)), dotw_(num(in, "DOTW", 1.5, 0, 50)),
           size_(num(in, "SPRD", 0.42, 0.01, 4)), inst_(in) {}
     void step(const OrganicStep& s, OrganicCanvas& c) override {
-        const double a = finiteOr(inst_.frameKey("PA", -1.4), -1.4), b = finiteOr(inst_.frameKey("PB", 1.6), 1.6);
-        const double cc = finiteOr(inst_.frameKey("PC", 1.0), 1.0), d = finiteOr(inst_.frameKey("PD", 0.7), 0.7);
-        for (int i = 0; i < num_ + 10; ++i) {
-            const double nx = std::sin(a * y_) + cc * std::cos(a * x_);
-            const double ny = std::sin(b * x_) + d * std::cos(b * y_);
-            x_ = std::isfinite(nx) ? nx : 0.1;
-            y_ = std::isfinite(ny) ? ny : 0.1;
-            if (i >= 10) c.dot(x_ * size_, y_ * size_, dotw_, s.pen);
+        double p[4] = {finiteOr(inst_.frameKey("PA", -1.4), -1.4), finiteOr(inst_.frameKey("PB", 1.6), 1.6),
+                       finiteOr(inst_.frameKey("PC", 1.0), 1.0), finiteOr(inst_.frameKey("PD", 0.7), 0.7)};
+        // Some parameters are not chaotic, or have a short cycle next to the strange attractor: the orbit falls onto a
+        // fixed point or a cycle and the 9000 dots land on a handful of pixels, so the organic seems to blink off
+        // (Clifford Attractor spent 13 % of its first path there). Then try again from a fresh start (which side it
+        // lands on depends on where the orbit starts), and if it still collapses, draw the last full cloud again.
+        if (!iterate(p)) {
+            x_ = 0.1;
+            y_ = 0.1;
+            if (!iterate(p) && !last_.empty()) pts_ = last_;
         }
+        if (cells_ >= kMinCells) last_ = pts_;
+        for (std::size_t i = 0; i < pts_.size(); i += 2) c.dot(pts_[i] * size_, pts_[i + 1] * size_, dotw_, s.pen);
     }
+    // Distinct cells (1/50 of a unit) the drawn points cover; fewer than this is a collapsed orbit.
+    static constexpr int kMinCells = 800;
     std::string summary() const override {
         char b[48];
         std::snprintf(b, sizeof b, "%d points per frame", num_);
@@ -380,10 +389,40 @@ public:
     }
 
 private:
+    // Runs the map for this frame's points into pts_; false when they cover fewer than kMinCells cells.
+    bool iterate(const double* p) {
+        const double a = p[0], b = p[1], cc = p[2], d = p[3];
+        pts_.clear();
+        std::fill(seen_.begin(), seen_.end(), 0);
+        cells_ = 0;
+        for (int i = 0; i < num_ + 10; ++i) {
+            const double nx = std::sin(a * y_) + cc * std::cos(a * x_);
+            const double ny = std::sin(b * x_) + d * std::cos(b * y_);
+            x_ = std::isfinite(nx) ? nx : 0.1;
+            y_ = std::isfinite(ny) ? ny : 0.1;
+            if (i < 10) continue;
+            pts_.push_back(x_);
+            pts_.push_back(y_);
+            // |x|, |y| <= 1 + |c| or 1 + |d|; cells over +-6 cover any sane parameters (outside: not counted).
+            const int gx = int(std::floor((x_ + 6.0) * 50.0)), gy = int(std::floor((y_ + 6.0) * 50.0));
+            if (gx < 0 || gy < 0 || gx >= kGrid || gy >= kGrid) continue;
+            const std::size_t k = std::size_t(gy) * kGrid + std::size_t(gx);
+            if (!seen_[k]) {
+                seen_[k] = 1;
+                ++cells_;
+            }
+        }
+        return cells_ >= kMinCells;
+    }
+    static constexpr int kGrid = 600;
     int num_;
     double dotw_, size_;
     scene::OrganicInstance& inst_;
     double x_ = 0.1, y_ = 0.1;
+    std::vector<double> pts_;
+    std::vector<unsigned char> seen_ = std::vector<unsigned char>(std::size_t(kGrid) * kGrid, 0);
+    int cells_ = 0;
+    std::vector<double> last_;  // the last frame's points that covered a real cloud
 };
 
 }  // namespace
@@ -432,20 +471,101 @@ void OrganicCanvas::dot(double x, double y, double width, double pen) {
     out_.push_back({ax, ay, ax, ay, float(pen), float(pen), radius(width), path_});
 }
 
-void OrganicCanvas::dotUnits(double x, double y, double diameter, double pen) {
+void OrganicCanvas::dotUnits(double x, double y, double diameter, double pen, bool hard) {
     pen = std::clamp(finiteOr(pen, 0), 0.0, 1.0);
     if (pen <= 0 || !(diameter > 0)) return;
     float ax, ay;
     if (!toPx(x, y, ax, ay)) return;
     const float r = float(std::max(0.5, 0.25 * diameter * map_.height * absScale_));  // tree unit = H / 2 px
-    out_.push_back({ax, ay, ax, ay, float(pen), float(pen), r, path_});
+    out_.push_back({ax, ay, ax, ay, float(pen), float(pen), hard ? -r : r, path_});
+}
+
+double OrganicCanvas::pixelsPerUnit() const { return 0.5 * map_.height * absScale_; }
+
+void OrganicCanvas::fillPolygon(const double* xs, const double* ys, int n, double pen) {
+    pen = std::clamp(finiteOr(pen, 0), 0.0, 1.0);
+    if (pen <= 0 || n < 3 || n > 4096) return;
+    // Into frame pixels (Rot and Scal applied), then scanlines there.
+    float px[4096], py[4096];
+    float y0 = 1e30f, y1 = -1e30f;
+    for (int i = 0; i < n; ++i) {
+        if (!toPx(xs[i], ys[i], px[i], py[i])) return;
+        y0 = std::min(y0, py[i]);
+        y1 = std::max(y1, py[i]);
+    }
+    const float pf = float(pen);
+    // Hard-edged strokes (negative radius; a soft rim's in-between intensities take unrelated ColorMap colours),
+    // laid on the pixel grid so the edges are clean: one stroke per pair of pixel rows (radius 1 on the line between
+    // them covers both rows' centres and nothing else), each ending on the first and last pixel centre inside the
+    // span, whose round cap then reaches no further pixel (square corners). Pixel centres are at k + .5.
+    const auto spans = [&](float y, float rad) {
+        float hits[64];
+        int k = 0;
+        for (int i = 0, j = n - 1; i < n && k < 64; j = i++) {
+            const float ya = py[j], yb = py[i];
+            if ((ya <= y && yb > y) || (yb <= y && ya > y)) hits[k++] = px[j] + (y - ya) / (yb - ya) * (px[i] - px[j]);
+        }
+        std::sort(hits, hits + k);
+        for (int i = 0; i + 1 < k; i += 2) {
+            const float first = std::ceil(hits[i] - 0.5f) + 0.5f, last = std::floor(hits[i + 1] - 0.5f) + 0.5f;
+            if (first <= last) {
+                out_.push_back({first, y, last, y, pf, pf, -rad, path_});
+            } else if (hits[i + 1] - hits[i] > 0.25f) {  // narrower than a pixel: the nearest pixel, not nothing
+                const float m = std::floor(0.5f * (hits[i] + hits[i + 1])) + 0.5f;
+                out_.push_back({m, y, m, y, pf, pf, -rad, path_});
+            }
+        }
+    };
+    const int rFirst = int(std::ceil(y0 - 0.5f)), rLast = int(std::floor(y1 - 0.5f));
+    if (rLast < rFirst) {  // thinner than a pixel row: the row nearest its middle
+        if (y1 - y0 > 0.25f) spans(std::floor(0.5f * (y0 + y1)) + 0.5f, 0.5f);
+        return;
+    }
+    if (rLast - rFirst > 8000) return;  // absurdly large
+    for (int r = rFirst; r <= rLast; r += 2) {
+        if (r + 1 <= rLast) spans(float(r) + 1.0f, 1.0f);  // rows r and r + 1
+        else spans(float(r) + 0.5f, 0.5f);                // the last row alone
+    }
+}
+
+void OrganicCanvas::rect(double cx, double cy, double w, double h, double pen) {
+    const double hw = 0.5 * std::abs(w), hh = 0.5 * std::abs(h);
+    const double xs[4] = {cx - hw, cx + hw, cx + hw, cx - hw};
+    const double ys[4] = {cy - hh, cy - hh, cy + hh, cy + hh};
+    fillPolygon(xs, ys, 4, pen);
+}
+
+void OrganicCanvas::bitmap(const char* const* rows, int nRows, double cx, double cy, double px, double pen,
+                           bool mirror) {
+    if (nRows <= 0 || !(px > 0)) return;
+    int cols = 0;
+    for (int r = 0; r < nRows; ++r) cols = std::max(cols, int(std::strlen(rows[r])));
+    const double left = cx - 0.5 * cols * px, top = cy + 0.5 * nRows * px;
+    auto lit = [](char ch) { return ch != '.' && ch != ' ' && ch != 0; };
+    for (int r = 0; r < nRows; ++r) {
+        const char* row = rows[r];
+        const int len = int(std::strlen(row));
+        int q = 0;
+        while (q < len) {
+            if (!lit(row[q])) {
+                ++q;
+                continue;
+            }
+            int e = q;
+            while (e < len && lit(row[e])) ++e;
+            // Columns q..e-1, flipped when mirrored.
+            const double a = mirror ? cols - e : q, b = mirror ? cols - q : e;
+            rect(left + 0.5 * (a + b) * px, top - (r + 0.5) * px, (b - a) * px, px, pen);
+            q = e;
+        }
+    }
 }
 
 // ------------------------------------------------------------------ factory
 
 const std::vector<std::string>& organicBodyKinds() {
     static const std::vector<std::string> k = {"phyllotaxis", "harmonograph", "automaton", "life", "lsystem",
-                                               "attractor"};
+                                               "attractor", "invaders", "hopper", "cycles", "rocks", "bricks", "chase"};
     return k;
 }
 
@@ -457,6 +577,12 @@ std::unique_ptr<OrganicBody> makeOrganicBody(const std::string& kind, scene::Org
     if (kind == "life") return std::make_unique<Life>(inst, seed);
     if (kind == "lsystem") return std::make_unique<LSystem>(inst);
     if (kind == "attractor") return std::make_unique<Attractor>(inst);
+    if (kind == "invaders") return arcade::makeInvaders(inst, seed);
+    if (kind == "hopper") return arcade::makeHopper(inst, seed);
+    if (kind == "cycles") return arcade::makeCycles(inst, seed);
+    if (kind == "rocks") return arcade::makeRocks(inst, seed);
+    if (kind == "bricks") return arcade::makeBricks(inst, seed);
+    if (kind == "chase") return arcade::makeChase(inst, seed);
     return nullptr;
 }
 

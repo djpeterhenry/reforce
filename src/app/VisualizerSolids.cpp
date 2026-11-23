@@ -83,22 +83,28 @@ bool Visualizer::startSolid(std::shared_ptr<const scene::CompiledConfig> cfg, co
              "sphere, torus, prism)\n", label.c_str(), written.c_str());
         return false;
     }
+    makeRoomForObject(t, fade.fade, label);
     int slot = freeSolidSlot();
     if (slot < 0) {
         if (liveSolids_.empty()) {
-            rlog("[reforce] Solid \"%s\": no free solid slot (reforce.Solid.MaxLive)\n", label.c_str());
+            rlog("[reforce] Solid \"%s\": no free solid slot (reforce.Object.MaxLive)\n", label.c_str());
             return false;
         }
-        rlog("[reforce] Solid \"%s\" makes way for \"%s\" (reforce.Solid.MaxLive %d)\n",
-             liveSolids_.front().run->name().c_str(), label.c_str(), solids_->maxLive());
-        slot = liveSolids_.front().slot;
-        liveSolids_.erase(liveSolids_.begin());
+        // Every target is taken (several quick starts in a row): the oldest fading one goes at once.
+        auto it = std::find_if(liveSolids_.begin(), liveSolids_.end(), [&](const auto& s) { return s.run->fadingOut(t); });
+        if (it == liveSolids_.end()) it = liveSolids_.begin();
+        rlog("[reforce] Solid \"%s\" removed for \"%s\" (no free render target)\n", it->run->name().c_str(),
+             label.c_str());
+        slot = it->slot;
+        liveSolids_.erase(it);
     }
     perf::tag(perf::TagSolidStart);
     scene::Environment env = environment(t);
     env.seed = opts_.seed + 0x1000 * ++loads_;
     auto run = std::make_unique<engine::SolidRun>(std::move(cfg), env, label, *mesh, t, fade.fade, fade.defaultHold,
                                                   fade.fn);
+    run->setHold(engine::holdForBars(run->bars(), fade.fade, syncInput(), phrase_.state().bars,
+                                     phrase_.state().quantum));  // PBar
     const auto& e = run->envelope();
     rlog("[reforce] Solid \"%s\" starts: %s, Text=%d, slot %d, fade %.2f s, hold %.2f s\n", label.c_str(),
          engine::meshKindName(*mesh), run->text(), slot, e.fade, e.hold);

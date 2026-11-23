@@ -1,4 +1,0 @@
-ThemeName = "Organics: Fractals"
-About = "reforce: everything as in (Standard), plus a Julia set morphing with the bars every 30 seconds or so."
-Organic.CategoryExpr = "+Fractals"
-Organic.Slideshow.Interval.Duration = 30

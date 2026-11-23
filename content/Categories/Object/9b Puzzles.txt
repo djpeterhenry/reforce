@@ -1,0 +1,5 @@
+CategoryTitle = "Puzzles"
+Include.List = "
+Rubik Cube
+Fifteen Glass
+"

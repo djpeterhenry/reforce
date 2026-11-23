@@ -25,8 +25,15 @@ add_library(reforce_engine STATIC
     src/engine/Fifteen.cpp
     src/engine/StickerColors.cpp
     src/engine/TreeGrowth.cpp
+    src/engine/MandelDive.cpp
     src/engine/Organics.cpp
     src/engine/OrganicKinds.cpp
+    src/engine/arcade/Invaders.cpp
+    src/engine/arcade/Hopper.cpp
+    src/engine/arcade/Cycles.cpp
+    src/engine/arcade/Rocks.cpp
+    src/engine/arcade/Bricks.cpp
+    src/engine/arcade/Chase.cpp
     src/engine/DancerRig.cpp
     src/engine/DanceMoves.cpp
     src/engine/DanceClips.cpp
@@ -89,6 +96,14 @@ if(REFORCE_BUILD_TESTS)
         tests/test_engine_rubik.cpp
         tests/test_engine_fifteen.cpp
         tests/test_engine_organics.cpp
+        tests/test_engine_mandel.cpp
+        tests/test_engine_arcade.cpp
+        tests/test_engine_arcade_invaders.cpp
+        tests/test_engine_arcade_hopper.cpp
+        tests/test_engine_arcade_cycles.cpp
+        tests/test_engine_arcade_rocks.cpp
+        tests/test_engine_arcade_bricks.cpp
+        tests/test_engine_arcade_chase.cpp
         tests/test_engine_dancers.cpp
         tests/test_engine_danceclips.cpp
         tests/test_engine_body.cpp

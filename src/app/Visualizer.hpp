@@ -82,7 +82,7 @@ struct VisualizerOptions {
     bool syncBuilds = false; // deterministic: FlowField builds complete inside the switch call
                              // (and video sources deliver the exact frame for the sim time)
     // TEST HOOK (PLAN 5L.2, --solid-test): hard-coded 3D solids that live from the first step on, each holding a
-    // slot of reforce.Solid.MaxLive. Solid scene files (startSolid) are the real way in (PLAN 5L.4).
+    // slot of reforce.Object.MaxLive + 1. Solid scene files (startSolid) are the real way in (PLAN 5L.4).
     std::vector<render::SolidTestSpec> solidTests;
     // TEST HOOK (PLAN 5P, --dancer-test STYLE[,STYLE...]): built-in characters dancing from the first step on.
     std::vector<std::string> dancerTests;
@@ -213,21 +213,34 @@ public:
     render::VideoLevels videoLevels(const video::SourceSpec& spec) const;
     std::vector<std::string> particleNames() const { return particles_.names(); }
 
-    // ---- 3D solids (PLAN 5L.4): reforce.Solid.package scene files. Each live solid holds one of the
-    // reforce.Solid.MaxLive render targets; when all are taken the oldest solid makes way (removed at once).
-    // False when solids are unavailable or the Mesh name is unknown.
+    // ---- 3D solids (PLAN 5L.4): reforce.Solid.package scene files. Up to reforce.Object.MaxLive (solids and organics together) at full strength:
+    // a new one fades the oldest out under it (each holds one of MaxLive + 1 render targets; with none free the
+    // oldest already fading goes at once). PBar sets the hold in bars. False when solids are unavailable or the Mesh
+    // name is unknown.
     bool startSolid(std::shared_ptr<const scene::CompiledConfig> cfg, const std::string& label, double t,
                     const FadeSpec& fade);
     // Fades every live solid out over `fade` seconds (0 = remove now).
     void killSolids(double t, double fade = 0);
     std::vector<std::string> solidNames() const;
     // ---- Organics (PLAN 5N): reforce.Organic.package scene files, drawn as line segments after the particles.
-    // Up to reforce.Organic.MaxLive at once (a new one replaces the oldest). False for an unknown Kind.
+    // Up to reforce.Object.MaxLive (with the solids) at full strength (a new one fades the oldest out under it). PBar sets the hold in
+    // bars. False for an unknown Kind.
     bool startOrganic(std::shared_ptr<const scene::CompiledConfig> cfg, const std::string& label, double t,
                       const FadeSpec& fade);
     // Fades every live organic out over `fade` seconds (trees with Wthr ungrow; 0 = remove now).
     void killOrganics(double t, double fade = 0);
     std::vector<std::string> organicNames() const;
+    // ---- Objects (solids and organics as one layer, 2026-11-22): reforce.Object.MaxLive counts both.
+    void killObjects(double t, double fade = 0);
+    std::vector<std::string> objectNames() const;
+    // Room for a slideshow start on `layer` (Object: fewer than MaxLive at full strength; true for the others): the
+    // slideshow waits until the live one starts fading out, so long pieces (PBar) are never cut.
+    bool spawnRoom(engine::Layer layer, double t) const;
+    // The same for movie / live video sprites (reforce.MovieSprite.MaxLive; prerolling ones count).
+    bool movieRoom(double t) const;
+    // A solid, an organic or a movie / live video sprite at full strength (or a movie prerolling): the slideshow
+    // starts none of the three meanwhile (reforce.Slideshow.OneFeature).
+    bool featureActive(double t) const;
     // ---- Dancers (PLAN 5P): reforce.Dancer.package characters, drawn in full colour over the colorized frame.
     // Up to reforce.Dancer.MaxLive at once (a new one sends the oldest off). False when dancers are unavailable.
     bool startDancer(std::shared_ptr<const scene::CompiledConfig> cfg, const std::string& label, double t,
@@ -632,6 +645,9 @@ private:
     std::optional<SpriteParams> makeSpriteParams(const std::filesystem::path& image) const;
     SpriteImage decodeSprite(const std::filesystem::path& image, bool invert);
     void adoptSprites(double t);
+    // Solids and organics at full strength (not fading out); makes room for a new object (fades the oldest out).
+    int activeObjects(double t) const;
+    void makeRoomForObject(double t, double fade, const std::string& label);
     std::vector<PendingSprite> spritePending_;  // request order
     std::string prefetchKey_;
     SpriteImage prefetch_;

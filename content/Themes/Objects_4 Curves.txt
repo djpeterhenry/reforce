@@ -1,0 +1,4 @@
+ThemeName = "Objects: Curves"
+About = "reforce: everything as in (Standard), plus a curve traced in time with the bars (harmonographs, a strange attractor, a spiral galaxy) every 30 seconds or so."
+Object.CategoryExpr = "+Curves"
+Object.Slideshow.Interval.Duration = 30

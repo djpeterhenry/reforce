@@ -340,6 +340,7 @@ public:
     bool hasFlags() const { return hasFlag_; }
     unsigned flags() const { return flags_; }          // Flag (0 when absent)
     double duration() const { return duration_; }      // PDur, NaN when absent
+    double bars() const { return bars_; }              // PBar (bars at full strength), NaN when absent
     bool perspective() const { return pers_; }         // Pers != 0 (default 1)
     bool colorKey() const { return colorKey_; }        // ColorKey != 0 (default 1; 0 = opaque in the Syphon alpha)
     bool glass() const { return glass_; }              // Glas != 0: fifteen drawn as glass over the frame
@@ -354,6 +355,7 @@ private:
     int turn_ = -1, seed_ = -1, shuf_ = -1, fros_ = -1, tint_ = -1, bend_ = -1;
     unsigned flags_ = 0;
     double duration_ = 0.0;
+    double bars_ = std::nan("");
     int x_ = -1, y_ = -1, z_ = -1, scal_ = -1, rx_ = -1, ry_ = -1, rz_ = -1;
     int fill_ = -1, shad_ = -1, edge_ = -1, pen_ = -1, epen_ = -1;
 };
@@ -361,7 +363,8 @@ private:
 // ----------------------------------------------------------------- Organic
 // reforce extension (PLAN 5N, docs/organics-design.md). Load-time keys: Kind (a literal name), PDur and the
 // algorithm's numbers (Pts, Seg, ...: loaded()). Per point / per root, once (with `s`): the C vars, then PX PY or
-// RtX RtY RtA (evaluatePoints). Per frame: B vars, then Grow, TrpX, TrpY, Sway, X, Y, Scal, Rot, Pen, Bud.
+// RtX RtY RtA (evaluatePoints). Per frame: B vars, then Grow, TrpX, TrpY, Sway, X, Y, Scal, Rot, Pen, Bud (trees: with `s`
+// = beats since the current growth began; Vib, Puls, PAll read through frameKey).
 
 struct OrganicFrame {
     double grow = 12, trpX = 0, trpY = 0, sway = 0.15;   // trees
@@ -375,7 +378,8 @@ using OrganicFrameInput = SolidFrameInput;
 class OrganicInstance : public ConfigInstance {
 public:
     OrganicInstance(const CompiledConfig& cfg, const Environment& env);
-    OrganicFrame evaluateFrame(const OrganicFrameInput& in);
+    // `s`: when finite, the value of `s` in the B vars and frame keys (trees: beats since the current growth began).
+    OrganicFrame evaluateFrame(const OrganicFrameInput& in, double s = std::nan(""));
 
     // For k = 0..count-1 with s = k / (count - 1) (0 for one): the C vars in ascending order, then each of
     // `keys` (key name, value when absent), appending to out[i] for keys[i].
@@ -386,6 +390,11 @@ public:
     void evaluatePoints(int count, std::span<const PointKey> keys, std::vector<std::vector<double>>& out);
     // A Pre-tier key's value, `fallback` when absent or empty.
     double loaded(const char* key, double fallback) const;
+    // Evaluates the A vars again (trees: at every strike after the first, so a strike can pick its own place).
+    void reloadA() {
+        ctx_.randomLanes = 1;
+        evalFamily(expr::FamA);
+    }
     bool defines(const char* key) const { return cfg_->defines(key); }
     // A per-frame key's value this frame (call after evaluateFrame), `fallback` when absent.
     double frameKey(const char* key, double fallback) { return evalScalar(cfg_->indexOf(key), fallback); }
@@ -393,10 +402,12 @@ public:
     std::string literal(const char* key) const;
     const std::string& kind() const { return kind_; }  // Kind as written, trimmed ("" when absent)
     double duration() const { return duration_; }      // PDur, NaN when absent
+    double bars() const { return bars_; }              // PBar (bars at full strength), NaN when absent
 
 private:
     std::string kind_;
     double duration_ = 0.0;
+    double bars_ = std::nan("");
     int grow_ = -1, trpX_ = -1, trpY_ = -1, sway_ = -1, x_ = -1, y_ = -1, scal_ = -1, rot_ = -1, pen_ = -1,
         bud_ = -1, amp_ = -1, strg_ = -1, phas_ = -1;
 };

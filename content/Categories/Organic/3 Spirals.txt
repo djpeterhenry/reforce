@@ -1,5 +1,0 @@
-CategoryTitle = "Spirals"
-Include.List = "
-Sunflower
-Spiral Galaxy
-"

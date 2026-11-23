@@ -12,11 +12,11 @@ reforce's own scene content, laid out like a G-Force scene root (`Packages/`, `T
   2021; https://google.github.io/aistplusplus_dataset/), whose annotations are licensed by Google LLC under
   CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/). Changed: retargeted to our characters, cut into 8-beat
   loops, and filtered. The motion was recorded from the AIST Dance Video Database (Tsuchida et al., ISMIR 2019).
-- `Themes/`: themes that join G-Force's in the theme list. `Solids` turns on a solid every ~30 s, `Organics` an
-  organic, `Organics: <group>` an organic from that group only, `Dance Party` a dancer every ~15 s.
+- `Themes/`: themes that join G-Force's in the theme list. `Objects` turns on an object (a solid or an organic) every
+  ~30 s, `Objects: <group>` one from that group only, `Dance Party` a dancer every ~15 s.
 - `Controllers/`: DJ controller MIDI maps (faders, crossfader, assign switches, hot cue pads) for deck starts
   (docs/rhythm-design.md; format in src/sync/ControllerMap.hpp).
-- `Categories/Organic/`: the organic groups (Trees, Pendulums, Spirals, Curves, Cells, Water, Fractals), which the
-  Organics card browses and the group themes select.
+- `Categories/Object/`: the object groups (Trees, Pendulums, Curves, Cells, Water, Fractals, Arcade, Solids,
+  Puzzles), which the Objects card browses and the group themes select.
 
 reforce reads this folder from the source tree by default (an app built elsewhere uses the copy bundled in it); `reforce.ContentDir` or `--content DIR|none` changes it.

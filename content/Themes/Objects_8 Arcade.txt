@@ -1,0 +1,4 @@
+ThemeName = "Objects: Arcade"
+About = "reforce: everything as in (Standard), plus a game-inspired organic playing on the beat (invaders, a pyramid hopper, light cycles, rocks, a brick wall) every 30 seconds or so."
+Object.CategoryExpr = "+Arcade"
+Object.Slideshow.Interval.Duration = 30

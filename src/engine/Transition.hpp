@@ -13,12 +13,13 @@
 namespace reforce::engine {
 
 // Layers that switch configs (Particles/Sprites: M6).
-enum class Layer { WaveShape, ColorMap, FlowField, Union, Particle, Sprite, Solid, Organic, Dancer };
-inline constexpr int kLayerCount = 9;
+// Object (Peter 2026-11-22): solids and organics as one layer ("Objects"), each scene file still drawn its own way
+// (a 3D solid or an organic); the scene types stay SceneType::Solid / SceneType::Organic.
+enum class Layer { WaveShape, ColorMap, FlowField, Union, Particle, Sprite, Object, Dancer };
+inline constexpr int kLayerCount = 8;
 // Layers whose configs are spawned instances with their own lifetimes (several alive at once), not switched.
 inline constexpr bool isSpawnLayer(Layer l) {
-    return l == Layer::Particle || l == Layer::Sprite || l == Layer::Solid || l == Layer::Organic ||
-           l == Layer::Dancer;
+    return l == Layer::Particle || l == Layer::Sprite || l == Layer::Object || l == Layer::Dancer;
 }
 inline constexpr Layer kMorphLayers[] = {Layer::WaveShape, Layer::ColorMap, Layer::FlowField};
 

@@ -89,6 +89,7 @@ int TreeGrowth::addNode(int parent, double x, double y, double dx, double dy) {
     nd.parent = parent;
     nd.root = parent < 0 ? int(nodes_.size()) : nodes_[std::size_t(parent)].root;
     nd.gen = parent < 0 ? 0 : gen_ + 1;
+    nd.depth = parent < 0 ? 0 : nodes_[std::size_t(parent)].depth + 1;
     if (parent >= 0) {
         TreeNode& pa = nodes_[std::size_t(parent)];
         // Sway phase runs on along a branch; a side branch starts a little out of step.
@@ -230,10 +231,81 @@ int TreeGrowth::iterate(double tx, double ty) {
         return 0;
     }
     ++gen_;
+    ++revision_;
     tips_ = std::move(grown);
     updateTips();
     if (livePoints_ == 0 || int(nodes_.size()) >= p_.maxNodes) done_ = true;
     return int(tips_.size());
+}
+
+std::vector<int> TreeGrowth::prune(const std::vector<char>& remove) {
+    const std::size_t n = nodes_.size();
+    std::vector<int> map(n, -1);
+    std::vector<char> gone(n, 0);
+    // Parents always come first, so one pass carries a removal down to the descendants.
+    for (std::size_t i = 0; i < n; ++i) {
+        const TreeNode& nd = nodes_[i];
+        if (nd.parent < 0) continue;
+        gone[i] = (i < remove.size() && remove[i]) || gone[std::size_t(nd.parent)];
+    }
+    std::vector<TreeNode> kept;
+    std::vector<char> trunk;
+    kept.reserve(n);
+    for (std::size_t i = 0; i < n; ++i) {
+        if (gone[i]) continue;
+        map[i] = int(kept.size());
+        TreeNode nd = nodes_[i];
+        nd.children = 0;
+        if (nd.parent >= 0) {
+            nd.parent = map[std::size_t(nd.parent)];
+            ++kept[std::size_t(nd.parent)].children;
+        }
+        nd.root = map[std::size_t(nd.root)];
+        kept.push_back(nd);
+        trunk.push_back(i < trunk_.size() ? trunk_[i] : 0);
+    }
+    if (kept.size() == n) return map;
+    nodes_ = std::move(kept);
+    trunk_ = std::move(trunk);
+    tips_.clear();
+    for (auto& c : nodeGrid_.cells) c.clear();
+    for (std::size_t i = 0; i < nodes_.size(); ++i) nodeGrid_.insert(int(i), nodes_[i].x, nodes_[i].y);
+    updateTips();
+    ++revision_;
+    return map;
+}
+
+int TreeGrowth::addPoints(const std::vector<double>& xs, const std::vector<double>& ys) {
+    const std::size_t n = std::min(xs.size(), ys.size());
+    const double x1 = nodeGrid_.x0 + nodeGrid_.cell * nodeGrid_.cols, y1 = nodeGrid_.y0 + nodeGrid_.cell * nodeGrid_.rows;
+    const double k2 = p_.kill * p_.kill;
+    int added = 0;
+    for (std::size_t i = 0; i < n && p_.pointsX.size() < 200000; ++i) {
+        const double x = xs[i], y = ys[i];
+        if (!std::isfinite(x) || !std::isfinite(y) || x < nodeGrid_.x0 || y < nodeGrid_.y0 || x > x1 || y > y1) continue;
+        // Already reached: a node within Kill.
+        bool near = false;
+        const int c = std::clamp(int(std::floor((x - nodeGrid_.x0) / nodeGrid_.cell)), 0, nodeGrid_.cols - 1);
+        const int r = std::clamp(int(std::floor((y - nodeGrid_.y0) / nodeGrid_.cell)), 0, nodeGrid_.rows - 1);
+        for (int rr = std::max(0, r - 1); !near && rr <= std::min(nodeGrid_.rows - 1, r + 1); ++rr)
+            for (int cc = std::max(0, c - 1); !near && cc <= std::min(nodeGrid_.cols - 1, c + 1); ++cc)
+                for (int id : nodeGrid_.cells[std::size_t(rr * nodeGrid_.cols + cc)]) {
+                    const double ex = x - nodes_[std::size_t(id)].x, ey = y - nodes_[std::size_t(id)].y;
+                    if (ex * ex + ey * ey <= k2) {
+                        near = true;
+                        break;
+                    }
+                }
+        if (near) continue;
+        p_.pointsX.push_back(x);
+        p_.pointsY.push_back(y);
+        alive_.push_back(1);
+        pointGrid_.insert(int(p_.pointsX.size()) - 1, x, y);
+        ++livePoints_;
+        ++added;
+    }
+    if (added > 0 && int(nodes_.size()) < p_.maxNodes) done_ = false;
+    return added;
 }
 
 }  // namespace reforce::engine

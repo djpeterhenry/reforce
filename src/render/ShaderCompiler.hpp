@@ -15,9 +15,10 @@ struct ShaderCompileError : std::runtime_error {
 };
 
 // Returns a library the caller owns (release() it). Throws ShaderCompileError
-// with the compiler log on failure.
+// with the compiler log on failure. `fastMath` false keeps IEEE float semantics (no reassociation: the
+// double-float arithmetic of render/FieldPipeline's Mandelbrot needs it).
 MTL::Library* compileLibrary(MTL::Device* device, const std::string& source,
-                             const std::string& label);
+                             const std::string& label, bool fastMath = true);
 
 // Returns a function the caller owns. Throws ShaderCompileError if missing.
 MTL::Function* loadFunction(MTL::Library* library, const char* name);

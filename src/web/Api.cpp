@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdlib>
 #include <fstream>
+#include <set>
 #include <sstream>
 
 #include "engine/Blend.hpp"
@@ -46,7 +47,7 @@ constexpr TypeInfo kTypes[] = {
     {Layer::FlowField, scene::SceneType::FlowField},   {Layer::WaveShape, scene::SceneType::WaveShape},
     {Layer::ColorMap, scene::SceneType::ColorMap},     {Layer::Union, scene::SceneType::FlowFieldUnion},
     {Layer::Particle, scene::SceneType::Particle},     {Layer::Sprite, scene::SceneType::Sprite},
-    {Layer::Solid, scene::SceneType::Solid},           {Layer::Organic, scene::SceneType::Organic},
+    {Layer::Object, scene::SceneType::Organic},  // solids and organics (see buildLibrary)
     {Layer::Dancer, scene::SceneType::Dancer},
 };
 
@@ -313,7 +314,7 @@ std::string commandFromObject(const json::Value& o, Command& out) {
         double s = 0;
         if (auto e = number({"seconds", "value"}, s); !e.empty()) return e;
         if (action == "life" && !engine::isSpawnLayer(l))
-            return "life applies to particle, sprite, solid, organic and dancer";
+            return "life applies to particle, sprite, object and dancer";
         if (action == "movieinterval" && l != Layer::Sprite) return "movieinterval applies to sprite";
         out = action == "interval"   ? Command::interval(l, s)
               : action == "duration" ? Command::transitionDuration(l, s)
@@ -365,8 +366,7 @@ const char* layerKey(Layer l) {
         case Layer::Union: return "union";
         case Layer::Particle: return "particle";
         case Layer::Sprite: return "sprite";
-        case Layer::Solid: return "solid";
-        case Layer::Organic: return "organic";
+        case Layer::Object: return "object";
         case Layer::Dancer: return "dancer";
     }
     return "?";
@@ -388,20 +388,29 @@ Library buildLibrary(const fs::path& scenesDir, const std::string& exclude, cons
     for (const TypeInfo& ti : kTypes) {
         LibraryLayer ll;
         ll.layer = ti.layer;
-        const std::string typeName(scene::sceneTypeName(ti.type));
+        const bool objects = ti.layer == Layer::Object;
+        const std::string typeName = objects ? std::string("Object") : std::string(scene::sceneTypeName(ti.type));
         std::vector<engine::SceneEntry> entries;
-        if (ti.type == scene::SceneType::Solid) {
-            // Like the Director: content/, then scenes/, then reforce.Solid.Dir; the first of an id wins.
-            auto add = [&](std::vector<engine::SceneEntry> more) {
+        std::set<std::string> solidIds;  // Objects: which entries are solids
+        if (objects) {
+            // Like the Director: solids (content/, scenes/, reforce.Solid.Dir), then organics (content/, scenes/);
+            // the first of an id wins; each list skips its own type's reforce.Exclude rules.
+            auto add = [&](std::vector<engine::SceneEntry> more, scene::SceneType type) {
+                engine::removeExcluded(more, type, excludeRules);
                 for (auto& e : more)
                     if (std::none_of(entries.begin(), entries.end(),
-                                     [&](const engine::SceneEntry& c) { return lower(c.id) == lower(e.id); }))
+                                     [&](const engine::SceneEntry& c) { return lower(c.id) == lower(e.id); })) {
+                        if (type == scene::SceneType::Solid) solidIds.insert(lower(e.id));
                         entries.push_back(std::move(e));
+                    }
             };
-            if (!contentDir.empty()) add(engine::listScenes(contentDir, ti.type));
-            if (!scenesDir.empty()) add(engine::listScenes(scenesDir, ti.type));
-            if (!solidDir.empty()) add(engine::listSceneFolder(solidDir, ti.type, "Extra/"));
-        } else if (ti.type == scene::SceneType::Organic || ti.type == scene::SceneType::Dancer) {
+            const auto S = scene::SceneType::Solid, O = scene::SceneType::Organic;
+            if (!contentDir.empty()) add(engine::listScenes(contentDir, S), S);
+            if (!scenesDir.empty()) add(engine::listScenes(scenesDir, S), S);
+            if (!solidDir.empty()) add(engine::listSceneFolder(solidDir, S, "Extra/"), S);
+            if (!contentDir.empty()) add(engine::listScenes(contentDir, O), O);
+            if (!scenesDir.empty()) add(engine::listScenes(scenesDir, O), O);
+        } else if (ti.type == scene::SceneType::Dancer) {
             // Like the Director: content/, then scenes/; the first of an id wins.
             if (!contentDir.empty()) entries = engine::listScenes(contentDir, ti.type);
             if (!scenesDir.empty())
@@ -414,19 +423,20 @@ Library buildLibrary(const fs::path& scenesDir, const std::string& exclude, cons
         }
         if (ti.type == scene::SceneType::Sprite && !externalSpritesDir.empty())
             for (auto& e : engine::listMediaFolder(externalSpritesDir, "External/", false)) entries.push_back(std::move(e));
-        engine::removeExcluded(entries, ti.type, excludeRules);
-        if (!scenesDir.empty()) ll.categories = categoryTitles(scenesDir, typeName);
-        if (!contentDir.empty())
-            for (auto& c : categoryTitles(contentDir, typeName))
+        if (!objects) engine::removeExcluded(entries, ti.type, excludeRules);
+        for (const fs::path& root : {scenesDir, contentDir}) {
+            if (root.empty()) continue;
+            for (auto& c : categoryTitles(root, typeName))
                 if (std::find(ll.categories.begin(), ll.categories.end(), c) == ll.categories.end())
                     ll.categories.push_back(std::move(c));
+        }
         std::vector<const engine::Category*> cats;
         for (const auto& title : ll.categories) cats.push_back(themes.category(typeName, title));
-        if (ti.type == scene::SceneType::Organic)
+        if (objects)
             for (const auto& title : ll.categories) {
                 LibraryLayer::Group g{title, {}};
                 for (const auto& t : themes.themes()) {
-                    const auto it = t.categoryExpr.find("organic");
+                    const auto it = t.categoryExpr.find("object");
                     if (it == t.categoryExpr.end()) continue;
                     std::string e = it->second;
                     e.erase(0, e.find_first_not_of(" \t"));
@@ -450,9 +460,9 @@ Library buildLibrary(const fs::path& scenesDir, const std::string& exclude, cons
                 if (mo.bpm) le.bpm = *mo.bpm;
                 le.noColorKey = mo.colorKey == std::optional<bool>(false);
             }
-            if (ti.type == scene::SceneType::Solid)
+            if (objects && solidIds.count(lower(e.id)))
                 if (const auto file = scene::loadSceneFile(e.path))
-                    le.beat = scene::usesBeat(scene::compileConfig(*file, ti.type));
+                    le.beat = scene::usesBeat(scene::compileConfig(*file, scene::SceneType::Solid));
             for (std::size_t i = 0; i < cats.size(); ++i)
                 if (cats[i] && cats[i]->matches(e.name)) le.categories.push_back(ll.categories[i]);
             ll.configs.push_back(std::move(le));
@@ -463,7 +473,7 @@ Library buildLibrary(const fs::path& scenesDir, const std::string& exclude, cons
 }
 
 std::vector<Favorite> parseFavorites(const std::string& text) {
-    static const char* const kLayers[] = {"flowfield", "waveshape", "colormap", "union", "particle", "sprite", "solid", "organic", "dancer"};
+    static const char* const kLayers[] = {"flowfield", "waveshape", "colormap", "union", "particle", "sprite", "object", "dancer"};
     std::vector<Favorite> out;
     std::string item;
     auto flush = [&] {

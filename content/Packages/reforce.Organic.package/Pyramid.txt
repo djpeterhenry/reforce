@@ -1,0 +1,10 @@
+Vers=100
+Meta="reforce organic: the pyramid hopper on a tall 9-row pyramid of 45 cubes, all lit exactly on the 16-bar line; two balls a bar bouncing on the off-beat."
+Kind="hopper"
+PBar="32"
+Rows="9"
+Cyc="16"
+Levels="2"
+Ball="2"
+Offb="1"
+TLo=".45"

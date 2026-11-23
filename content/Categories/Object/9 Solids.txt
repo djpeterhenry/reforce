@@ -1,0 +1,15 @@
+CategoryTitle = "Solids"
+Include.List = "
+(Beat Clock)
+Cube Roll
+Dodecahedron Beat
+Icosahedron Drift
+Icosahedron Kick
+Octahedron Mirror
+Octahedron Steps
+Prism Flyby
+Prism Metronome
+Sphere Bounce
+Tetrahedron Hopscotch
+Torus Coin Flip
+"

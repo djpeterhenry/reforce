@@ -1,6 +1,0 @@
-CategoryTitle = "Curves"
-Include.List = "
-Harmonograph
-Harmonograph Rose
-Clifford Attractor
-"

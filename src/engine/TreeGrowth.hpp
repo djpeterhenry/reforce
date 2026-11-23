@@ -38,6 +38,7 @@ struct TreeNode {
     int parent = -1;       // index of the parent (always lower), -1 for a root
     int root = 0;          // index of its root node
     int gen = 0;           // growth iteration that made this node (roots: 0)
+    int depth = 0;         // segments from its root
     int children = 0;
     float tips = 1;        // pipe model: tips (childless nodes) this node feeds, itself included
     float phase = 0;       // sway phase (radians), continuous along a branch
@@ -50,6 +51,16 @@ public:
     // One growth iteration with tropism (tx, ty) added to every new direction. Returns the nodes added
     // (0 once the tree is complete).
     int iterate(double tx = 0, double ty = 0);
+
+    // Rewiring (docs/organics-design.md "Pulses", Rwir): removes the nodes marked in `remove` (index = node; roots
+    // are never removed; a removed node's descendants go too) and returns, per old node, its new index or -1. Growth
+    // stops continuing old trunks.
+    std::vector<int> prune(const std::vector<char>& remove);
+    // Adds attraction points (finite ones within the grid's bounds, not already within Kill of a node) and lets the
+    // tree grow on towards them. Returns how many were added.
+    int addPoints(const std::vector<double>& xs, const std::vector<double>& ys);
+    // Changes with every structural change (nodes added or removed).
+    int revision() const { return revision_; }
 
     bool done() const { return done_; }
     int generation() const { return gen_; }  // iterations that added nodes
@@ -82,6 +93,7 @@ private:
     std::vector<double> pullX_, pullY_;
     std::vector<int> pullN_, pulled_;
     int gen_ = 0;
+    int revision_ = 0;
     bool done_ = false;
     float maxTips_ = 1;
 };

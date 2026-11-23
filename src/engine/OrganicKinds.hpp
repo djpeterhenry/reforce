@@ -12,6 +12,7 @@
 //   lsystem       an L-system (literal Axm, R1..R4 rules "F=FF"), one generation per Rate bars, each new generation
 //                 traced over its first bar
 //   attractor     a Clifford attractor (PA, PB, PC, PD per frame): Num points per frame as dots
+//   invaders, hopper, cycles, rocks, bricks, chase   arcade games (engine/arcade, docs/arcade-design.md)
 
 #include <memory>
 #include <string>
@@ -34,8 +35,31 @@ public:
         line(x0, y0, x1, y1, width, pen, pen);
     }
     void dot(double x, double y, double width, double pen);
-    // A dot `diameter` tree units across (cells of a grid), at least 1 px.
-    void dotUnits(double x, double y, double diameter, double pen);
+    // A dot `diameter` tree units across (cells of a grid), at least 1 px. `hard`: no anti-aliased rim (its in-between
+    // intensities take unrelated ColorMap colours, a speckled fringe on big dots).
+    void dotUnits(double x, double y, double diameter, double pen, bool hard = false);
+
+    // Filled shapes (PLAN 5Q, arcade kinds), made of horizontal strokes on the frame's pixel grid, one per pair of
+    // pixel rows (kFillSpacingPx), so they stay solid at any Scal / Rot. Hard-edged (no anti-aliased rim, whose
+    // in-between intensities the ColorMap paints in unrelated colours: a speckled fringe), with square corners. Strokes of one path
+    // max-combine, so overlapping fills do not add up. The polygon is in tree units (even-odd rule, any shape).
+    static constexpr float kFillSpacingPx = 2.0f;
+    void fillPolygon(const double* xs, const double* ys, int n, double pen);
+    // An axis-aligned rectangle (in tree units, before Rot) centred at (cx, cy), w x h.
+    void rect(double cx, double cy, double w, double h, double pen);
+    // Pixel art: `rows` top to bottom, one char per pixel ('.' or ' ' = empty, anything else = lit), each pixel
+    // `px` tree units square, the whole picture centred at (cx, cy). Runs of lit pixels in a row are one rectangle.
+    // `mirror` flips it left-right.
+    void bitmap(const char* const* rows, int nRows, double cx, double cy, double px, double pen, bool mirror = false);
+
+    // Starts a new path: what is drawn from here on overwrites (rather than max-combines with) what this organic
+    // drew before, e.g. a character over the floor it stands on. The whole organic still goes after the WaveShape.
+    void newPath() { path_ = float(out_.size()); }
+    // Frame pixels per tree unit at the current Scal (H / 2 x |Scal|).
+    double pixelsPerUnit() const;
+    // Half the frame's width in tree units (W / H; 16 / 9 for 16:9), before the organic's X / Y / Scal / Rot: a game
+    // fitting its field to the frame. Constant for a run (the render size).
+    double halfWidth() const { return map_.height > 0 ? map_.width / map_.height : 16.0 / 9.0; }
 
 private:
     bool toPx(double x, double y, float& ox, float& oy) const;

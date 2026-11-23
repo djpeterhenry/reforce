@@ -1,11 +1,21 @@
 Vers=100
-Meta="reforce organic: a lightning strike from the top edge, forking jaggedly down the frame in under a second, a flash at every fork tip, gone again in a few seconds."
+Meta="reforce organic: lightning strikes on every bar line for 8 bars (from the slideshow it starts on an 8-bar line; started by hand, on the next bar): a bolt leaps from a new point along the top edge, forks down the frame in half a beat, flashes and flickers, and fades before the next one."
 Kind="tree"
-PDur="2.5"
+PBar="9"
+// eight strikes, a bar apart, the first on the next bar line (s = beats since the strike began)
+Strk="8"
+SGap="4"
+SAln="4"
+// from the slideshow, start only on an 8-bar line of the phrase clock (by hand: at once, the first strike on the next bar)
+SBar="8"
+// each strike's place along the top edge: A vars run again at every strike
+A0="1.3 * (2 * rnd(1) - 1)"
 Pts="220"
-PX="(.3 * (2 * rnd(1) - 1)) + 1.2 * (2 * rnd(1) - 1) * rnd(1)"
-PY=".9 - 1.9 * rnd(1)"
-RtX=".6 * (2 * rnd(1) - 1)"
+// the points: a cloud below the root, widening as it goes down (C0 = depth, per point)
+C0="rnd(1)"
+PX="A0 * (1 - .4 * C0) + (.25 + .8 * C0) * (2 * rnd(1) - 1)"
+PY=".9 - 1.9 * C0"
+RtX="A0"
 RtY="1"
 RtA="-PI / 2"
 Seg=".03"
@@ -15,8 +25,12 @@ Jitr=".7"
 Wdth="4"
 Tip="1"
 BudW="7"
-Grow="80"
+// the leader takes half a beat at any tempo (about 63 segments)
+B0="SYNC_ON * SYNC_BPM + (1 - SYNC_ON) * 120"
+Grow="2 * max(B0, 80)"
 TrpY="-.4"
 Sway="0"
-B0="t - START_TIME"
-Bud="exp(-3 * B0)"
+// dim while the leader grows, the flash once it lands (.6 beats), flickering as it fades over two beats
+B1="max(0, s - .6)"
+Pen="(.5 + .5 * (s >= .6)) * exp(-1.8 * B1) * (.8 + .2 * cos(40 * B1))"
+Bud="2 * (s >= .6) * exp(-4 * B1)"

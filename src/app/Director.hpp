@@ -20,14 +20,16 @@
 //     Slideshow.Interval.Duration); the Sprite timer starts images only.
 //   - Solids (PLAN 5L.4): a spawn layer like Particles, from reforce.Solid.package
 //     (scenesDir and contentDir) and reforce.Solid.Dir. Not in the default
-//     slideshow (Solid.Slideshow.Interval.Duration 0); a Theme may set
-//     Solid.Slideshow.Interval.Duration to start them while it is on.
+//     slideshow (Object.Slideshow.Interval.Duration 0); a Theme may set
+//     Object.Slideshow.Interval.Duration to start them while it is on.
 
 #include <array>
 #include <deque>
 #include <filesystem>
 #include <memory>
 #include <optional>
+#include <map>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -102,6 +104,11 @@ private:
     // The playlist's next item; for Dancers, skipping generated characters in a style switched off
     // (reforce.Dancer.RandomStyles). "" when nothing may come next.
     std::string nextId(LayerData& d, engine::SchedRng& rng);
+    // An entry's scene type: the layer's, or Solid / Organic for an Object.
+    scene::SceneType entryType(const LayerData& d, const engine::SceneEntry& e) const;
+    // An object's `SBar` key: from the slideshow it starts only on a line every SBar bars of the phrase clock
+    // (Lightning: 8); a manual start ignores it. 0 when unset.
+    double startBars(const LayerData& d, const engine::SceneEntry& e);
     void applyTheme(const std::string& name);
     void handle(const engine::Command& c, double t);
     bool switchTo(LayerData& d, const engine::SceneEntry& e, bool quick, double t, const char* why,
@@ -127,9 +134,9 @@ private:
     engine::SchedRng rng_;
     engine::ThemeLibrary themes_;
     std::string theme_ = "(Standard)";
-    std::array<LayerData, 9> layers_;  // WaveShape, ColorMap, FlowField, Union, Particle, Sprite, Solid, Organic, Dancer
-    double solidInterval_ = 0;         // Solid interval outside themes (setting, or the last interval command)
-    double organicInterval_ = 0;       // the same for Organics
+    std::array<LayerData, 8> layers_;  // WaveShape, ColorMap, FlowField, Union, Particle, Sprite, Object, Dancer
+    double objectInterval_ = 0;        // Object interval outside themes (setting, or the last interval command)
+    std::set<std::string> objectSolids_;  // lower-case ids of the Object catalog's solids (the rest are organics)
     double dancerInterval_ = 0;        // the same for Dancers
     engine::SchedRng spawnRng_;        // Particle/Sprite decisions (keeps the other layers' sequence)
     engine::Playlist moviePlaylist_;   // slideshow movie sprites (kept out of layers_[5].playlist)
@@ -161,6 +168,8 @@ private:
     std::vector<engine::Command> linkHeld_;  // manual switches waiting for the next beat/bar (QuantizeManual)
     bool phraseOn_ = false;                  // phrase clock (PLAN 5O.1) as of the last step
     double phrasePrev_ = 0, phraseCur_ = 0;
+    double barPrev_ = 0, barCur_ = 0;        // the phrase clock's running bar count, last step and this one
+    std::map<std::string, double> startBars_;  // object id -> its SBar (slideshow start lines, bars; 0 = any time)
     engine::StateBox state_;
     engine::AudioState audioState_;  // latest analyzer scalars (published with the state)
     engine::EngineState scratch_;    // filled in place, swapped into state_ (no reader wait)

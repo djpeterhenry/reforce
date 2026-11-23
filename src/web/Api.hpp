@@ -62,8 +62,8 @@ struct LibraryLayer {
     engine::Layer layer = engine::Layer::WaveShape;
     std::vector<std::string> categories;  // category titles defined for this type
     std::vector<LibraryEntry> configs;
-    // Organics: the groups the Organics card browses (each category, in file order) and the theme that plays just
-    // that group (the theme whose Organic.CategoryExpr is "+<title>"; "" when there is none).
+    // Objects: the groups the Objects card browses (each category, in file order) and the theme that plays just
+    // that group (the theme whose Object.CategoryExpr is "+<title>"; "" when there is none).
     struct Group {
         std::string name, theme;
     };

@@ -1,6 +1,8 @@
 Vers=100
-Meta="reforce organic: five neurons grow dendrites towards each other until they fill the frame; every tip is a synapse that fires on the beat."
+Meta="reforce organic: five neurons grow dendrites towards each other until they fill the frame; on every beat one fires, a pulse running out along its dendrites to arrive on the next beat, the synapses at the tips flashing, then a neuron its dendrites touch fires in turn; every bar line a lead neuron starts a new wave with a stronger pulse, every phrase line they all fire together and the network rewires (a third of the side branches wither back over four bars and new ones grow elsewhere); a drop fires them all at once, hardest."
 Kind="tree"
+// two phrases: the network rewires on the phrase line in between
+PBar="32"
 Pts="600"
 C0="2 * PI * rnd(1)"
 C1="sqrt(rnd(1))"
@@ -17,8 +19,18 @@ Jitr=".35"
 Wdth="5"
 Tip=".6"
 BudW="4"
-B0="t - START_TIME"
-B1="SYNC_ON * SYNC_BEAT + (1 - SYNC_ON) * 2 * B0"
 Grow="10"
 Sway=".08"
-Bud=".25 + .75 * exp(-6 * wrap(B1))"
+// action potentials: one neuron fires per beat (PlsE), its pulse reaching the farthest tip a beat later (PlsB)
+PlsE="1"
+PlsB="1"
+Pen=".55"
+Puls="1"
+PAll="SYNC_DROP"
+Bud=".3"
+// the bar line: a lead neuron restarts the cascade, 1.7 x as strong; the phrase line: all fire together
+PlsL="1.7"
+PlsP="1"
+// rewiring on each phrase line: about 30% of the side branches wither back over 4 bars, new ones grow elsewhere
+Rwir=".3"
+RwrB="4"

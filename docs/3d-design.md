@@ -86,9 +86,9 @@ categories work as for sprites, and content themes join G-Force's in the theme l
 `SceneType::Solid` and `Layer::Solid` (a spawn layer like Particles and Sprites: `engine::isSpawnLayer`) are added.
 `scene::SolidInstance` evaluates the config: `Mesh` is a literal name (`CompiledKey::text`, never compiled),
 `Text` / `Pers` / `Flag` / `PDur` load once, then per frame the `B#` vars (persistent) and `X Y Z Scal RotX RotY
-RotZ Fill Shad Edge Pen EPen`. `engine::SolidRun` adds the lifetime (FADER, PDur or `Solid.Duration`) and clamps
-the outputs; the Visualizer gives each live solid a target slot (`reforce.Solid.MaxLive`; when all are taken the
-oldest solid makes way) and composites it like the test hook. Key reference: docs/scene-format.md §5.7.
+RotZ Fill Shad Edge Pen EPen`. `engine::SolidRun` adds the lifetime (FADER, PDur or `Object.Duration`) and clamps
+the outputs; the Visualizer gives each live solid a target slot (MaxLive + 1 targets: `reforce.Object.MaxLive` at
+full strength, the oldest fading out under a new one) and composites it like the test hook. Key reference: docs/scene-format.md §5.7.
 
 `DT` is the age as a fraction of the lifetime (0..1), as for sprites and particles, not a frame step: motion uses
 the age `t - START_TIME`. An example (content's Dodecahedron Beat, abridged):
@@ -215,11 +215,11 @@ values. G-Force scenes don't reference them, so nothing changes for them (scene-
 
 - **Slideshow:** solids are not in the default slideshow (Peter: manual + Themes). They are started by command
   (`switch:solid:NAME`, `next:solid`, `kill:solid`), the panel (phase 5) or a Theme:
-  `Solid.Slideshow.Interval.Duration` defaults to 0, and a theme file may set it (reforce key), e.g. content's
+  `Object.Slideshow.Interval.Duration` defaults to 0, and a theme file may set it (reforce key), e.g. content's
   "Solids" theme (30 s). Switching to a theme without it restores the setting's interval.
 - **Settings:**
-  - `Solid.Slideshow.Interval.Duration` (0), `Solid.Duration`
-  - `reforce.Solid.MaxLive` (3), `reforce.Solid.TileSize` (512), `reforce.Solid.Msaa` (4 | 1)
+  - `Object.Slideshow.Interval.Duration` (0), `Object.Duration`
+  - `reforce.Object.MaxLive` (1; was 3 until 2026-11-22), `reforce.Solid.TileSize` (512), `reforce.Solid.Msaa` (4 | 1)
   - `reforce.Solid.Dir`, an extra folder of solid scene files.
 - **Control panel:** a "Solids" card cloned from Sprites: library, start, kill, interval and duration. It reuses the
   `Switch` / `Kill` / `SetSlideshowInterval` / `SetSpawnDuration` commands with `Layer::Solid`.

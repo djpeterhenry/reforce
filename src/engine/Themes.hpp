@@ -37,11 +37,10 @@ struct Theme {
     std::string baseName;  // the theme's own title ("Infernal"); find() accepts either
     std::string about;
     std::map<std::string, std::string> categoryExpr;  // lower-case type name -> expression
-    // reforce extension (PLAN 5L.4): `Solid.Slideshow.Interval.Duration = SEC` in a theme starts solids every SEC
-    // seconds while the theme is on (solids are not in the default slideshow); unset = the setting's interval.
-    std::optional<double> solidInterval;
-    // The same for Organics (PLAN 5N): `Organic.Slideshow.Interval.Duration = SEC`.
-    std::optional<double> organicInterval;
+    // reforce extension: `Object.Slideshow.Interval.Duration = SEC` in a theme starts objects (solids and organics)
+    // every SEC seconds while the theme is on (objects are not in the default slideshow); unset = the setting's
+    // interval.
+    std::optional<double> objectInterval;
     // The same for Dancers (PLAN 5P): `Dancer.Slideshow.Interval.Duration = SEC`.
     std::optional<double> dancerInterval;
 };

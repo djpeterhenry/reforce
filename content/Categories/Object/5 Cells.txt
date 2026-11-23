@@ -1,0 +1,5 @@
+CategoryTitle = "Cells"
+Include.List = "
+Rule 30
+Game of Life
+"

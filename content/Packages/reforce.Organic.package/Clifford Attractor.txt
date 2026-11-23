@@ -3,11 +3,13 @@ Meta="reforce organic: a Clifford strange attractor, thousands of points a frame
 Kind="attractor"
 Num="9000"
 DotW="1.4"
-Sprd=".42"
+Sprd=".38"
 B0="t - START_TIME"
 B1="SYNC_ON * SYNC_BAR + (1 - SYNC_ON) * .5 * B0"
-PA="-1.4 + .25 * sin(2 * PI * B1 / 32)"
-PB="1.6 + .2 * cos(2 * PI * B1 / 24)"
-PC="1.0 + .3 * sin(2 * PI * B1 / 40)"
-PD=".7 + .25 * cos(2 * PI * B1 / 28)"
+// A path that stays chaotic (searched: about 1 % of it collapses onto a short cycle, which the attractor then skips by
+// keeping the last full cloud; the first path collapsed 13 % of the time and seemed to blink off).
+PA="-1.887 + .126 * sin(2 * PI * B1 / 32)"
+PB="1.999 + .116 * cos(2 * PI * B1 / 24)"
+PC="1.279 + .232 * sin(2 * PI * B1 / 40)"
+PD="1.045 + .239 * cos(2 * PI * B1 / 28)"
 Pen=".85"

@@ -52,7 +52,18 @@ struct FadeEnvelope {
     // fade-out lasts `outFade` seconds (< 0: the instance's own fade; 0: cut).
     // An early fade-out already running is only ever shortened. linear: see earlyLinear.
     void fadeOutAt(double age, double outFade = -1.0, bool linear = false);
+    // Past full strength at `age`: fading out (on its own or early), or over.
+    bool fadingOut(double age) const {
+        return earlyOut >= 0.0 ? age >= earlyOut : age >= fade + hold;
+    }
 };
+
+// Seconds at full strength for a lifetime given in bars (PBar, solids and organics). With the beat clock (sync.on,
+// sync.bpm, sync.bar) the fade-out starts on the bar line nearest to `bars` bars after the fade-in, or on the nearest
+// phrase line (every `phraseBars` bars of SYNC_BAR) when `bars` is a whole number of phrases; the hold never drops
+// below half of `bars`. Without the clock: `bars` at 120 BPM. A bar is `beatsPerBar` beats (Link's quantum). The tempo is the one at the start (a later tempo change
+// does not stretch it). NaN for bars that are not finite and > 0.
+double holdForBars(double bars, double fade, const scene::SyncInput& sync, int phraseBars, double beatsPerBar = 4.0);
 
 // Slideshow spawn timer: the interval counts from one spawn to the next
 // (particles overlap; GUESS for G-Force, whose docs say "when G-Force rolls

@@ -10,6 +10,25 @@ double FadeEnvelope::total() const {
     return 2.0 * fade + hold;
 }
 
+double holdForBars(double bars, double fade, const scene::SyncInput& sync, int phraseBars, double beatsPerBar) {
+    if (!(std::isfinite(bars) && bars > 0)) return std::nan("");
+    bars = std::min(bars, 10000.0);
+    fade = std::isfinite(fade) ? std::max(0.0, fade) : 0.0;
+    const bool clock = sync.on > 0 && std::isfinite(sync.bpm) && sync.bpm > 1 && std::isfinite(sync.bar);
+    if (!(std::isfinite(beatsPerBar) && beatsPerBar > 0)) beatsPerBar = 4.0;
+    const double secPerBar = beatsPerBar * 60.0 / (clock ? sync.bpm : 120.0);
+    if (!clock) return bars * secPerBar;
+    const int pb = std::max(1, phraseBars);
+    const double rounded = std::round(bars);
+    const double unit = (std::abs(bars - rounded) < 1e-9 && rounded >= pb && std::fmod(rounded, double(pb)) == 0.0)
+                            ? double(pb) : 1.0;
+    // Bar (on SYNC_BAR) where full strength would end, snapped to the nearest line.
+    const double want = sync.bar + fade / secPerBar + bars;
+    double end = std::round(want / unit) * unit;
+    while ((end - sync.bar) * secPerBar - fade < 0.5 * bars * secPerBar) end += unit;
+    return (end - sync.bar) * secPerBar - fade;
+}
+
 double FadeEnvelope::outFade() const { return earlyFade >= 0.0 ? earlyFade : fade; }
 
 double FadeEnvelope::operator()(double age) const {

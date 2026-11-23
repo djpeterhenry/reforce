@@ -47,9 +47,11 @@ TEST_CASE("solids: scene type, package, layer names") {
     CHECK(packageDirName(SceneType::Solid) == "reforce.Solid.package");
     CHECK(reforce::scene::sceneTypeName(SceneType::Solid) == "Solid");
     CHECK(reforce::scene::sceneTypeFromPath("/x/reforce.Solid.package/Spin/Cube.txt") == SceneType::Solid);
-    CHECK(parseLayer("solids") == Layer::Solid);
-    CHECK(std::string(layerName(Layer::Solid)) == "Solid");
-    CHECK(isSpawnLayer(Layer::Solid));
+    CHECK_FALSE(parseLayer("solids"));  // Solids and Organics are one layer, Objects (2026-11-22)
+    CHECK_FALSE(parseLayer("organic"));
+    CHECK(parseLayer("Objects") == Layer::Object);
+    CHECK(std::string(layerName(Layer::Object)) == "Object");
+    CHECK(isSpawnLayer(Layer::Object));
     CHECK_FALSE(isSpawnLayer(Layer::FlowField));
     CHECK(std::string(defaultReferenceScene(SceneType::Solid)).empty());
 }
@@ -159,34 +161,38 @@ TEST_CASE("solid run: envelope, PDur, clamping, sync passed through") {
 }
 
 TEST_CASE("solids: commands, slideshow settings") {
-    auto c = parseCommand("switch:solid:Cube Orbit");
+    auto c = parseCommand("switch:object:Cube Orbit");
     REQUIRE(c);
-    CHECK((c->type == CommandType::Switch && c->layer == Layer::Solid && c->text == "Cube Orbit" && c->quick));
-    c = parseCommand("kill:solid");
+    CHECK((c->type == CommandType::Switch && c->layer == Layer::Object && c->text == "Cube Orbit" && c->quick));
+    c = parseCommand("kill:object");
     REQUIRE(c);
-    CHECK((c->type == CommandType::Kill && c->layer == Layer::Solid));
-    c = parseCommand("life:solid:20");
+    CHECK((c->type == CommandType::Kill && c->layer == Layer::Object));
+    c = parseCommand("life:object:20");
     REQUIRE(c);
     CHECK((c->type == CommandType::SetSpawnDuration && c->value == 20));
-    CHECK_FALSE(parseCommand("morph:solid:2:Cube Orbit"));
-    CHECK_FALSE(parseCommand("kill:solid:images"));
+    CHECK_FALSE(parseCommand("morph:object:2:Cube Orbit"));
+    CHECK_FALSE(parseCommand("kill:object:images"));
     // interval 0 (none from the slideshow) is saved for spawn layers.
-    CHECK(slideshowSaveEntries(Command::interval(Layer::Solid, 0)).string("Solid.Slideshow.Interval.Duration", "?") == "0");
-    CHECK(slideshowSaveEntries(Command::spawnDuration(Layer::Solid, 25)).string("Solid.Duration", "?") == "25");
+    CHECK(slideshowSaveEntries(Command::interval(Layer::Object, 0)).string("Object.Slideshow.Interval.Duration", "?") == "0");
+    CHECK(slideshowSaveEntries(Command::spawnDuration(Layer::Object, 25)).string("Object.Duration", "?") == "25");
 }
 
 TEST_CASE("solids: settings (reforce-only, never imported from G-Force)") {
     Settings p;
-    CHECK(p.solid.slideshowInterval == 0);  // not in the default slideshow
-    CHECK(p.solid.duration > 0);
+    CHECK(p.object.slideshowInterval == 0);  // not in the default slideshow
+    CHECK(p.object.duration > 0);
+    CHECK(p.objectMaxLive == 1);
     PrefsTable t;
-    t.set("Solid.Slideshow.Interval.Duration", "45", false);
-    t.set("Solid.Duration", "12", false);
+    t.set("Object.Slideshow.Interval.Duration", "45", false);
+    t.set("Object.Duration", "12", false);
+    t.set("reforce.Object.MaxLive", "2", false);
+    t.set("Solid.Duration", "99", false);  // the layers before Objects: no longer read
     t.set("reforce.Solid.Dir", "/tmp/solids", true);
     t.set("reforce.ContentDir", "/tmp/content", true);
     p.apply(t);
-    CHECK(p.solid.slideshowInterval == 45);
-    CHECK(p.solid.duration == 12);
+    CHECK(p.object.slideshowInterval == 45);
+    CHECK(p.object.duration == 12);
+    CHECK(p.objectMaxLive == 2);
     CHECK(p.solidDir == "/tmp/solids");
     CHECK(p.contentDir == "/tmp/content");
     for (const auto& k : importedGForceKeys()) CHECK(k.rfind("Solid.", 0) != 0);
@@ -196,17 +202,20 @@ TEST_CASE("solids: themes start them, content themes merge") {
     ThemeLibrary lib;
     lib.addTheme("ThemeName = \"Night\"\nSprite.CategoryExpr = \"+Space\"\n");
     ThemeLibrary more;
-    more.addTheme("ThemeName = \"Solids\"\nSolid.Slideshow.Interval.Duration = 30\n");
-    more.addTheme("ThemeName = \"night\"\nSolid.Slideshow.Interval.Duration = 5\n");  // name taken: ignored
-    more.addCategory("Solid", "CategoryTitle = \"Beat\"\nInclude.List = \"\nDodecahedron Beat\n\"\n");
+    more.addTheme("ThemeName = \"Solids\"\nObject.Slideshow.Interval.Duration = 30\nObject.CategoryExpr = \"+Beat\"\n");
+    more.addTheme("ThemeName = \"Old\"\nSolid.Slideshow.Interval.Duration = 40\n");  // no longer read
+    more.addTheme("ThemeName = \"night\"\nObject.Slideshow.Interval.Duration = 5\n");  // name taken: ignored
+    more.addCategory("Object", "CategoryTitle = \"Beat\"\nInclude.List = \"\nDodecahedron Beat\n\"\n");
     lib.merge(more);
-    REQUIRE(lib.themes().size() == 2);
-    CHECK_FALSE(lib.find("Night")->solidInterval);
-    REQUIRE(lib.find("Solids")->solidInterval);
-    CHECK(*lib.find("Solids")->solidInterval == 30);
-    CHECK(lib.category("Solid", "Beat"));
-    // No Solid.CategoryExpr: every solid.
-    CHECK(lib.filter(lib.find("Solids"), "Solid", {"A", "B"}).size() == 2);
+    REQUIRE(lib.themes().size() == 3);
+    CHECK_FALSE(lib.find("Night")->objectInterval);
+    REQUIRE(lib.find("Solids")->objectInterval);
+    CHECK(*lib.find("Solids")->objectInterval == 30);
+    CHECK_FALSE(lib.find("Old")->objectInterval);
+    CHECK(lib.find("Solids")->categoryExpr.count("object"));
+    CHECK(lib.category("Object", "Beat"));
+    // No CategoryExpr: every object.
+    CHECK(lib.filter(lib.find("Old"), "Object", {"A", "B"}).size() == 2);
 }
 
 TEST_CASE("solids: reforce.Solid.Dir folder listing") {
@@ -255,10 +264,10 @@ TEST_CASE("content: every committed solid compiles cleanly and evaluates finitel
     }
     // The content's theme turns solids on.
     const ThemeLibrary themes = ThemeLibrary::load(kContent);
-    const Theme* t = themes.find("Solids");
+    const Theme* t = themes.find("Objects: Solids");
     REQUIRE(t);
-    REQUIRE(t->solidInterval);
-    CHECK(*t->solidInterval > 0);
+    REQUIRE(t->objectInterval);
+    CHECK(*t->objectInterval > 0);
 }
 
 TEST_CASE("content: Dodecahedron Beat snaps a fifth of a turn on each beat while locked") {

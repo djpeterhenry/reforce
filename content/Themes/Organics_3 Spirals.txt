@@ -1,4 +1,0 @@
-ThemeName = "Organics: Spirals"
-About = "reforce: everything as in (Standard), plus a seed spiral that grows on the beat (Sunflower, Spiral Galaxy) every 30 seconds or so."
-Organic.CategoryExpr = "+Spirals"
-Organic.Slideshow.Interval.Duration = 30

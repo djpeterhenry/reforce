@@ -969,6 +969,7 @@ SolidInstance::SolidInstance(const CompiledConfig& cfg, const Environment& env) 
     const double fl = loaded("FLAG", 0.0);
     flags_ = std::isfinite(fl) && fl > 0 ? unsigned(std::min(fl, 4294967295.0)) : 0u;
     duration_ = loaded("PDUR", std::nan(""));
+    bars_ = loaded("PBAR", std::nan(""));
     pers_ = loaded("PERS", 1.0) != 0.0;
     colorKey_ = loaded("COLORKEY", 1.0) != 0.0;
     over_ = loaded("OVER", 0.0) != 0.0;
@@ -1052,6 +1053,7 @@ OrganicInstance::OrganicInstance(const CompiledConfig& cfg, const Environment& e
         kind_ = b == std::string::npos ? std::string() : k->text.substr(b, e - b + 1);
     }
     duration_ = loaded("PDUR", std::nan(""));
+    bars_ = loaded("PBAR", std::nan(""));
     grow_ = cfg.indexOf("GROW");
     trpX_ = cfg.indexOf("TRPX");
     trpY_ = cfg.indexOf("TRPY");
@@ -1095,8 +1097,9 @@ void OrganicInstance::evaluatePoints(int count, std::span<const PointKey> keys,
     }
 }
 
-OrganicFrame OrganicInstance::evaluateFrame(const OrganicFrameInput& in) {
+OrganicFrame OrganicInstance::evaluateFrame(const OrganicFrameInput& in, double s) {
     ctx_.set(Var::T, in.t);
+    if (std::isfinite(s)) ctx_.set(Var::S, s);
     ctx_.set(Var::DT, in.dt);
     ctx_.set(Var::FADER, in.fader);
     ctx_.set(Var::START_TIME, in.startTime);

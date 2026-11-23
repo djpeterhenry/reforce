@@ -35,7 +35,7 @@ without a rebuild. To try a scene, start it from the control panel (`Cmd+K`), or
 
 ```sh
 build/reforce.app/Contents/MacOS/reforce --no-settings --no-audio --deterministic \
-    --render-frames 300 --save-every 30 --out /tmp/frames --command "0=switch:solid:Cube Orbit"
+    --render-frames 300 --save-every 30 --out /tmp/frames --command "0=switch:object:Icosahedron Drift"
 ```
 
 (`switch:organic:NAME`, `switch:dancer:NAME` and so on for the other layers; `--audio-file song.wav` drives it with

@@ -60,8 +60,8 @@
 //                         folder to the source picker. Commands: video:layer|sprite:SOURCE,
 //                         videostop:layer|sprite, videoset:KEY:VALUE (see engine/Commands.hpp)
 // 3D solids (PLAN 5L): scene files in reforce.Solid.package (content/), started with the command
-//   switch:solid:NAME (or --command T=switch:solid:NAME), next:solid, kill:solid, or a Theme. Test hook:
-//   --solid-test SPEC     a hard-coded solid from the first frame on (repeatable, up to reforce.Solid.MaxLive),
+//   switch:object:NAME (or --command T=switch:object:NAME), next:object, kill:object, or a Theme. Test hook:
+//   --solid-test SPEC     a hard-coded solid from the first frame on (repeatable, up to reforce.Object.MaxLive + 1),
 //                         SPEC = MESH[,key=value...], e.g. cube,rotx=.5,roty=.7,scale=.6,pen=1,flag=0,text=0
 //                         (keys: render/SolidPipeline.hpp parseSolidTest; text=0|1|2, default 2 = flat)
 // Dancers (PLAN 5P): scene files in reforce.Dancer.package (content/), started with switch:dancer:NAME, next:dancer,

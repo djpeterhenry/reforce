@@ -215,6 +215,17 @@ std::vector<ExcludeRule> parseExcludeList(const std::string& text, std::vector<s
         const auto colon = raw.find(':');
         if (colon != std::string::npos) {
             const std::string t = excludeKey(raw.substr(0, colon));
+            if (t == "object" || t == "objects") {  // Objects: solids and organics
+                const std::string name = excludeKey(raw.substr(colon + 1));
+                if (!name.empty())
+                    for (auto ty : {scene::SceneType::Solid, scene::SceneType::Organic}) {
+                        ExcludeRule o;
+                        o.type = ty;
+                        o.name = name;
+                        out.push_back(std::move(o));
+                    }
+                return;
+            }
             static const std::pair<const char*, scene::SceneType> kTypes[] = {
                 {"waveshape", scene::SceneType::WaveShape}, {"particle", scene::SceneType::Particle},
                 {"flowfield", scene::SceneType::FlowField}, {"union", scene::SceneType::FlowFieldUnion},

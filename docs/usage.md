@@ -220,7 +220,8 @@ One video-source layer (`src/video/`, architecture §5c) feeds two places:
 
 Controls: the web UI's **Video layer** section (collapsed by default; source picker listing movie files, cameras and
 Syphon servers; play on the layer; stop; all layer settings), the **Movie sprites** card (movie files from its
-library; cameras and Syphon servers as live sprites with **Start live**), the **Video** menu, and commands (`--command T=CMD`, `POST
+library; no camera picker there since 2026-11-22: the camera goes under the visuals as the Camera backdrop; a camera or
+Syphon server can still be a live sprite by command, `video:sprite:SOURCE`), the **Video** menu, and commands (`--command T=CMD`, `POST
 /api/command` with `{"command": ...}`):
 
 ```
@@ -305,6 +306,28 @@ are not used. They are part of the picture in both the window and Syphon (unlike
 `videoset:syphon:off` can keep out of Syphon). Control panel: **Full colour** on the Movie sprites card (saved);
 command `videoset:spritecolour:over|off`.
 
+## Objects: 3D solids and organics (one layer)
+
+Since 2026-11-22 (Peter) the 3D solids and the organics are one layer, **Objects**: one control panel card, one
+library browsed by group (Trees, Pendulums, Curves, Cells, Water, Fractals, Arcade, Solids, Puzzles;
+`content/Categories/Object/`), one slideshow timer, one duration and one "at a time" count. Underneath each scene file
+is still a solid (`reforce.Solid.package`, drawn by the 3D solid pipeline, can sit on top with `Over` / `Glas` /
+EPen) or an organic (`reforce.Organic.package`, drawn into the feedback); the two sections below describe them.
+
+- **Control panel:** the **Objects** card: `Interval`, `Duration`, Start next / Clear, the alive list, the library
+  with group headings, ★ favourites, and **▶ Play <group>** (switches to that group's theme, e.g. `Objects: Arcade`;
+  press again to go back to `Objects`). Not in the default slideshow (Interval 0) unless a theme or the card sets it.
+- **Commands:** `switch:object:NAME`, `next:object`, `kill:object`, `interval:object:SEC`, `life:object:SEC`.
+- **Start lines:** an object with `SBar=N` starts from the slideshow only on a line every N bars of the phrase clock
+  (Lightning: 8, so its 8 strikes fill an 8-bar phrase); started by hand it starts at once. Without a beat clock it
+  never waits.
+- **One at a time:** `reforce.Object.MaxLive` (1) objects at full strength: a new one, solid or organic, fades the
+  oldest out under it, and a slideshow start waits until the live one begins its fade-out, so a long one (`PBar`) is
+  never cut short. With `reforce.Slideshow.OneFeature` (1) objects also take turns with movie sprites.
+- **Settings:** `Object.Slideshow.Interval.Duration` (0 = none), `Object.Duration` (40 s), `Object.Transition.Duration`
+  (fade, 4 s) and `.Quick`, `reforce.Object.MaxLive` (1). Themes: `Object.Slideshow.Interval.Duration`,
+  `Object.CategoryExpr`.
+
 ## 3D solids (PLAN 5L)
 
 Polyhedra, a sphere, a torus and a prism drawn into the intensity buffer through the sprite pass, so they trail and
@@ -325,7 +348,6 @@ lock; also in WaveShapes, Particles and Sprites). Ours are committed in `content
 | Solid | What it does |
 |---|---|
 | Icosahedron Drift | spins at .5 rad/s, drifts slowly in X, Y and Z |
-| Cube Orbit | an ellipse that comes towards you and goes away, tumbling |
 | Dodecahedron Beat | snaps a fifth of a turn on each beat while the beat clock is locked |
 | (Beat Clock) | debug, never in a slideshow: a white cube stepping through the bar (with Link the leftmost is the bar line), flashing on each beat; small and dim in the centre when the clock is not locked. Use it to set the Beat offset |
 | Sphere Bounce | bounces once per beat (about 105 BPM without a lock) |
@@ -334,18 +356,15 @@ lock; also in WaveShapes, Particles and Sprites). Ours are committed in `content
 | Fifteen Glass | a 15 puzzle solved on every 8-bar line: on the line the tiles leap into a scramble, then slide back one tile per beat (31 slides), the last landing on the next 8-bar line. Clear 3D glass buttons over the visuals, which show through, bent by the buttons' shape; etched white numbers |
 | Rubik Cube | solved on every 8-bar line: scrambles itself in two beats (30 turns), then undoes one turn per beat so the last lands on the next 8-bar line. Sticker colours are picked from the current ColorMap; `ColorKey=0` keeps the whole cube opaque over the camera |
 
-**Starting them:** solids are not in the default slideshow. Start one from the control panel's **Solids** card
-(Start next, Clear, the library, or a ★ favourite), with a command (`switch:solid:NAME`, `next:solid`, `kill:solid`
-through the web API or `--command`), or pick the **Solids** theme (`content/Themes/Solids.txt`), which starts one every ~30 s: a theme can set
-`Solid.Slideshow.Interval.Duration`. Up to `reforce.Solid.MaxLive` (3) live at once; a fourth replaces the oldest.
+**Starting them:** as Objects (above): the **Objects** card, `switch:object:NAME`, or the `Objects: Solids` /
+`Objects: Puzzles` themes, which start one every ~30 s.
 
 ```sh
-curl -s -X POST -H 'Content-Type: application/json' localhost:8411/api/command -d '{"layer":"solid","action":"switch","config":"Icosahedron Drift"}'
-build/reforce.app/Contents/MacOS/reforce --theme Solids
+curl -s -X POST -H 'Content-Type: application/json' localhost:8411/api/command -d '{"layer":"object","action":"switch","config":"Icosahedron Drift"}'
+build/reforce.app/Contents/MacOS/reforce --theme "Objects: Solids"
 ```
 
-Settings: `Solid.Slideshow.Interval.Duration` (0 = none), `Solid.Duration` (40 s), `Solid.Transition.Duration`
-(fade, 4 s) and `.Quick`, `reforce.Solid.MaxLive` (3), `reforce.Solid.Msaa` (4 | 1), `reforce.Solid.TileSize` (512),
+Solid-only settings: `reforce.Solid.Msaa` (4 | 1), `reforce.Solid.TileSize` (512),
 `reforce.Solid.Dir` (an extra folder of solid scene files, ids `Extra/...`), `reforce.ContentDir` (reforce's own
 content root; default the source tree's `content/`; `--content DIR|none`).
 
@@ -377,36 +396,27 @@ committed in `content/Packages/reforce.Organic.package/`:
 
 | Organic | What it does |
 |---|---|
-| Oak | a trunk from the bottom into a wide crown, growth surging on the beat, buds on the bar line |
-| Willow | a tall trunk whose branches droop in curtains, swaying with the bass |
-| Roots | grows down from the top edge, wide and deep, bursts on the beat |
-| Lightning | a strike from the top, forking down the frame in under a second, gone in a few |
-| Neurons | five cells grow dendrites into each other; every tip fires on the beat |
+| Oak | a trunk from the bottom into a wide crown, growth surging on the beat, leafing out as it grows (leaves unfurling over a bar, fluttering on the beat, falling at the end), swaying over and back every 4 beats about its base, buds on the bar line |
+| Lightning | a strike on every bar line for 8 bars, each from a new point on the top edge: forks down in half a beat, flashes, flickers away |
+| Neurons | five cells grow dendrites into each other; on every beat one fires, a pulse running out to flash the tips on the next beat, cascading to the neuron it touches; every bar line a lead neuron starts a new wave with a stronger pulse, every phrase line they all fire together and the network rewires (a third of the side branches wither back, new ones grow elsewhere); a drop fires them all hardest. Two phrases long |
 | Kelp Forest | seven stalks rise from the sea floor and wave in the current |
-| Radial Bloom | branches out in every direction from the centre, slowly turning; buds on the bar line |
+| Radial Bloom | branches out in every direction from the centre, slowly turning, shivering outwards on every beat (harder on the bar line and a drop); buds on the bar line |
 | Pendulum Wave / (Side) / Ring | a pendulum wave (from above, from the side, on a ring) that lines up again on every phrase line |
-| Sunflower, Spiral Galaxy | phyllotaxis: a seed per 16th note at the golden angle; the galaxy sweeps its angle once per phrase |
+| Spiral Galaxy | phyllotaxis: a seed per 16th note at the golden angle; the galaxy sweeps its angle once per phrase |
 | Harmonograph, Harmonograph Rose | Lissajous figures in cycles per bar, closing on the bar |
-| Rule 30, Sierpinski | 1D cellular automata, a row per 8th / beat, scrolling up |
+| Rule 30 | a 1D cellular automaton, a row per 8th, scrolling up |
 | Game of Life | a generation per beat, a fresh soup every phrase |
-| Fern, Bush | L-systems, a generation every 1-2 bars, traced in over the bar |
 | Clifford Attractor | a strange attractor whose parameters glide over 24-40 bars |
 | Kick Ripples, Rain on a Pond, Ripple Ring | water (GPU wave equation): a drop on every beat / bar / 8th note, rings that spread, cross and fade |
 | Julia Drift, Julia Pulse, Julia Bands | Julia sets (GPU): morphing once per phrase, swelling on the beat, bands flowing on the beat |
+| Mandelbrot Dive | a Mandelbrot zoom (GPU): one slow dive of `Dive` bars (32; its length, the zoom is paced to fill it) toward one of 14 endings of four kinds taking turns (seahorse spirals with 2-5 arms, elephant lace, a mini-Mandelbrot standing upright, the ring of decorations around a mini), up to 2^32 deep, then 4 bars rushing back out; from the slideshow on a phrase line, by hand at once (catching up from the whole set); bands flow in on the beat, kicks push the zoom, a drop pulls it out |
 
 Kinds other than trees and their keys: docs/scene-format.md §5.8 and docs/rhythm-design.md.
 
-**Groups:** Trees, Pendulums, Spirals, Curves, Cells, Water, Fractals (`content/Categories/Organic/`). The Organics
-card's library lists them under group headings; its dropdown shows one group, and **▶ Play <group>** switches to that
-group's theme (`Organics: Trees`, ...), so the slideshow grows only that group (press again to go back to Organics).
+**Groups and starting them:** as Objects (above): the Objects card's groups, `switch:object:NAME`, the **Objects**
+theme (`content/Themes/Objects.txt`, an object every ~30 s) or a group's theme (`Objects: Trees`, ...).
 
-**Starting them:** not in the default slideshow. Use the control panel's **Organics** card (Start next, Clear, the
-library, ★ favourites), commands (`switch:organic:NAME`, `next:organic`, `kill:organic`), or the **Organics** theme
-(`content/Themes/Organics.txt`), which grows one every ~30 s, or a group's theme. Up to `reforce.Organic.MaxLive` (3)
-live at once; a fourth replaces the oldest.
-
-Settings: `Organic.Slideshow.Interval.Duration` (0 = none), `Organic.Duration` (40 s), `Organic.Transition.Duration`
-(fade, 4 s) and `.Quick`, `reforce.Organic.MaxLive` (3), `reforce.Organic.MaxNodes` (6000 per tree).
+Organic-only setting: `reforce.Organic.MaxNodes` (6000 per tree).
 
 ## Dancers: 3D cartoon characters (PLAN 5P)
 
@@ -492,14 +502,20 @@ so it survives a restart (a failed save says so; the change still applies).
   at full strength, `Particle.Duration`; a config's own PDur wins).
 - **Image sprites** card: `Interval`, `Duration` and `Mix` (`Sprite.Slideshow.Interval.Duration`, `Sprite.Duration`,
   `reforce.Sprite.Mix`), Start next / Clear for images only, and a library of the images.
+- **One feature at a time** (`reforce.Slideshow.OneFeature`, 1): the slideshow starts a solid, an organic or a movie
+  sprite only while none of the three is at full strength; when the one showing begins its fade-out, whichever timer
+  has been due longest starts (so they crossfade, never pile up). Manual starts are never held back. 0 = each on its
+  own timer.
 - **Movie sprites** card: movie sprites have their own shuffle and timer: `Interval`
   (`reforce.MovieSprite.Slideshow.Interval.Duration`, default = the sprite interval; 0 = no movies from the
   slideshow), `Mix` (`reforce.MovieSprite.Mix`), Start next / Clear for movies (and live video sprites), Loop until stopped, and a library of the
-  movies. Movies that play once last their own length. Command text: `interval:sprite:SEC`, `life:sprite:SEC`,
+  movies. Movies that play once last their own length. One movie (or live video) sprite at a time
+  (`reforce.MovieSprite.MaxLive`, 1; 0 = no limit): a new one fades the old one out under it, even one looping until
+  stopped, and a due slideshow movie waits until the playing one fades out. Command text: `interval:sprite:SEC`, `life:sprite:SEC`,
   `movieinterval:sprite:SEC`, `nextmovie:sprite`, `kill:sprite:images|movies`.
-- **Solids** card (3D solids): `Interval` (`Solid.Slideshow.Interval.Duration`, default 0 = none; a theme that sets
-  its own, like Solids, wins while it is on) and `Duration` (`Solid.Duration`, 40 s), Start next / Clear, the alive
-  list and a library of the solid scene files. Command text: `interval:solid:SEC`, `life:solid:SEC`.
+- **Objects** card (3D solids and organics): `Interval` (`Object.Slideshow.Interval.Duration`, default 0 = none; a
+  theme that sets its own, like the Objects themes, wins while it is on) and `Duration` (`Object.Duration`, 40 s),
+  Start next / Clear, the alive list and the library by group. Command text: `interval:object:SEC`, `life:object:SEC`.
 - **`reforce.SpriteReplace`** = `own` (default) | `any`. A new EPen-only sprite fades out the running EPen-only
   sprites (probe #44). With `own` only those of its kind: images replace images, movies replace movies. `any` is
   G-Force: any of them.

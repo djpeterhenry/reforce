@@ -1,0 +1,3 @@
+ThemeName = "Objects"
+About = "reforce: everything as in (Standard), plus an object from any group (trees, pendulums, curves, cells, water, fractals, arcade games, solids, puzzles) every 30 seconds or so."
+Object.Slideshow.Interval.Duration = 30

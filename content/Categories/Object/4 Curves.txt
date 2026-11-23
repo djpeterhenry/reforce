@@ -1,0 +1,7 @@
+CategoryTitle = "Curves"
+Include.List = "
+Spiral Galaxy
+Harmonograph
+Harmonograph Rose
+Clifford Attractor
+"

@@ -309,8 +309,7 @@ void Settings::apply(const PrefsTable& t) {
     targetFrameRate = t.number("Graphics.TargetFrameRate", targetFrameRate);
     LayerPrefs* layers[] = {&waveShape, &flowField, &colorMap, &particle, &sprite, &union_};
     for (int i = 0; i < 6; ++i) applyLayer(*layers[i], t, kLayerPrefixes[i]);
-    applyLayer(solid, t, "Solid");  // reforce-only, not imported from G-Force
-    applyLayer(organic, t, "Organic");  // reforce-only
+    applyLayer(object, t, "Object");    // reforce-only: solids and organics
     applyLayer(dancer, t, "Dancer");    // reforce-only
     startupTheme = t.string("Theme.StartupTheme", startupTheme);
     blendWaveShape = t.string("reforce.Blend.WaveShape", blendWaveShape);
@@ -333,6 +332,7 @@ void Settings::apply(const PrefsTable& t) {
     movieSpriteMix = t.number("reforce.MovieSprite.Mix", movieSpriteMix);
     movieSpriteColour = t.string("reforce.MovieSprite.Colour", movieSpriteColour);
     movieSpriteGamma = t.number("reforce.MovieSprite.Gamma", movieSpriteGamma);
+    movieSpriteMaxLive = std::clamp(int(t.number("reforce.MovieSprite.MaxLive", movieSpriteMaxLive)), 0, 64);
     syphonAllowFeedback = t.flag("reforce.Syphon.AllowFeedback", syphonAllowFeedback);
     syphonAlpha = t.flag("reforce.Syphon.Alpha", syphonAlpha);
     syphonAlphaPremultiplied = t.flag("reforce.Syphon.AlphaPremultiplied", syphonAlphaPremultiplied);
@@ -343,11 +343,10 @@ void Settings::apply(const PrefsTable& t) {
     backdropMirror = t.flag("reforce.Backdrop.Mirror", backdropMirror);
     backdropFit = t.string("reforce.Backdrop.Fit", backdropFit);
     backdropOpacity = std::clamp(t.number("reforce.Backdrop.Opacity", backdropOpacity), 0.0, 1.0);
-    solidMaxLive = int(t.number("reforce.Solid.MaxLive", solidMaxLive));
+    objectMaxLive = std::clamp(int(t.number("reforce.Object.MaxLive", objectMaxLive)), 1, 15);
     solidMsaa = int(t.number("reforce.Solid.Msaa", solidMsaa));
     solidTileSize = int(t.number("reforce.Solid.TileSize", solidTileSize));
     solidDir = t.string("reforce.Solid.Dir", solidDir);
-    organicMaxLive = std::clamp(int(t.number("reforce.Organic.MaxLive", organicMaxLive)), 1, 16);
     organicMaxNodes = std::clamp(int(t.number("reforce.Organic.MaxNodes", organicMaxNodes)), 100, 50000);
     dancerMaxLive = std::clamp(int(t.number("reforce.Dancer.MaxLive", dancerMaxLive)), 1, 32);
     dancerFloor = t.flag("reforce.Dancer.Floor", dancerFloor);
@@ -377,6 +376,7 @@ void Settings::apply(const PrefsTable& t) {
     linkQuantize = t.string("reforce.Link.Quantize", linkQuantize);
     linkQuantizeManual = t.string("reforce.Link.QuantizeManual", linkQuantizeManual);
     spawnQuantize = t.string("reforce.Quantize.Spawn", spawnQuantize);
+    slideshowOneFeature = t.number("reforce.Slideshow.OneFeature", slideshowOneFeature ? 1 : 0) != 0;
     phraseBars = std::clamp(int(t.number("reforce.Phrase.Bars", phraseBars)), 1, 64);
     phraseAutoAlign = t.flag("reforce.Phrase.AutoAlign", phraseAutoAlign);
     phraseDeckStarts = t.flag("reforce.Phrase.DeckStarts", phraseDeckStarts);

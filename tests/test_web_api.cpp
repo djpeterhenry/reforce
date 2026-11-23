@@ -255,11 +255,10 @@ TEST_CASE("library: configs per type with categories, parenthesized") {
     auto v = web::json::parse(web::libraryToJson(lib));
     REQUIRE(v);
     const auto& layers = v->get("layers")->array;
-    REQUIRE(layers.size() == 9);  // ... particle, sprite, solid, organic, dancer
+    REQUIRE(layers.size() == 8);  // ... particle, sprite, object (solids and organics), dancer
     CHECK(layers[0].get("key")->str == "flowfield");
-    CHECK(layers[6].get("key")->str == "solid");
-    CHECK(layers[7].get("key")->str == "organic");
-    CHECK(layers[8].get("key")->str == "dancer");
+    CHECK(layers[6].get("key")->str == "object");
+    CHECK(layers[7].get("key")->str == "dancer");
     CHECK(layers[0].get("blendModes")->array.size() == 3);
     CHECK(layers[0].get("configs")->array[0].get("parenthesized")->b);
     CHECK(!layers[0].get("configs")->array[1].get("parenthesized"));
@@ -291,11 +290,11 @@ TEST_CASE("library: solids from reforce's content/ and reforce.Solid.Dir; conten
     // Beat-synced through a B var (SYNC_BEAT); a commented-out mention does not count.
     std::ofstream(content / "Packages/reforce.Solid.package/Stomp.txt")
         << "Mesh=\"cube\"\n// TEMPO\nB0=\"wrap(SYNC_BEAT)\"\nScal=\".5 + .1 * B0\"\n";
-    std::ofstream(content / "Themes/Solids.txt") << "ThemeName = \"Solids\"\nSolid.Slideshow.Interval.Duration = 30\n";
+    std::ofstream(content / "Themes/Solids.txt") << "ThemeName = \"Solids\"\nObject.Slideshow.Interval.Duration = 30\n";
     std::ofstream(extra / "Mine.txt") << "Mesh=\"torus\"\n";
     const web::Library lib = web::buildLibrary(scenes.root, {}, {}, content, extra);
     CHECK(lib.themes == std::vector<std::string>{"Solids", "g-force: Spinning"});  // reforce's own first
-    const web::LibraryLayer* solids = lib.find(Layer::Solid);
+    const web::LibraryLayer* solids = lib.find(Layer::Object);
     REQUIRE(solids);
     REQUIRE(solids->configs.size() == 3);
     CHECK(solids->configs[0].id == "Spin");
@@ -313,10 +312,10 @@ TEST_CASE("library: solids from reforce's content/ and reforce.Solid.Dir; conten
         REQUIRE(cfgs[1].get("beat"));
         CHECK(cfgs[1].get("beat")->b);
     }
-    CHECK(web::parseCommandJson(R"({"layer":"solid","action":"switch","config":"spin"})", &lib).ok());
-    CHECK(web::parseCommandJson(R"({"layer":"solid","action":"switch","config":"Nope"})", &lib).status == 404);
-    CHECK(web::parseCommandJson(R"({"layer":"solid","action":"interval","seconds":0})", &lib).ok());
-    CHECK(web::parseCommandJson(R"({"layer":"solid","action":"life","seconds":20})", &lib).ok());
+    CHECK(web::parseCommandJson(R"({"layer":"object","action":"switch","config":"spin"})", &lib).ok());
+    CHECK(web::parseCommandJson(R"({"layer":"object","action":"switch","config":"Nope"})", &lib).status == 404);
+    CHECK(web::parseCommandJson(R"({"layer":"object","action":"interval","seconds":0})", &lib).ok());
+    CHECK(web::parseCommandJson(R"({"layer":"object","action":"life","seconds":20})", &lib).ok());
     fs::remove_all(content);
     fs::remove_all(extra);
 }
@@ -325,34 +324,34 @@ TEST_CASE("library: organics come in groups (categories), each with the theme th
     const fs::path content = fs::temp_directory_path() / "reforce_web_api_organics";
     fs::remove_all(content);
     fs::create_directories(content / "Packages/reforce.Organic.package");
-    fs::create_directories(content / "Categories/Organic");
+    fs::create_directories(content / "Categories/Object");
     fs::create_directories(content / "Themes");
     for (const char* n : {"Oak", "Fern", "Pendulum Wave", "Loner"})
         std::ofstream(content / "Packages/reforce.Organic.package" / (std::string(n) + ".txt")) << "Kind=\"tree\"\n";
-    std::ofstream(content / "Categories/Organic/1 Trees.txt") << "CategoryTitle = \"Trees\"\nInclude.List = \"\nOak\nFern\n\"\n";
-    std::ofstream(content / "Categories/Organic/2 Pendulums.txt")
+    std::ofstream(content / "Categories/Object/1 Trees.txt") << "CategoryTitle = \"Trees\"\nInclude.List = \"\nOak\nFern\n\"\n";
+    std::ofstream(content / "Categories/Object/2 Pendulums.txt")
         << "CategoryTitle = \"Pendulums\"\nInclude.List = \"\nPendulum Wave\n\"\n";
     std::ofstream(content / "Themes/Organics_1 Trees.txt")
-        << "ThemeName = \"Organics: Trees\"\nOrganic.CategoryExpr = \"+Trees\"\n";
+        << "ThemeName = \"Objects: Trees\"\nObject.CategoryExpr = \"+Trees\"\n";
     const web::Library lib = web::buildLibrary({}, {}, {}, content);
-    const web::LibraryLayer* org = lib.find(Layer::Organic);
+    const web::LibraryLayer* org = lib.find(Layer::Object);
     REQUIRE(org);
     REQUIRE(org->groups.size() == 2);
     CHECK(org->groups[0].name == "Trees");
-    CHECK(org->groups[0].theme == "Organics: Trees");
+    CHECK(org->groups[0].theme == "Objects: Trees");
     CHECK(org->groups[1].name == "Pendulums");
     CHECK(org->groups[1].theme.empty());  // no theme for it
     auto v = web::json::parse(web::libraryToJson(lib));
     REQUIRE(v);
     const web::json::Value* layer = nullptr;
     for (const auto& l : v->get("layers")->array)
-        if (l.get("key")->str == "organic") layer = &l;
+        if (l.get("key")->str == "object") layer = &l;
     REQUIRE(layer);
     REQUIRE(layer->get("groups"));
     const auto& g = layer->get("groups")->array;
     REQUIRE(g.size() == 2);
     CHECK(g[0].get("name")->str == "Trees");
-    CHECK(g[0].get("theme")->str == "Organics: Trees");
+    CHECK(g[0].get("theme")->str == "Objects: Trees");
     for (const auto& c : layer->get("configs")->array) {
         const std::string id = c.get("id")->str;
         const auto* cats = c.get("categories");
@@ -365,7 +364,7 @@ TEST_CASE("library: organics come in groups (categories), each with the theme th
     }
     // Other layers carry no groups.
     for (const auto& l : v->get("layers")->array)
-        if (l.get("key")->str != "organic") CHECK(!l.get("groups"));
+        if (l.get("key")->str != "object") CHECK(!l.get("groups"));
     fs::remove_all(content);
 }
 
@@ -608,6 +607,8 @@ TEST_CASE("favourites: parse and join") {
     CHECK(f[0].id == "External/images/  dj peter henry");
     CHECK(f[1].layer == "waveshape");
     CHECK(web::joinFavorites(f) == "sprite:External/images/  dj peter henry;waveshape:Corona");
+    const auto o = web::parseFavorites("solid:Rubik Cube;object:Oak");  // solid: is no layer any more
+    CHECK(web::joinFavorites(o) == "object:Oak");
 }
 
 TEST_CASE("rhythm (PLAN 5O): beatset commands, their settings, and the rhythm state") {
@@ -672,7 +673,7 @@ TEST_CASE("dancers: commands and the Dancers card's settings") {
     CHECK(web::parseCommandJson(R"({"command":"kill:dancer"})").ok());
     CHECK(web::parseCommandJson(R"({"layer":"dancer","action":"life","seconds":60})").ok());
     CHECK(web::parseCommandJson(R"({"layer":"dancer","action":"life","seconds":0})").ok());  // forever (∞)
-    CHECK_FALSE(web::parseCommandJson(R"({"layer":"solid","action":"life","seconds":0})").ok());
+    CHECK_FALSE(web::parseCommandJson(R"({"layer":"object","action":"life","seconds":0})").ok());
     CHECK(web::parseCommandJson(R"({"layer":"dancer","action":"interval","seconds":0})").ok());
     CHECK(web::parseCommandJson(R"({"action":"beatset","key":"dancefloor","value":"on"})").ok());
     CHECK(web::parseCommandJson(R"({"action":"beatset","key":"dancefloor","value":"off"})").ok());

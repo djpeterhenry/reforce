@@ -5,7 +5,8 @@ Text="0"
 B0="t - START_TIME"
 // bounce phase in beats: the beat clock when locked, else 1.75 bounces per second
 B1="SYNC_ON * SYNC_BEAT + (1 - SYNC_ON) * 1.75 * B0"
-X=".7 * sin(.17 * B0)"
+// side to side: one way in 4 bars (16 beats), back in the next 4
+X=".7 * sin(2 * PI * B1 / 32)"
 Y="-.5 + .85 * abs(sin(PI * B1))"
 Z=".5 * sin(.11 * B0)"
 Scal=".32"

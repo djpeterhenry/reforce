@@ -6,9 +6,12 @@
 namespace reforce::render {
 
 MTL::Library* compileLibrary(MTL::Device* device, const std::string& source,
-                             const std::string& label) {
+                             const std::string& label, bool fastMath) {
     NS::SharedPtr<MTL::CompileOptions> options = NS::TransferPtr(MTL::CompileOptions::alloc()->init());
-    options->setFastMathEnabled(true);
+    options->setFastMathEnabled(fastMath);
+    // macOS 15+: say it with the newer property too (safe: no reassociation, no reciprocal tricks).
+    if (!fastMath && NS::ProcessInfo::processInfo()->isOperatingSystemAtLeastVersion({15, 0, 0}))
+        options->setMathMode(MTL::MathModeSafe);
     options->setLanguageVersion(MTL::LanguageVersion3_0);
 
     NS::Error* error = nullptr;

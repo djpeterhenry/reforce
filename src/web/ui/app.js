@@ -5,13 +5,13 @@
 'use strict';
 (() => {
   const MAIN = ['flowfield', 'waveshape', 'colormap'];
-  const EXTRA = ['union', 'particle', 'sprite', 'movie', 'solid', 'organic', 'dancer'];
+  const EXTRA = ['union', 'particle', 'sprite', 'movie', 'object', 'dancer'];
   // Card key -> engine layer: the Movie sprites card drives the Sprite layer's movie half.
   const layerOf = (key) => (key === 'movie' ? 'sprite' : key);
   const TITLES = {
     flowfield: 'FlowField', waveshape: 'WaveShape', colormap: 'ColorMap',
     union: 'FlowField Union', particle: 'Particles', sprite: 'Image sprites', movie: 'Movie sprites',
-    solid: 'Solids', organic: 'Organics', dancer: 'Dancers',
+    object: 'Objects', dancer: 'Dancers',
   };
 
   const $ = (sel, root = document) => root.querySelector(sel);
@@ -412,15 +412,11 @@
     view.sel = null;
 
     const f = view.filter;
-    // Organics: browse by group (each one an "Organics: <group>" theme); "All" lists them under group headings.
-    view.groups = view.key === 'organic' ? (lib.groups || []) : [];
+    // Objects: browse by group (each one an "Objects: <group>" theme); "All" lists them under group headings.
+    view.groups = view.key === 'object' ? (lib.groups || []) : [];
     f.append(new Option(view.groups.length ? 'All groups' : 'All configs', ''));
     for (const g of view.groups) f.append(new Option(g.name, `g:${g.name}`));
     if (view.key === 'movie') f.append(new Option('Beat sync only (♩ BPM)', 'bpm'));
-    if (view.key === 'solid') {
-      f.append(new Option('Beat-synced (♩)', 'beat'));
-      f.append(new Option('Not beat-synced', 'nobeat'));
-    }
     const saved = store.get(`reforce.filter.${view.key}`);
     if (saved && [...f.options].some((o) => o.value === saved)) f.value = saved;
     f.hidden = f.options.length < 2;  // only "All configs": nothing to pick
@@ -438,7 +434,7 @@
       updateGroupTheme(view);
     });
     if (view.groups.some((g) => g.theme)) {
-      // "Play only <group>": the group's theme (organics from that group only); pressed again: back to Organics.
+      // "Play only <group>": the group's theme (objects from that group only); pressed again: back to Objects.
       const b = document.createElement('button');
       b.className = 'grouptheme';
       b.hidden = true;
@@ -448,7 +444,7 @@
         const g = groupOf(view);
         if (!g || !g.theme) return;
         const playing = state && state.theme === g.theme;
-        post({ action: 'theme', theme: playing ? 'Organics' : g.theme });
+        post({ action: 'theme', theme: playing ? 'Objects' : g.theme });
       });
     }
     view.list.addEventListener('click', (e) => {
@@ -472,7 +468,7 @@
     return v.startsWith('g:') ? view.groups.find((g) => `g:${g.name}` === v) : null;
   }
 
-  // The Organics card's group button: shown for a group that has a theme; pressed while that theme plays.
+  // The Objects card's group button: shown for a group that has a theme; pressed while that theme plays.
   function updateGroupTheme(view) {
     const b = view.groupBtn;
     if (!b) return;
@@ -484,8 +480,8 @@
     b.classList.toggle('toggle', true);
     b.textContent = playing ? `✓ Playing ${g.name}` : `▶ Play ${g.name}`;
     b.title = playing
-      ? `The theme "${g.theme}" is on: the slideshow starts only ${g.name}. Press to go back to the Organics theme (all groups).`
-      : `Switch to the theme "${g.theme}": the slideshow starts an organic from ${g.name} every 30 s or so, and no others.`;
+      ? `The theme "${g.theme}" is on: the slideshow starts only ${g.name}. Press to go back to the Objects theme (all groups).`
+      : `Switch to the theme "${g.theme}": the slideshow starts an object from ${g.name} every 30 s or so, and no others.`;
   }
 
   function select(view, id) {
@@ -531,7 +527,7 @@
     const ls = viewState(view);
     const frag = document.createDocumentFragment();
     let n = 0;
-    // Organics, all groups: in group order under headings (configs in no group last, under "Other").
+    // Objects, all groups: in group order under headings (configs in no group last, under "Other").
     let order = view.configs, heads = null;
     if (!filter && view.groups && view.groups.length) {
       const rank = (c) => {
@@ -824,19 +820,17 @@
       $('.row.buttons', root).append(view.clear, view.auto);
       $('summary', root).firstChild.textContent = 'Union library ';
     } else {
-      $('.prev', root).hidden = true;  // Particles/Sprites/Solids/Organics: "next" starts one more
+      $('.prev', root).hidden = true;  // Particles/Sprites/Objects: "next" starts one more
       $('.next', root).textContent = 'Start next';
       const clear = document.createElement('button');
       clear.textContent = 'Clear';
       const kill = { particle: 'kill:particle', sprite: 'kill:sprite:images', movie: 'kill:sprite:movies',
-                     solid: 'kill:solid', organic: 'kill:organic', dancer: 'kill:dancer' }[key];
+                     object: 'kill:object', dancer: 'kill:dancer' }[key];
       clear.title = key === 'movie' ? 'Fade out every movie and live video sprite'
         : key === 'sprite' ? 'Fade out every image sprite'
-        : key === 'solid' ? 'Fade out every solid'
-        : key === 'organic' ? 'Wither every organic (trees ungrow back to the root)'
+        : key === 'object' ? 'Fade out the objects (trees wither back to the root)'
         : key === 'dancer' ? 'Every dancer waves goodbye and leaves the stage' : 'Fade out every particle';
-      if (key === 'solid') $('.next', root).title = 'Start the next solid (with all slots taken, the oldest makes way)';
-      if (key === 'organic') $('.next', root).title = 'Grow the next organic (with three alive, the oldest makes way)';
+      if (key === 'object') $('.next', root).title = 'Start the next object (the one showing fades out under it)';
       if (key === 'dancer') $('.next', root).title = 'Bring on the next dancer (with Max dancers on stage, the oldest generated dancer leaves; guests stay)';
       clear.addEventListener('click', () => post({ command: kill }));
       $('.row.buttons', root).append(clear);
@@ -864,19 +858,8 @@
           const colour = $('#vSpriteColourLabel');
           if (colour) row.append(colour);
           $('.row.buttons', root).after(row);
-          // Live sprite: a camera or Syphon server as a sprite (stops with Clear like the movies).
-          const live = document.createElement('div');
-          live.className = 'row filters liverow';
-          live.title = 'Start a camera or Syphon input as a sprite. Clear fades it out with the movies.';
-          const ls = document.createElement('select');
-          ls.id = 'liveSrc';
-          ls.setAttribute('aria-label', 'Live sprite source');
-          ls.addEventListener('change', () => store.set('reforce.liveSource', ls.value));
-          const lb = document.createElement('button');
-          lb.id = 'liveStart';
-          lb.textContent = 'Start live';
-          live.append(ls, lb);
-          row.after(live);
+          // No live (camera / Syphon) sprites here: the camera goes under the visuals as the Camera backdrop
+          // (Peter 2026-11-22).
         }
       }
     }
@@ -931,19 +914,13 @@
         view.sliders = [all.interval, all.life];
         if (key === 'sprite') view.sliders.push(mix);
         else $('.field.mixfield', root).remove();
-        if (key === 'solid') {
-          $('.interval', root).closest('.field').title = 'Seconds from one slideshow start to the next (±10%). '
-            + 'At 0 the slideshow starts none. A theme with Solid.Slideshow.Interval.Duration (Solids) sets its own; '
-            + 'saved to settings.json, this one applies to every other theme.';
+        if (key === 'object') {
+          $('.interval', root).closest('.field').title = 'Seconds from one slideshow start to the next (±10%); a start '
+            + 'waits while an object, organic or solid, or a movie is showing (reforce.Slideshow.OneFeature). '
+            + 'At 0 the slideshow starts none. A theme with Object.Slideshow.Interval.Duration (the Objects themes) '
+            + 'sets its own; saved to settings.json, this one applies to every other theme.';
           $('.life', root).closest('.field').title = 'Seconds at full strength, between the fade-in and fade-out (±20%). '
-            + 'A solid\'s own PDur wins. Saved to settings.json.';
-        }
-        if (key === 'organic') {
-          $('.interval', root).closest('.field').title = 'Seconds from one slideshow start to the next (±10%). '
-            + 'At 0 the slideshow starts none. A theme with Organic.Slideshow.Interval.Duration (Organics) sets its own; '
-            + 'saved to settings.json, this one applies to every other theme.';
-          $('.life', root).closest('.field').title = 'Seconds at full strength, between the growth and the withering. '
-            + 'An organic\'s own PDur wins. Saved to settings.json.';
+            + 'An object\'s own PBar (bars) or PDur wins. Saved to settings.json.';
         }
         if (key === 'dancer') {
           $('.interval', root).closest('.field').title = 'Seconds from one dancer arriving to the next (±10%). '
@@ -1052,7 +1029,7 @@
         if (!ls.moviePlaylistSize) txt = 'no movies in the slideshow';
         else if (ls.movieInterval > 0 && ls.nextMovieIn >= 0) txt = `next movie in ${Math.round(ls.nextMovieIn)} s`;
       } else if (ls.interval > 0 && ls.nextSwitchIn >= 0) {
-        const what = { sprite: 'image', solid: 'solid', organic: 'organic', dancer: 'dancer' }[view.key] || 'particle';
+        const what = { sprite: 'image', object: 'object', dancer: 'dancer' }[view.key] || 'particle';
         txt = `next ${what} in ${Math.round(ls.nextSwitchIn)} s`;
       }
       setText(view.countdown, txt);
@@ -1174,7 +1151,7 @@
       theme.replaceChildren(...names.map((n) => new Option(n, n)));
     }
     if (document.activeElement !== theme) theme.value = s.theme;
-    const ov = views.get('organic');
+    const ov = views.get('object');
     if (ov) updateGroupTheme(ov);
 
     const ss = s.slideshow || {};
@@ -1329,15 +1306,6 @@
       : 'Camera access is off for reforce. Turn it on, then pick the camera again. ';
   }
 
-  // The Movie sprites card's live picker: cameras and Syphon servers only (files are in its library).
-  function fillLiveSources(v, camNote) {
-    const sel = $('#liveSrc');
-    if (!sel) return;
-    const any = fillSources(sel, [['Cameras' + camNote, v.cameras, (c) => c.name], ['Syphon', v.syphon, (x) => x.display]],
-                            'No cameras or Syphon servers', sel.value || store.get('reforce.liveSource') || '');
-    $('#liveStart').disabled = !any;
-  }
-
   // Camera backdrop (docs/backdrop.md): cameras first, then Syphon servers and movie files.
   function fillBackdropSources(v, camNote) {
     const sel = $('#bdSource');
@@ -1366,7 +1334,6 @@
                         ['Syphon', v.syphon, (x) => x.display]],
                   'No sources (Sprite package movies, reforce.VideoDir, cameras, Syphon)',
                   sel.value || store.get('reforce.videoSource') || '');
-      fillLiveSources(v, camNote);
       fillBackdropSources(v, camNote);
     } catch { /* not connected */ }
   }
@@ -1413,12 +1380,6 @@
     $('#vPlayLayer').addEventListener('click', play('layer'));
     // The Video layer section opens on demand (most sets never use it); remembered per browser.
     rememberOpen($('#videoWrap'), 'reforce.videoOpen');
-    // Live sprites (Movie sprites card): a camera or Syphon server as a sprite.
-    const liveBtn = $('#liveStart');
-    if (liveBtn) liveBtn.addEventListener('click', () => {
-      const src = $('#liveSrc').value;
-      if (src) post({ action: 'video', target: 'sprite', source: src });
-    });
     $('#vStopLayer').addEventListener('click', () => post({ action: 'videostop', target: 'layer' }));
     $('#vHoldSprites').addEventListener('click', () => post({ action: 'videohold' }));
     $('#vBeatSync').addEventListener('change', (e) => vset('beatsync', e.target.checked));
@@ -1497,7 +1458,8 @@
     status.textContent = !b.track ? 'off' : !backdrop ? 'no backdrop' : !b.running ? 'starting' : seen ? 'person' : 'nobody';
     status.className = 'chip status' + (seen ? ' on' : '');
     setText($('#bodySummary'), !b.track ? 'off' : !backdrop ? 'on: needs the camera backdrop' : seen ? 'on: tracking' : 'on');
-    $('#bodySummary').classList.toggle('on', seen);
+    // Green while on and working (tracking the backdrop), like the camera backdrop and room lights; not only with a person seen.
+    $('#bodySummary').classList.toggle('on', !!(b.track && backdrop));
     let meta;
     if (!backdrop) meta = 'Tracks the camera backdrop: turn that on first.';
     else if (!b.track) meta = 'Tick Track to follow the person on the backdrop.';

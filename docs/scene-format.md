@@ -687,11 +687,14 @@ colorized frame (`reforce.MovieSprite.Colour = over`); see usage.md, "Sprite vis
 ---
 
 ### 5.7 Solid (reforce extension, PLAN 5L)
+
+*Since 2026-11-22 solids and organics are one layer, Objects (`switch:object:NAME`, `Object.*` settings and theme
+keys, `reforce.Object.MaxLive`; docs/usage.md "Objects"); the scene types and their keys below are unchanged. Any object may set `SBar=N`: from the slideshow it starts only on a line every N bars of the phrase clock.*
 3D solids: a polyhedron, sphere, torus or prism wearing the current WaveShape (or the frame), drawn into the
 intensity buffer through the sprite pass so it trails and takes the ColorMap (design: docs/3d-design.md). Scene
 files live in `reforce.Solid.package` (reforce's committed `content/Packages/`, a scene root's `Packages/`, or the
-folder `reforce.Solid.Dir`). Solids are a spawn layer like Particles: `switch:solid:NAME`, `next:solid`,
-`kill:solid`, `life:solid:SEC`; `Solid.Slideshow.Interval.Duration` is 0 (none) unless a Theme sets it (§8).
+folder `reforce.Solid.Dir`). Solids are Objects, a spawn layer like Particles: `switch:object:NAME`, `next:object`,
+`kill:object`, `life:object:SEC`; `Object.Slideshow.Interval.Duration` is 0 (none) unless a Theme sets it (§8).
 
 | Key | Tier | Meaning |
 |---|---|---|
@@ -699,7 +702,8 @@ folder `reforce.Solid.Dir`). Solids are a spawn layer like Particles: `switch:so
 | `Text` | Pre | Face texture: `0` the current WaveShape (default), `1` the previous frame (Droste), `2` flat. |
 | `Pers` | Pre | `1` perspective (default; 40° vertical field of view, camera at z ≈ 2.75), `0` orthographic. |
 | `Flag` | Pre | Sprite blend flags (§5.6); absent = 0, a keyed copy. |
-| `PDur` | Pre | Seconds at full strength (else `Solid.Duration`, 40). |
+| `PDur` | Pre | Seconds at full strength (else `Object.Duration`, 40). |
+| `PBar` | Pre | Bars at full strength instead (wins over `PDur`). With the beat clock the fade-out starts on the bar line nearest to that many bars after the fade-in, or on the nearest phrase line when it is a whole number of phrases (never under half of it); without it, bars at 120 BPM. The tempo at the start counts. |
 | `A#` | Load | Once at start. |
 | `B#` | Frame | Per frame, persisting (like sprites). `C#`/`D#` are not evaluated. |
 | `X`, `Y`, `Z` | FrameOutput | Centre. Sprite convention: ±1 = the frame edges at z = 0; +z comes towards the viewer (stay below ~2). Default 0. |
@@ -755,12 +759,15 @@ RotX=".35"  RotY=".5 * B0"
 
 ### 5.8 Organic (reforce extension, PLAN 5N)
 
+*Since 2026-11-22 solids and organics are one layer, Objects (`switch:object:NAME`, `Object.*` settings and theme
+keys, `reforce.Object.MaxLive`; docs/usage.md "Objects"); the scene types and their keys below are unchanged. Any object may set `SBar=N`: from the slideshow it starts only on a line every N bars of the phrase clock.*
+
 Procedural growth, drawn as tapered lines into the intensity buffer through the WaveShape line pass, so it trails and
 takes the ColorMap (design: docs/organics-design.md). Scene files live in `reforce.Organic.package` (reforce's
 committed `content/Packages/`, or a scene root's `Packages/`). Organics are a spawn layer like Solids:
-`switch:organic:NAME`, `next:organic`, `kill:organic` (trees wither: they ungrow), `life:organic:SEC`;
-`Organic.Slideshow.Interval.Duration` is 0 (none) unless a Theme sets it (§8). Up to `reforce.Organic.MaxLive` (3)
-live at once; a tree stops growing at `reforce.Organic.MaxNodes` (6000) nodes.
+`switch:object:NAME`, `next:object`, `kill:object` (trees wither: they ungrow), `life:object:SEC`;
+`Object.Slideshow.Interval.Duration` is 0 (none) unless a Theme sets it (§8). Up to `reforce.Object.MaxLive` (1)
+at full strength (a new one fades the oldest out; the slideshow waits for a fade-out); a tree stops growing at `reforce.Organic.MaxNodes` (6000) nodes.
 
 The only `Kind` so far is `tree`: space colonisation. `Pts` attraction points (the crown's shape) pull the nearest
 node within `Infl`; pulled nodes grow a segment of `Seg` towards them; points within `Kill` are used up. The trunk
@@ -769,7 +776,8 @@ grows from each root until it reaches the points.
 | Key | Tier | Meaning |
 |---|---|---|
 | `Kind` | literal | `tree` (default), or one of the other kinds below. A name, not an expression; unknown kinds refuse to start. |
-| `PDur` | Pre | Seconds at full strength (else `Organic.Duration`, 40). |
+| `PDur` | Pre | Seconds at full strength (else `Object.Duration`, 40). |
+| `PBar` | Pre | Bars at full strength instead (wins over `PDur`), ending on a bar or phrase line as for Solids (§5.7). |
 | `Pts`, `Rts` | Pre | Attraction points (300; 10..4000) and roots (1; 1..64). |
 | `C#` | per point / root | Before each point's and each root's keys, ascending (with `s` = k / (count - 1) and `rnd`). |
 | `PX`, `PY` | per point | A point's position. Default: an ellipse .9 x .55 at (0, .3). |
@@ -777,16 +785,28 @@ grows from each root until it reaches the points.
 | `Seg`, `Infl`, `Kill`, `Jitr` | Pre | Segment length (.02), influence radius (.3), kill distance (2 × Seg), direction jitter (.15). |
 | `Wdth`, `Tip`, `BudW` | Pre | Trunk width, tip width, bud diameter in LWdt units (8, 1, 4). Widths follow the pipe model. |
 | `Wthr` | Pre | 1 (default): ungrow during the fade-out; 0: dim with `FADER`. |
-| `A#` | Load | Once at start. |
-| `B#` | Frame | Per frame, persisting. `D#` is not evaluated. |
+| `Strk`, `SGap`, `SAln` | Pre | Strikes: grow `Strk` times (1; 1..16), each from fresh points and roots (A vars, points and roots evaluated again), the first on the next line every `SAln` beats (1; 4 = bar lines), the next every `SGap` beats (4). |
+| `SwyB` | Pre | Beats per sway cycle on the beat clock, about the fixed root (0 = the free 0.3 Hz wave). |
+| `VibF` | Pre | Vibration cycles per beat at the tips (3; .6 x that at the root). |
+| `PlsB`, `PlsE` | Pre | Pulses: beats for a pulse to reach the farthest tip (1); a root fires every `PlsE` beats (1), the next one a root whose branches meet the last one's. |
+| `PlsL`, `PlsP` | Pre | On every bar line (`SYNC_BAR`) a lead root restarts the cascade with a pulse this strong (0 = none; 1.7 = brighter and thicker); on every phrase line (`SYNC_PHRASE`) every root fires at `PlsP` (0 = none). A drop (`PAll`) fires all at 1.6. |
+| `Rwir`, `RwrB` | Pre | Rewiring: on every phrase line a share `Rwir` (0 = none) of the side branches withers back over `RwrB` bars (4), is removed, and `Pts × Rwir` new points (`PX`, `PY` again) grow new branches; the roots stay put. |
+| `LeafW`, `LeafD`, `LeafA`, `LeafU` | Pre | Leaves: length in tree units (.05), on every `LeafD`-th node of the outer twigs and every tip (2), angle off the twig in radians, alternating sides (.9), beats to unfurl (4). |
+| `A#` | Load | Once at start, and again at every strike after the first. |
+| `B#` | Frame | Per frame, persisting. `D#` is not evaluated. `s` = beats since the current growth (strike) began. |
 | `Grow` | FrameOutput | Growth iterations (one segment per tip) per second (12). |
 | `TrpX`, `TrpY` | FrameOutput | Tropism added to each new branch segment's direction (0; the trunk ignores it). |
 | `Sway` | FrameOutput | Sway at the thinnest tips in radians (.15). |
 | `X`, `Y`, `Scal`, `Rot` | FrameOutput | Move, scale and turn the whole organic (0, 0, 1, 0). |
 | `Pen`, `Bud` | FrameOutput | Branch intensity (1) and tip-bud intensity relative to Pen (0). |
+| `Vib` | FrameOutput | Radial vibration (0): each node out from its root by Vib × its distance × cos(2π VibF (.6 + .8 depth) wrap(beat)). |
+| `Puls`, `PAll` | FrameOutput | Pulse brightness added to Pen (absent = no pulses); every root fires when `PAll` rises past .5 (0). |
+| `Leaf`, `LFlt` | FrameOutput | Leaf intensity relative to Pen (0 = no leaves); leaf flutter in radians (0). Leaves are hard-edged pointed ovals drawn over the branches; they fall as the tree withers. |
 
 Coordinates: y = ±1 at the bottom / top of the frame, x in the same units (±1.78 at the edges of 16:9), so circles
-stay round. Variables: as for Solids, plus `s` in the per-point and per-root keys.
+stay round. Variables: as for Solids, plus `s` in the per-point and per-root keys and, in the B vars and frame
+keys, the beats since the current growth began. The beat clock is `SYNC_BEAT` while locked, else 120 BPM from the
+start.
 
 **Other kinds** (PLAN 5O). Every kind takes `PDur`, `A#`, `B#`, and per frame `X`, `Y`, `Scal`, `Rot`, `Pen`. Time is
 the beat clock when it is locked (`SYNC_BEAT`, and `SYNC_BAR` aligned to the phrase), else 120 BPM from the start.
@@ -802,15 +822,21 @@ the beat clock when it is locked (`SYNC_BEAT`, and `SYNC_BAR` aligned to the phr
 | `attractor` | `Num` points per frame (6000, at most 30000), `DotW` (1.5), `Sprd` scale (.42) | `PA`, `PB`, `PC`, `PD` (-1.4, 1.6, 1, .7): a Clifford attractor x' = sin(a y) + c cos(a x), y' = sin(b x) + d cos(b y) |
 | `ripples` | GPU (render/FieldPipeline). `Rate` drops per beat (1; 0 = none), `Rad` drop radius in frame heights (.03), `Spd` wave speed in frame heights per second (.4), `Decy` seconds to 1/e (2.5), `Edge` 0 = the frame's edges absorb, 1 = they reflect, `Flag` sprite blend flags (0) | `DX`, `DY` where the next drop lands (tree units; default random), `Amp` drop height (1), `Rain` extra small drops per second (0), `Gain` brightness of the crests (3), `Pen` |
 | `julia` | GPU. `Iter` iterations (120; 8..1000), `Flag` (0) | `CRe`, `CIm` the constant c (-.8, .156), `X`, `Y`, `Scal`, `Rot` (the set's ±1.6 fills the frame height at Scal 1), `Gain` (1), `Band` bands per Iter of escape count (0 = none), `Phas` band phase in radians, `Pen` |
+| `mandel` | GPU. A Mandelbrot dive on the clock (engine/MandelDive). `Dive` bars per dive (16: one per phrase), `Dbl` beats per doubling of the magnification (2; 0 = paced to reach `Deep` just before the rush out), `Deep` deepest log2 magnification (34; at most 44), `Out` beats of the rush back out to the whole set at the end of a dive (4; 0 = a cut), `Algn` dives count from the phrase line (every Algn bars) at or before the start (16; 0 = from bar 0), `Ent` doublings a beat while catching up from the whole set after a start mid-dive (6; 0 = jump straight in), `Kick` doublings surging in on each beat line (.3), `Drop` doublings a drop pulls out (6), `Iter` least iterations (200), `Itk` x the iterations the target needs at the depth (1.5), `MaxI` cap (4000), `Prec` 0 auto (float32, perturbation past 2^12), 1 float32, 2 double-float, 3 perturbation, `Res` render scale (1; .5 = a quarter of the pixels, upscaled), `Mini` which endings: 0 all four kinds (spirals, lace, mini-Mandelbrots, the decorations around a mini; taking turns), 1 minis and decorations only, 2 no minis, `Aff` 0 turns off the mini interior shortcut (1), `Flag` (0) | `Tgt` target index (-1 = the shared seeded order, one per dive; 0-4 spirals, 5-6 lace, 7-10 minis, 11-13 decorations), `X`, `Y`, `Scal`, `Rot` (the whole set fills the frame height at Scal 1 and depth 0), `Gain` (1), `Band` escape-count iterations per band (0 = none), `Phas` band phase (default: the bands flow inward one per beat), `Glow` pixels from the edge fully lit (1; 0 = none), `Pen` |
+| `invaders`, `hopper`, `cycles`, `rocks`, `bricks`, `chase` | Arcade kinds (PLAN 5Q): an invader march, a pyramid hopper, light cycles, vector rocks, a brick wall, the light cycles in 3D behind one cycle; keys in docs/arcade-design.md | |
 
 The GPU kinds are not lines: each draws into its own frame-sized texture and is composited through the sprite pass
 like a solid (Pen, `Flag`, the fade envelope as opacity), so it trails. Ripples solve the wave equation on a grid of
 270 rows (the frame's aspect); a drop is a Gaussian bump. Julia shading: the smooth escape count mu, luminance
 (mu / Iter)^0.4 x Gain, times .5 + .5 cos(2 pi Band mu / Iter + Phas) when Band > 0; the set itself is dark.
+Mandelbrot shading, the same at every depth: d = the distance estimate to the set in pixels, luminance
+(1 - log2(d) / 12) x Gain, times .5 + .5 cos(2 pi mu / Band + Phas) when Band > 0 (faded where the bands would
+alias), at least (Glow / d)^2 x Gain; the set itself is dark. Dives head for Misiurewicz points (the boundary
+looks the same at every depth there), so a dive never ends in a flat frame.
 
-**Groups** (the Organics card's dropdown): `content/Categories/Organic/*.txt` (one category per group: Trees,
-Pendulums, Spirals, Curves, Cells, Water, Fractals) and a theme per group, `Organics: <group>`
-(`Organic.CategoryExpr = "+<group>"`, an organic every ~30 s). An organic in no group is listed under "Other".
+**Groups** (the Objects card's dropdown): `content/Categories/Object/*.txt` (one category per group: Trees,
+Pendulums, Curves, Cells, Water, Fractals, Arcade) and a theme per group, `Objects: <group>`
+(`Object.CategoryExpr = "+<group>"`, an organic every ~30 s). An organic in no group is listed under "Other".
 
 Example (content's Oak, abridged):
 
@@ -819,7 +845,7 @@ Kind="tree"  Pts="420"
 C0="PI * rnd(1)"  C1="sqrt(rnd(1))"
 PX="1.15 * C1 * cos(C0)"  PY=".1 + .75 * C1 * sin(C0)"
 B1="SYNC_ON * SYNC_BEAT + (1 - SYNC_ON) * 2 * (t - START_TIME)"
-Grow="8 * (1 + 2.5 * exp(-5 * wrap(B1)))"  Sway=".12 + .25 * BASS"  Bud=".9 * exp(-3 * wrap(B1 / 4))"
+Grow="8 * (1 + 2.5 * exp(-5 * wrap(B1)))"  SwyB="4"  Sway=".25 + .12 * BASS"  Bud=".9 * exp(-3 * wrap(B1 / 4))"
 ```
 
 ### 5.9 Dancer (reforce extension, PLAN 5P)
@@ -912,7 +938,7 @@ strings is a **literal** separator (it is not a real tab byte in the files).
 | `Locked` | 1 for factory themes |
 | `Version` | 1 |
 | `LastModified` | Hex timestamp |
-| `Solid.Slideshow.Interval.Duration` | reforce extension (§5.7): seconds between slideshow solids while the theme is on (solids are not in the default slideshow). Absent: the setting's interval (0). |
+| `Object.Slideshow.Interval.Duration` | reforce extension (§5.7): seconds between slideshow solids while the theme is on (solids are not in the default slideshow). Absent: the setting's interval (0). |
 | `<Type>.CategoryExpr` | Per type (WaveShape, FlowField, ColorMap, Particle, Sprite; reforce: Solid). A `\t`-separated list of `+Category` (include) and `-Category` (exclude) terms, e.g. `"+(Suggested)\t-Bright Background\t-Low Saturation"`. A type whose key is absent is presumably unrestricted. Inferred semantics: union of the `+` sets minus the union of the `-` sets. |
 
 **Category** (`Categories/<Type>/*.txt`):

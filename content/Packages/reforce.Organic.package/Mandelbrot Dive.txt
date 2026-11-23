@@ -1,0 +1,21 @@
+Vers=100
+Meta="reforce organic: an endless Mandelbrot zoom: one slow dive (32 bars, two phrases) toward one of 14 endings of four kinds that take turns (seahorse spirals with 2 to 5 arms, elephant-valley lace, a mini-Mandelbrot standing upright like the whole set, the ring of decorations around a mini), paced to reach it (up to 2^32) just before four bars rushing back out to the whole set; escape-count bands flow inward on every beat, the kicks push the zoom, a drop pulls it back out; it turns slowly."
+Kind="mandel"
+// The length: bars of one dive (the whole object is one dive; the zoom is paced to fill it, so any length works).
+Dive="32"
+PBar="Dive"
+// from the slideshow, start on a phrase line (by hand: at once, catching up from the whole set to the dive)
+SBar="16"
+// paced: deep enough (2^32) just before the rush back out over the last 16 beats
+Dbl="0"
+Deep="32"
+Out="16"
+// the zoom surges in on every beat line by this many doublings (half the default .3)
+Kick=".15"
+Band="10"
+B0="t - START_TIME"
+B1="SYNC_ON * SYNC_BAR + (1 - SYNC_ON) * .5 * B0"
+// a slow turn, swinging half a turn each way over two phrases
+Rot="1.6 * sin(2 * PI * B1 / 32)"
+Gain="1.2"
+Pen=".9"

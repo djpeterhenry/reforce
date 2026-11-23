@@ -69,7 +69,7 @@ namespace reforce::render {
 class ScenePipeline;
 
 struct SolidPipelineOptions {
-    int maxLive = 3;      // reforce.Solid.MaxLive: render targets (live solids at once)
+    int maxLive = 3;      // render targets (reforce.Object.MaxLive + 1)
     int msaa = 4;         // reforce.Solid.Msaa: 4 or 1
     bool cullBack = true; // tests: false draws back faces too (the depth test still picks the front)
     int tileSize = 512;   // reforce.Solid.TileSize: the face texture tiles (Text=0 / 1), R8Unorm, mipmapped

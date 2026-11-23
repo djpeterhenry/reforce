@@ -123,18 +123,18 @@ docs/scene-format.md §5.8.
 
 | Kind | Content | Beat use |
 |---|---|---|
-| `phyllotaxis` | Sunflower, Spiral Galaxy | one seed per 16th (Rate per beat); Spiral Galaxy sweeps the angle once per phrase |
+| `phyllotaxis` | Spiral Galaxy | one seed per 16th (Rate per beat); Spiral Galaxy sweeps the angle once per phrase |
 | `harmonograph` | Harmonograph, Harmonograph Rose | frequencies in cycles per bar, so the figure closes on the bar |
-| `automaton` | Rule 30, Sierpinski | one row per 8th / beat, scrolling up |
+| `automaton` | Rule 30 | one row per 8th, scrolling up |
 | `life` | Game of Life | one generation per beat, a fresh soup every 16 bars (phrase lines) |
-| `lsystem` | Fern, Bush | one generation per 1-2 bars, each traced in over its first bar |
+| `lsystem` | (none: Fern and Bush removed 2026-11-22; the kind stays) | one generation per 1-2 bars, each traced in over its first bar |
 | `attractor` | Clifford Attractor | parameters glide over 24-40 bars |
 
 ## GPU kinds (5O.6, render/FieldPipeline)
 
 Peter 2026-11-18: "build these". Not line segments: each live one draws into its own frame-sized RG8 texture
 (premultiplied luminance, alpha) that the sprite pass composites like a solid, so it gets Pen, `Flag`, the fade
-envelope and trails. Slots = `reforce.Organic.MaxLive`, allocated at startup.
+envelope and trails. Slots = `reforce.Object.MaxLive` + 1 (the spare for a crossfade), allocated at startup.
 
 - **ripples**: the wave equation on a 270-row grid (R32Float, three fields ping-ponged), substeps at <= .5 cells
   each (stable), damping exp(-dt / Decy), absorbing (a sponge) or reflecting edges. A drop is a Gaussian bump added as
@@ -147,15 +147,70 @@ envelope and trails. Slots = `reforce.Organic.MaxLive`, allocated at startup.
   phrase along the outside of the Mandelbrot set's main cardioid: always connected, so never dust), Julia Pulse
   (San Marco, swelling on every beat), Julia Bands (escape-count bands flowing in once per beat).
 
-GPU cost at 1920x1080: about 1 ms a frame for one live (Apple silicon, measured in the headless render). Tests:
-tests/test_render_fields.cpp (a ring's speed, stability, decay, reset; the set dark and its edge lit),
-tests/test_engine_organics.cpp (drops on the beat lines, DX / DY placement, Julia keys).
+- **mandel** (Peter 2026-11-22: "does a mandelbrot somehow cool ... zooming in is the usual cool thing"): an endless
+  Mandelbrot zoom on the beat clock (engine/MandelDive). Each dive (`Dive` bars, 16 = a phrase) heads for a target on
+  the set's edge in a seeded order, the magnification doubling every `Dbl` beats (2: about 2^30 by the end of a
+  phrase), easing in over the first beat and softly capped at `Deep`; over the last `Out` beats (4) it rushes back
+  out to the whole set, so the phrase line itself is seamless and the next dive starts from the same overview. The
+  view centre slides from the overview's centre to the target as it zooms (T + (H - T) 2^(-1.5 depth)). Beats: the
+  escape-count bands flow inward one band per beat; started mid-dive (by hand; from the slideshow the configs' `SBar`
+  waits for a dive line) it starts from the whole set and catches up at `Ent` doublings a beat; every beat line surges the zoom in by `Kick` doublings, relaxing
+  over the beat; a drop (SYNC_DROP) pulls out by `Drop` doublings with an 80 ms attack, then follows the drop's decay
+  over the bar and the dive resumes; the content turns the view slowly over the phrase (`Rot`).
+  Endings (Peter 2026-11-22: no more zooms into the "cross points"; minis "sound awesome if you can check what the
+  compute is"; more variety): 14 targets of four kinds (MandelKind), which take turns, never the same kind twice in a
+  row; each kind's targets in a seeded order. The sequence is shared by the whole process, so the next Mandelbrot
+  object carries on with the next dive (another kind) instead of starting over.
+  - Spiral (5): seahorse-valley Misiurewicz points with 2, 3, 4 and 5 arms (M(28,2), M(20,3), M(20,4), M(20,5)) and a
+    swirl in the period-5 bulb's valley (M(12,4)); spirals all the way down.
+  - Lace (2): elephant-valley Misiurewicz points M(13,3), M(12,2).
+  - Mini (4): a mini-Mandelbrot filling the frame like the whole set at the start, turned upright over the last 10
+    doublings: on the west antenna (period 13, 2^20, spiky antenna crown), in elephant valley (p19, 2^19, lace
+    around it), by the snowflake branch (p20, 2^19), south (p49, 2^31.5, a ring of fine teeth).
+  - Decor (3): the ring of Julia-like decorations a dive passes on its way to a deep mini, ending about half way down
+    (in log) centred on the mini: a swirl ring (p112 mini, 2^23), a spiral ring (p49, 2^27), a star (p32, 2^24).
+  Misiurewicz points (the boundary passes through each and looks the same at every depth) by Newton in 50 digits
+  from random seeds per valley, exact (k, p) checked; the branch points (top M(4,1), west antenna M(3,1), period-3
+  bulb M(10,2), south dendrite M(7,1)) dropped. Minis: the period a small box near a Misiurewicz point first
+  surrounds 0, the nucleus by Newton (f^p(0) = 0), the size by the estimate 1 / (b l^2); distorted ones (elephant
+  p15, double spiral p54) dropped, and the seahorse p936 at 2^27 (45 x 936 iterations a pixel: 236 ms).
+  Iterations follow the target: on the way a fit of the 99.5th percentile escape count over the dive's frames
+  (itA + itB depth, numpy) x `Itk` (1.5), at least `Iter`; landing on a mini they ramp to 45 x its period (the
+  99th percentile around a framed mini: about 14 % of the frame is inside, the outside's median 6 x period), on a
+  decoration 10 x. The inside of a mini: the shader maps each pixel into the mini's own coordinates
+  (w = (c - nucleus) / size) and skips the main cardioid and period-2 bulb (shrunk 10 %), about 85 % of the inside,
+  with no false insides against the CPU (render test, every mini, upright and turned); 33-40 % less GPU time
+  (`Aff` 0 turns it off). Tried and not worth it: derivative / periodicity interior tests (catch an inside pixel only
+  after ~37-53 periods), series approximation (the deltas stop being linear within one period).
+  Precision: float32 pixelates past ~2^17 (at 2^30 the whole frame is one float: one flat colour). Two deep paths,
+  both checked against a CPU double reference (the render test at 2^30, by hand at 2^33, 2^38, 2^44: > 99.9 % of
+  pixels shaded the same, except double-float at 2^44, 97 %):
+  double-float (float2 hi + lo, two-sum / fma two-product, ~48 bits, its own library compiled without fast math),
+  and perturbation (the view centre's orbit in double on the CPU each frame, each pixel iterating only its float
+  difference e' = 2 Z e + e^2 + dc, rebasing to the reference's start when |z| < |e|: no glitches, one reference).
+  The default (`Prec` 0) is float32 to 2^12, perturbation beyond; both stay clean to ~2^40 (the double centre is
+  the limit; df64 starts to drift at 2^44, perturbation holds). Shading comes from the distance estimate in pixels,
+  so it looks the same at every depth. Content (Peter's 2026-11-22 review): one config, Mandelbrot Dive: one dive of `Dive` bars (32; PBar="Dive", so
+  that one number sets the length), paced (Dbl 0) to 2^32 just before 4 bars out; from the slideshow it starts on a
+  phrase line (SBar 16). (Mandelbrot Abyss, a slower deeper variant, was folded into it.)
+  GPU cost at 1920x1080 (M4 Pro, headless render, whole frame, held at the ending; budget 10 ms): spirals 1.6-8.0 ms
+  (the double spiral the most), lace 1.1-1.3, minis 2.4 (p13) / 4.0 (p19) / 3.6 (p20) / 9.0 (p49) ms (without the
+  affine test 4.0 / 6.0 / 5.8 / 13.3), decorations 8.9 (p112 ring) / 2.6 / 1.7 ms. Not kept: minis p24 4.5, p32
+  5.7, p35 6.0 (look like p20), p112 27.8 ms (Res .75 14.7, .5 7.2). First measured (Peter 2026-11-22): float32
+  2.5 ms on the double spiral (wrong past 2^17), double-float 21 ms, perturbation 10 ms.
+
+GPU cost at 1920x1080: about 1 ms a frame for one live ripple or Julia (Apple silicon, measured in the headless
+render). Tests: tests/test_render_fields.cpp (a ring's speed, stability, decay, reset; the Julia set dark and its
+edge lit; the Mandelbrot dark inside and shaded like a CPU reference at depth 0 and 2^30 in double-float and
+perturbation, float32 flat there), tests/test_engine_organics.cpp (drops on the beat lines, DX / DY placement, Julia
+keys), tests/test_engine_mandel.cpp (depth on the beat clock, the rush out and the reset on the dive line, kicks,
+drops, the seeded target order, keys, junk).
 
 ## Groups (5O.7)
 
 Peter 2026-11-18: organics grouped by theme, browsable and selectable by theme. Each group is a category
-(content/Categories/Organic) with a theme of its own, `Organics: <group>` (CategoryExpr "+<group>", an organic every
-~30 s). The library API gives the organic layer `groups` [{name, theme}]; the Organics card lists the configs under
+(content/Categories/Object) with a theme of its own, `Objects: <group>` (CategoryExpr "+<group>", an organic every
+~30 s). The library API gives the organic layer `groups` [{name, theme}]; the Objects card lists the configs under
 group headings, its dropdown shows one group, and **▶ Play <group>** sets that theme (pressed again: back to
 Organics). The general library dropdowns stay theme-free.
 

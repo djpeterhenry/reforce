@@ -1,0 +1,4 @@
+ThemeName = "Objects: Pendulums"
+About = "reforce: everything as in (Standard), plus a pendulum wave that lines up on the phrase lines every 30 seconds or so."
+Object.CategoryExpr = "+Pendulums"
+Object.Slideshow.Interval.Duration = 30

@@ -1,4 +1,0 @@
-ThemeName = "Organics: Curves"
-About = "reforce: everything as in (Standard), plus a curve traced in time with the bars (harmonographs, a strange attractor) every 30 seconds or so."
-Organic.CategoryExpr = "+Curves"
-Organic.Slideshow.Interval.Duration = 30

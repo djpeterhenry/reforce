@@ -1,0 +1,4 @@
+ThemeName = "Objects: Solids"
+About = "reforce: everything as in (Standard), plus a spinning 3D solid every 30 seconds or so."
+Object.CategoryExpr = "+Solids"
+Object.Slideshow.Interval.Duration = 30

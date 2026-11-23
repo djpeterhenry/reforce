@@ -1,0 +1,4 @@
+ThemeName = "Objects: Trees"
+About = "reforce: everything as in (Standard), plus a growing tree or plant (Oak, Lightning, Neurons, Kelp Forest, Radial Bloom) every 30 seconds or so."
+Object.CategoryExpr = "+Trees"
+Object.Slideshow.Interval.Duration = 30

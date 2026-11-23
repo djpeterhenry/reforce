@@ -2,7 +2,7 @@
 // reforce extension (PLAN 5L.4, docs/3d-design.md): one live 3D solid from a scene file in reforce.Solid.package.
 //
 // Like a sprite (engine/Sprites.hpp): the config is evaluated per frame (scene::SolidInstance: B vars, then the pose
-// and shading keys), the lifetime is a fade-in / hold / fade-out envelope (FADER; PDur, else Solid.Duration), and
+// and shading keys), the lifetime is a fade-in / hold / fade-out envelope (FADER; PBar or PDur, else Object.Duration), and
 // Pen / EPen / Flag pick the sprite layering and blend of its composite. The GPU side is render/SolidPipeline.
 //
 // Scene keys (docs/scene-format.md "Solids"):
@@ -11,7 +11,7 @@
 //   Text   0 = the current WaveShape on the faces (default), 1 = the previous frame, 2 = flat
 //   Pers   1 = perspective (default), 0 = orthographic
 //   Flag   sprite blend flags (engine::sprite::Flag; 0 = keyed copy)
-//   PDur   seconds at full strength (else Solid.Duration)
+//   PDur   seconds at full strength (else Object.Duration)
 //   per frame: X Y Z (sprite convention, +-1 = the frame edges at z = 0; +z towards the viewer), Scal (circumradius
 //   in frame half-heights, default .5), RotX RotY RotZ (radians, applied X, then Y, then Z), Fill (.15), Shad (.6),
 //   Edge (.8), Pen, EPen (no Pen and no EPen: Pen 1).
@@ -22,6 +22,8 @@
 //   rubik / fifteen: Moves (load, 30; rubik 1..32, fifteen 1..64), Turn and Seed per frame (engine/Rubik.hpp,
 //   engine/Fifteen.hpp frameAt; no Turn = solved); fifteen: Shuf per frame (1).
 
+#include <algorithm>
+#include <cmath>
 #include <memory>
 #include <optional>
 #include <string>
@@ -72,6 +74,13 @@ public:
     const FadeEnvelope& envelope() const { return env_; }
     bool expired(double t) const { return t - start_ >= env_.total(); }
     void fadeOutFrom(double t, double outFade = -1.0) { env_.fadeOutAt(t - start_, outFade); }
+    // Past full strength (fading out or over) at `t`: no longer counts against MaxLive.
+    bool fadingOut(double t) const { return env_.fadingOut(t - start_); }
+    // PBar (NaN when absent) and an explicit hold in seconds (PBar through engine::holdForBars).
+    double bars() const { return inst_->bars(); }
+    void setHold(double seconds) {
+        if (std::isfinite(seconds) && seconds >= 0) env_.hold = std::min(seconds, 24.0 * 3600.0);
+    }
 
     SolidSpec evaluate(double t, const SpriteAudio& audio = {});
 

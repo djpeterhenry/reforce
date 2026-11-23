@@ -128,10 +128,9 @@ struct Settings {
     LayerPrefs particle{6, 0.02, 0.9, "1-(1-t)^1.5", 120, 0.1, 25};
     LayerPrefs sprite{6, 0.02, 0.9, "1-(1-t)^1.5", 240, 0.1, 45};
     LayerPrefs union_{6, 0.02, 0.9, "1-(1-t)^1.5", 210, 0.1, 0};
-    // reforce-only (PLAN 5L.4): Solid.* keys like Sprite.*; interval 0 = none from the slideshow (manual + Themes).
-    LayerPrefs solid{4, 0.02, 0.9, "1-(1-t)^1.5", 0, 0.1, 40};
-    // reforce-only (PLAN 5N): Organic.* keys like Solid.*.
-    LayerPrefs organic{4, 0.02, 0.9, "1-(1-t)^1.5", 0, 0.1, 40};
+    // reforce-only: Objects (solids and organics, one layer since 2026-11-22): Object.* keys like Sprite.*; interval
+    // 0 = none from the slideshow (manual + Themes).
+    LayerPrefs object{4, 0.02, 0.9, "1-(1-t)^1.5", 0, 0.1, 40};
     // reforce-only (PLAN 5P): Dancer.* keys like Solid.* (Duration = seconds on stage; fade = the exit).
     LayerPrefs dancer{2, 0.02, 0.9, "1-(1-t)^1.5", 0, 0.1, 90};
 
@@ -165,6 +164,8 @@ struct Settings {
     std::string movieSpriteColour = "off";    // reforce.MovieSprite.Colour: off (G-Force: movie sprites are luminance in
                                               //   the intensity buffer) | over (their full-colour frames are drawn
                                               //   over the colorized frame, alpha = envelope x (0.5 + 0.5 Mix))
+    int movieSpriteMaxLive = 1;               // reforce.MovieSprite.MaxLive: movie / live video sprites at full strength at
+                                              // once (0 = no limit); like Object.MaxLive
     double movieSpriteGamma = 1.0;            // reforce.MovieSprite.Gamma: luminance gamma of movie and live sprites
                                               //   (> 0, below 1 brightens; times a movie's own Gamma in .reforce.txt)
     bool videoSpriteLoop = false;             // reforce.Video.Sprite.Loop: movie sprites loop for their lifetime
@@ -203,12 +204,13 @@ struct Settings {
     BodySettings body;                        // reforce.Body.*: body tracking on the backdrop camera (docs/body.md)
     LightsSettings lights;                    // reforce.Lights.*: Nanoleaf room lights following the visuals (docs/lights.md)
     // reforce-only: 3D solids (PLAN 5L, docs/3d-design.md).
-    int solidMaxLive = 3;                     // reforce.Solid.MaxLive: solid render targets (live solids at once)
+    int objectMaxLive = 1;                    // reforce.Object.MaxLive: objects (solids and organics) at full
+                                              // strength at once (a new one fades the oldest out under it; one render
+                                              // target more for solids and GPU organics, for that crossfade)
     int solidMsaa = 4;                        // reforce.Solid.Msaa: 4 (4x MSAA edges) | 1
     int solidTileSize = 512;                  // reforce.Solid.TileSize: face texture tiles (WaveShape / frame), px
     std::string solidDir;                     // reforce.Solid.Dir: extra folder of solid scene files (any layout)
     // reforce-only: Organics (PLAN 5N, docs/organics-design.md).
-    int organicMaxLive = 3;                   // reforce.Organic.MaxLive: live organics at once (a new one replaces the oldest)
     int organicMaxNodes = 6000;               // reforce.Organic.MaxNodes: a tree stops growing here
     // reforce-only: Dancers (PLAN 5P, docs/dancers-design.md). The panel's Dancers card saves Floor .. Height.
     int dancerMaxLive = 5;                    // reforce.Dancer.MaxLive: dancers on stage (a new one replaces the oldest)
@@ -244,6 +246,9 @@ struct Settings {
                                               //   | off (beat / bar: Link only; phrase: the phrase clock, PLAN 5O.1)
     std::string linkQuantizeManual = "beat";  // reforce.Link.QuantizeManual: manual switches wait for bar | beat | phrase
                                               //   | off
+    bool slideshowOneFeature = true;          // reforce.Slideshow.OneFeature: the slideshow starts a solid, an organic or a
+                                              // movie sprite only while none of the three is at full strength (Peter
+                                              // 2026-11-22: "too busy"); manual starts are not held back
     std::string spawnQuantize = "off";        // reforce.Quantize.Spawn: slideshow particles / sprites / solids /
                                               //   organics wait for the next beat | bar | phrase line, or off
     // Phrases (PLAN 5O.1, sync/PhraseClock.hpp).

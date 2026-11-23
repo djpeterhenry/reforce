@@ -1,0 +1,8 @@
+Vers=100
+Meta="reforce organic: a ball flying at a steady speed through a wall of bricks, every paddle and brick hit on a beat, one brick per hit, the paddle always there; the last brick breaks exactly on the phrase line, then a new wall drops in. A drop splits the ball; through a breakdown the hits land on 8ths."
+Kind="bricks"
+PBar="32"
+Cols="10"
+Rows="3"
+Spd="1.5"
+Cyc="16"

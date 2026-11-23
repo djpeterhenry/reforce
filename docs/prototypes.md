@@ -60,7 +60,7 @@ The seven trees from earlier (Oak … Radial Bloom) are unchanged. In a scene:
 
 These draw on the GPU (about 1 ms a frame), into their own texture, and trail like the rest.
 
-**Groups:** the Organics card's library now lists every organic under its group (Trees, Pendulums, Spirals, Curves,
+**Groups:** the Objects card's library now lists every organic under its group (Trees, Pendulums, Spirals, Curves,
 Cells, Water, Fractals). Pick a group in its dropdown to see only that group, and **▶ Play <group>** to switch to
 that group's theme (`Organics: Water` ...): the slideshow then grows only that group, one every ~30 s. Press it again
 (✓ Playing ...) to go back to the Organics theme. The group themes are also in the Theme menu at the top.
@@ -77,7 +77,7 @@ that group's theme (`Organics: Water` ...): the slideshow then grows only that g
 - Design and tuning notes: [rhythm-design.md](rhythm-design.md) (phrases, kick zoom, drops, new kinds),
   [organics-design.md](organics-design.md) (trees), keys in [scene-format.md](scene-format.md) §3.5 and §5.8.
 - Code: `src/sync/PhraseClock.*`, `src/sync/DropDetector.*`, `src/engine/OrganicKinds.*` (new kinds),
-  `src/render/FieldPipeline.*` (ripples, Julia), groups in `content/Categories/Organic/` and `content/Themes/`,
+  `src/render/FieldPipeline.*` (ripples, Julia), groups in `content/Categories/Object/` and `content/Themes/`,
   `src/engine/Organics.*` (trees, pendulums), kick zoom in `src/render/ScenePipeline.cpp` (`kick_src`), Rhythm panel in
   `src/web/ui/`.
 - Tests: `tests/test_sync_phrase.cpp`, `tests/test_sync_drop.cpp`, `tests/test_engine_organics.cpp`,

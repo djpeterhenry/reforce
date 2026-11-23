@@ -1,0 +1,9 @@
+Vers=100
+Meta="reforce organic: an invader march (our own aliens: gazers, moths and boxbots), one step per beat, stepping down a row at the edge; the march hurries to 8ths, then 16ths, through a breakdown. A cannon below shoots on the 8ths and the hit aliens burst into their pixels; a saucer is shot down on bar 12 of each phrase; a fresh wave every 16 bars; a drop blows up the whole formation. Nobody shoots back."
+Kind="invaders"
+PBar="32"
+Cols="11"
+Rows="5"
+Rate="1"
+Fire="2"
+Wave="16"

@@ -1,9 +1,0 @@
-Vers=100
-Meta="reforce organic: an L-system bush, a generation every bar, traced in on the bar; its branching angle breathes with the bass."
-Kind="lsystem"
-Axm="F"
-R1="F=FF+[+F-F-F]-[-F+F+F]"
-Gens="4"
-Rate="1"
-Wdth="1.6"
-Ang="22.5 + 6 * BASS"

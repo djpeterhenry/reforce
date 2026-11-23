@@ -215,6 +215,20 @@ void Visualizer::adoptSprites(double t) {
             const double len = video::playLength(p.video->spec(), p.video->duration());
             if (len > 0) run->fitLifetime(len);
         }
+        // reforce.MovieSprite.MaxLive (reforce extension): movie / live video sprites at full strength at once; the
+        // oldest of those fades out under the new one (over its fade-in), even one looping until stopped.
+        if (p.video && opts_.prefs.movieSpriteMaxLive > 0) {
+            const auto active = [&](const LiveSprite& s) { return s.video && !s.run->fadingOut(t); };
+            while (std::count_if(sprites_.begin(), sprites_.end(), active) >= opts_.prefs.movieSpriteMaxLive) {
+                auto it = std::find_if(sprites_.begin(), sprites_.end(), active);
+                rlog("[reforce] Sprite \"%s\" makes way for \"%s\": fading out over %.2f s "
+                     "(reforce.MovieSprite.MaxLive %d)\n",
+                     it->run->name().c_str(), p.label.c_str(), p.fade.fade, opts_.prefs.movieSpriteMaxLive);
+                it->held = false;
+                it->run->fadeOutFrom(t, p.fade.fade);
+                if (!it->run->fadingOut(t)) break;
+            }
+        }
         // A new EPen-only ("background") sprite fades out the running ones (probe #44);
         // with reforce.SpriteReplace = own only those of its kind (image vs video).
         if (!run->hasPen()) {
@@ -323,6 +337,26 @@ int Visualizer::holdVideoSprites() {
         }
     rlog("[reforce] %d video sprite(s) loop until stopped\n", n);
     return n;
+}
+
+bool Visualizer::movieRoom(double t) const {
+    const int cap = opts_.prefs.movieSpriteMaxLive;
+    if (cap <= 0) return true;
+    long n = std::count_if(sprites_.begin(), sprites_.end(), [&](const LiveSprite& s) { return s.video && !s.run->fadingOut(t); });
+    n += std::count_if(spritePending_.begin(), spritePending_.end(), [](const PendingSprite& p) { return bool(p.video); });
+    return n < cap;
+}
+
+bool Visualizer::featureActive(double t) const {
+    for (const auto& s : liveSolids_)
+        if (!s.run->fadingOut(t)) return true;
+    for (const auto& o : organics_)
+        if (!o->fadingOut(t)) return true;
+    for (const auto& s : sprites_)
+        if (s.video && !s.run->fadingOut(t)) return true;
+    for (const auto& p : spritePending_)
+        if (p.video) return true;
+    return false;
 }
 
 bool Visualizer::videoSpritesHeld() const {

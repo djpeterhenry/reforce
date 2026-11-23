@@ -16,8 +16,7 @@ const char* layerName(Layer l) {
         case Layer::Union: return "FlowField Union";
         case Layer::Particle: return "Particle";
         case Layer::Sprite: return "Sprite";
-        case Layer::Solid: return "Solid";
-        case Layer::Organic: return "Organic";
+        case Layer::Object: return "Object";
         case Layer::Dancer: return "Dancer";
     }
     return "?";
@@ -34,8 +33,7 @@ std::optional<Layer> parseLayer(const std::string& s) {
     if (k == "flowfieldunion" || k == "union") return Layer::Union;
     if (k == "particle" || k == "particles") return Layer::Particle;
     if (k == "sprite" || k == "sprites") return Layer::Sprite;
-    if (k == "solid" || k == "solids") return Layer::Solid;
-    if (k == "organic" || k == "organics") return Layer::Organic;
+    if (k == "object" || k == "objects") return Layer::Object;
     if (k == "dancer" || k == "dancers") return Layer::Dancer;
     return std::nullopt;
 }

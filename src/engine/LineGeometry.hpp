@@ -85,7 +85,8 @@ struct FrameMapping {
 struct LineSegment {
     float ax, ay, bx, by;  // pixels
     float penA, penB;      // intensity 0..1 at a and b
-    float radius;          // half the width, pixels (may be < 0.5, see LineStyle::minWidthPx)
+    float radius;          // half the width, pixels (may be < 0.5, see LineStyle::minWidthPx); negative = the same
+                           // width with a hard edge (no anti-aliasing: organic cells, OrganicCanvas::dotUnits)
     float path = 0;        // path id: index of the path's first segment in the output (per-path AA)
 };
 static_assert(sizeof(LineSegment) == 32);

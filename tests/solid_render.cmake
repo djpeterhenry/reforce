@@ -188,9 +188,9 @@ if(right_min LESS 35 OR right_sd LESS 10 OR right_max LESS 120)
 endif()
 
 # ---- phase 4 (PLAN 5L.4): solid scene files (reforce.Solid.package under --content), started by command or theme.
-# A scene file with the pose of the msaa4 run above (no fade: Solid.Transition.Duration.Quick = 0) must give the very
+# A scene file with the pose of the msaa4 run above (no fade: Object.Transition.Duration.Quick = 0) must give the very
 # same frame as the test hook; a moving Text=0 solid renders the same twice (deterministic); a theme with
-# Solid.Slideshow.Interval.Duration starts solids from the slideshow.
+# Object.Slideshow.Interval.Duration starts solids from the slideshow.
 set(C "${WORK_DIR}/content/Packages/reforce.Solid.package")
 file(WRITE "${C}/Probe.txt"
      "Vers=100\nMesh=\"cube\"\nText=\"2\"\nRotX=\".5\"\nRotY=\".7\"\nScal=\".6\"\nPen=\"1\"\nFlag=\"0\"\n")
@@ -198,7 +198,7 @@ file(WRITE "${C}/Drift.txt"
      "Vers=100\nMesh=\"icosahedron\"\nText=\"0\"\nB0=\"t - START_TIME\"\nX=\".3 * sin(B0)\"\nZ=\".5 * sin(.7 * B0)\"\n"
      "RotX=\".35\"\nRotY=\".5 * B0\"\nPen=\"1\"\nFlag=\"0\"\n")
 file(WRITE "${WORK_DIR}/content/Themes/Solids Test.txt"
-     "ThemeName = \"Solids Test\"\nSolid.Slideshow.Interval.Duration = 0.5\n")
+     "ThemeName = \"Solids Test\"\nObject.Slideshow.Interval.Duration = 0.5\n")
 
 function(scene_run name frames)
     set(OUT "${WORK_DIR}/${name}")
@@ -208,7 +208,7 @@ function(scene_run name frames)
         COMMAND "${REFORCE}" --no-settings --no-audio --deterministic --render-frames ${frames} --fps 60
                 --render-size 640x360 --scenes "${WORK_DIR}/scenes" --content "${WORK_DIR}/content"
                 --flowfield Void --colormap Gray --set ColorMap.MapFunction=i
-                --set Solid.Transition.Duration.Quick=0 ${ARGN}
+                --set Object.Transition.Duration.Quick=0 ${ARGN}
                 --out "${OUT}" --save-frames ${last}
         RESULT_VARIABLE rc
         OUTPUT_VARIABLE out
@@ -224,7 +224,7 @@ function(scene_run name frames)
     set(${name}_log "${err}" PARENT_SCOPE)
 endfunction()
 
-scene_run(scene_probe 3 --slideshow off --waveshape Off --command "0=switch:solid:Probe")
+scene_run(scene_probe 3 --slideshow off --waveshape Off --command "0=switch:object:Probe")
 file(SHA256 "${scene_probe_png}" h_scene)
 file(SHA256 "${WORK_DIR}/msaa4/frame_00002.png" h_hook)
 if(NOT h_scene STREQUAL h_hook)
@@ -235,8 +235,8 @@ if(NOT scene_probe_log MATCHES "Solid \"Probe\" starts: cube, Text=2")
     message(FATAL_ERROR "scene_probe: no start line in the log:\n${scene_probe_log}")
 endif()
 
-scene_run(scene_drift_a 30 --slideshow off --waveshape Bars --command "0=switch:solid:Drift")
-scene_run(scene_drift_b 30 --slideshow off --waveshape Bars --command "0=switch:solid:Drift")
+scene_run(scene_drift_a 30 --slideshow off --waveshape Bars --command "0=switch:object:Drift")
+scene_run(scene_drift_b 30 --slideshow off --waveshape Bars --command "0=switch:object:Drift")
 file(SHA256 "${scene_drift_a_png}" ha)
 file(SHA256 "${scene_drift_b_png}" hb)
 if(NOT ha STREQUAL hb)
@@ -248,8 +248,8 @@ if(NOT rc EQUAL 0 OR NOT bout MATCHES "bbox ([0-9]+) ([0-9]+) ([0-9]+) ([0-9]+) 
 endif()
 
 scene_run(scene_theme 75 --slideshow on --waveshape Off --theme "Solids Test"
-          --set Solid.Slideshow.Interval.Duration.Deviation=0)
-string(REGEX MATCHALL "Solid \\+ \"[A-Za-z]+\" \\(slideshow" starts "${scene_theme_log}")
+          --set Object.Slideshow.Interval.Duration.Deviation=0)
+string(REGEX MATCHALL "Object \\+ \"[A-Za-z]+\" \\(slideshow" starts "${scene_theme_log}")
 list(LENGTH starts ns)
 if(ns LESS 1)
     message(FATAL_ERROR "scene_theme: the theme started no solid:\n${scene_theme_log}")

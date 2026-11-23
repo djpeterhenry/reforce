@@ -1,5 +1,5 @@
 Vers=100
-Meta="reforce organic: a seed in the middle of the frame branches out in every direction into a slowly turning bloom; buds open on the bar line."
+Meta="reforce organic: a seed in the middle of the frame branches out in every direction into a slowly turning bloom that shivers outwards on every beat, its branches ringing at different rates by depth, harder on the bar line and on a drop; buds open on the bar line."
 Kind="tree"
 Pts="500"
 // a ring: denser towards the outside
@@ -19,7 +19,12 @@ Tip=".8"
 BudW="6"
 B0="t - START_TIME"
 B1="SYNC_ON * SYNC_BEAT + (1 - SYNC_ON) * 2 * B0"
+// bars: the phrase clock's when locked
+B2="SYNC_ON * SYNC_BAR + (1 - SYNC_ON) * B1 / 4"
 Grow="8 * (1 + 2 * exp(-5 * wrap(B1)))"
 Sway=".1"
 Rot=".08 * B0"
-Bud="exp(-2.5 * wrap(B1 / 4))"
+// vibration: pushed out on every beat line and ringing (VibF cycles per beat at the tips), dying away within the beat
+VibF="3"
+Vib=".09 * exp(-5 * wrap(B1)) * (1 + (wrap(B2) < .25) + 2 * SYNC_DROP)"
+Bud="exp(-2.5 * wrap(B2))"

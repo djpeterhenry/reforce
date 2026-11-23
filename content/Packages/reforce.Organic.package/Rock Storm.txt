@@ -1,0 +1,12 @@
+Vers=100
+Meta="reforce organic: a busy rock field: six large rocks a wave and a fresh wave every 8 bars, the ship firing 16th notes and splitting a rock on every half beat; faster rocks, so the trails fill with shards. A drop shatters the lot."
+Kind="rocks"
+PBar="32"
+Num="6"
+Fire="4"
+Hits="2"
+Spd=".2"
+Wdth="1.1"
+Size="1"
+Wave="8"
+Glow=".35"

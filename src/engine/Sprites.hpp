@@ -220,6 +220,7 @@ public:
     bool expired(double t) const { return t - start_ >= env_.total(); }
     // Starts the fade-out now over `outFade` seconds (< 0: its own fade).
     void fadeOutFrom(double t, double outFade = -1.0, bool linear = false) { env_.fadeOutAt(t - start_, outFade, linear); }
+    bool fadingOut(double t) const { return env_.fadingOut(t - start_); }
     // "Loop until stopped" (control panel): full and held until a stop/kill fades it out.
     void holdForever() {
         env_.hold = 1e12;

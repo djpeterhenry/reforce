@@ -1,0 +1,12 @@
+Vers=100
+Meta="reforce organic: vector rocks drifting through a wrapping field and a turret ship firing on the 8th notes; the shot on every other beat line splits a rock (the others chip it), large into medium into small into a burst of its own outline. Fresh rocks drift in on the phrase lines; a drop sends out a shockwave that shatters the field, a breakdown doubles the fire rate."
+Kind="rocks"
+PBar="32"
+Num="4"
+Fire="2"
+Hits=".5"
+Spd=".12"
+Wdth="1.1"
+Size="1"
+Wave="16"
+Glow=".35"

@@ -1,0 +1,13 @@
+CategoryTitle = "Arcade"
+Include.List = "
+Invader
+Rock Field
+Rock Storm
+Pyramid
+Brick Wall
+Brick Storm
+Chase Normal
+Chase Swarm
+(Chase Normal Top)
+(Chase Swarm Top)
+"

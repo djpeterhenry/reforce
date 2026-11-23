@@ -711,6 +711,10 @@ card. Peter away while built: **all of it waits for Peter to try**.
 - [x] 5O.6 GPU kinds (render/FieldPipeline, Peter 2026-11-18 "build these"): `ripples` (wave equation, a drop on the
   beat) and `julia` (Julia sets); content Kick Ripples, Rain on a Pond, Ripple Ring, Julia Drift, Julia Pulse, Julia
   Bands. Drawn into their own texture and composited like solids.
+- [x] Peter (2026-11-22, "a mandelbrot somehow cool ... zooming in"): GPU kind `mandel` (engine/MandelDive): a
+  phrase-long dive per target (ten Misiurewicz points), a doubling every 2 beats, a rush back out on the line, bands
+  on the beat, kick surges, drops pull out; float32 shallow, perturbation deep (double-float kept as an option);
+  content Mandelbrot Dive, Mandelbrot Abyss (Fractals). docs/rhythm-design.md "GPU kinds".
 - [x] 5O.7 Organics grouped by theme (Peter 2026-11-18): categories Trees, Pendulums, Spirals, Curves, Cells, Water,
   Fractals (content/Categories/Organic) with a theme each ("Organics: Trees", ...); the Organics card lists them
   under group headings, filters by group and plays a group (switches to its theme).
@@ -767,6 +771,44 @@ within each style a lot of variety"; "the rest of the visuals act as the lightin
 - [ ] 5P.5 Peter tries it; tune looks / moves.
 - [ ] Later: friends' faces (`Face=` image on the face), props, solos and spotlights, a trail silhouette into the
   feedback, walk-ons.
+
+### 5Q. Arcade organics: game-inspired visuals on the beat  (Peter, 2026-11-22)  `[~]`
+Peter: "develop a few video-game inspired visuals in parallel" (Space Invaders, Q*bert, Tron), "inputs to the flow
+field", "beat-synchronized". Decided 2026-11-22: drawn into the feedback only for now (the game "stirring" the warp is
+a later option); light cycles top-down; the pyramid as line art; the invaders never shoot back and the player never
+dies. Our own art and names (the repo is public). Design: docs/arcade-design.md.
+- [x] 5Q.0 Groundwork: Organic kinds `invaders`, `hopper`, `cycles` (engine/arcade/, one file each), filled shapes on
+  the OrganicCanvas (`fillPolygon`, `rect`, `bitmap`, `newPath`), tests/arcade_harness.hpp.
+- [x] 5Q.1 `invaders` (Invaders.cpp, content, tests): Invader March, Invader Swarm (Invader / Rock / Brick Drift removed 2026-11-22, Peter)
+- [x] 5Q.2 `hopper` (Hopper.cpp, content, tests): Pyramid Hop, Pyramid Cascade, Pyramid Mini
+- [x] 5Q.3 `cycles` (Cycles.cpp, content, tests): Trail Racers, Trail Duel, Trail Swarm
+- [ ] 5Q.4 Arcade group + theme, usage.md, Peter tries it.
+- [x] 5Q.5 `rocks` (Rocks.cpp: Asteroids-inspired; Peter 2026-11-22 "start asteroids-style and breakout-style"): Rock Field, Rock Storm
+- [x] 5Q.6 `bricks` (Bricks.cpp: Breakout-inspired): Brick Wall, Brick Storm
+- [x] 5Q.7 One at a time (Peter 2026-11-22: "at most one of each of movie sprites, organics, and solids"; then "slideshows only have 1 of the three active at a time": reforce.Slideshow.OneFeature, 1):
+  `reforce.Solid.MaxLive` and `reforce.Organic.MaxLive` default 1 (were 3), new `reforce.MovieSprite.MaxLive` (1);
+  MaxLive counts pieces at full strength, a new one fades the oldest out under it (one spare render target for the
+  crossfade), a due slideshow start waits until the live one starts fading out. `PBar` (solids, organics): the hold in
+  bars, ending on a bar line or, for whole phrases, a phrase line (engine::holdForBars).
+- [x] 5Q.8 `chase` (Chase.cpp; Peter 2026-11-22: "something more inspired by the [light-cycle] movies. A 3D view
+  following a motorcycle dynamically"): the cycles game (CyclesSim) seen in perspective from a chase camera, drawn as
+  3D line art into the feedback.
+- [-] 5Q.9 `maze`: built, then dropped (Peter 2026-11-22: no round critter with a wedge mouth, which is the famous
+  character; a gulping blob did not convince him either).
+- [x] 5Q.10 Objects (Peter 2026-11-22: "unify them into one layer for me but keep separate rendering paths
+  underneath", name "Objects", the full merge): Layer::Object replaces Layer::Solid and Layer::Organic (kLayerCount 8);
+  one catalog (solids, then organics; Director::entryType says which), one card, one timer, Object.* settings and theme
+  keys (old Solid.* / Organic.* read as fallbacks), reforce.Object.MaxLive counting both, groups in
+  content/Categories/Object (plus Solids, Puzzles), themes "Objects" / "Objects: <group>", commands and favourites
+  accept solid / organic as object.
+- [x] 5Q.11 Trees (Peter 2026-11-22): Bush, Fern, Roots, Willow removed; Lightning strikes 4 times a bar apart from new
+  points on the top edge (Strk, SGap); Oak sways over 2 beats about a fixed base (SwyB); Radial Bloom pushes out and
+  rings on every beat (Vib, VibF); Neurons fire action potentials along their dendrites on the beat, cascading from
+  neuron to neuron, all at once on a drop (Puls, PAll, PlsB, PlsE). docs/organics-design.md "Trees on the beat".
+- [x] 5Q.12 Chase bikes: three designs (Bike = Arc, Blade, Orb), wheels glowing rings rolling at their real speed,
+  more glow; Arc for every config (Peter picked it; the comparison configs and a headlight beam were removed).
+- [ ] Later: the games stir the warp (a low-res displacement added to the flow pass: explosions push, landings ripple,
+  cycles leave a wake).
 
 ### Fidelity choices: match G-Force vs do it right  (Peter, 2026-11-11)  `[ ]` Peter to decide defaults
 Past decisions that copy a G-Force quirk. "Option" = can already switch it; "Proposed" = what the "done right" option

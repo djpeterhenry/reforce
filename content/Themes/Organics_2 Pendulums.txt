@@ -1,4 +1,0 @@
-ThemeName = "Organics: Pendulums"
-About = "reforce: everything as in (Standard), plus a pendulum wave that lines up on the phrase lines every 30 seconds or so."
-Organic.CategoryExpr = "+Pendulums"
-Organic.Slideshow.Interval.Duration = 30

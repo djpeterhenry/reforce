@@ -129,7 +129,7 @@ std::string validateLook(const Command& c);
 //   G-Force's StartParticle: the regular Transition.Duration), next:particle
 //   starts the next of the playlist (quick), kill:particle|sprite fades all out
 //   over Transition.Duration.Quick. Solids (PLAN 5L.4) work like particles:
-//   switch:solid:NAME, next:solid, kill:solid.
+//   switch:object:NAME, next:object, kill:object (Objects: solids and organics).
 //   Video (Phase 5F): video:layer:SOURCE plays SOURCE on the colour video layer
 //   (crossfade), video:sprite:SOURCE starts it as a movie/live sprite;
 //   SOURCE = file:PATH | camera[:ID] | syphon:NAME | a name from the video

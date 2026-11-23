@@ -39,8 +39,7 @@ const engine::LayerPrefs& layerPrefs(const engine::Settings& p, Layer l) {
         case Layer::Union: return p.union_;
         case Layer::Particle: return p.particle;
         case Layer::Sprite: return p.sprite;
-        case Layer::Solid: return p.solid;
-        case Layer::Organic: return p.organic;
+        case Layer::Object: return p.object;
         case Layer::Dancer: return p.dancer;
     }
     return p.waveShape;
@@ -50,12 +49,13 @@ const engine::LayerPrefs& layerPrefs(const engine::Settings& p, Layer l) {
 
 Director::Director(std::unique_ptr<Visualizer> vis, const engine::Settings& prefs, const DirectorOptions& opts)
     : vis_(std::move(vis)), prefs_(prefs), opts_(opts), rng_(opts.seed), spawnRng_(opts.seed * 7919 + 17) {
-    const Layer ls[9] = {Layer::WaveShape, Layer::ColorMap, Layer::FlowField, Layer::Union, Layer::Particle,
-                         Layer::Sprite,    Layer::Solid,    Layer::Organic,   Layer::Dancer};
-    const SceneType ts[9] = {SceneType::WaveShape, SceneType::ColorMap, SceneType::FlowField,
+    // Objects hold two scene types (solids and organics, objectSolids_ says which); d.type is Organic for them.
+    const Layer ls[8] = {Layer::WaveShape, Layer::ColorMap, Layer::FlowField, Layer::Union, Layer::Particle,
+                         Layer::Sprite,    Layer::Object,   Layer::Dancer};
+    const SceneType ts[8] = {SceneType::WaveShape, SceneType::ColorMap, SceneType::FlowField,
                              SceneType::FlowFieldUnion, SceneType::Particle, SceneType::Sprite,
-                             SceneType::Solid,     SceneType::Organic,  SceneType::Dancer};
-    for (int i = 0; i < 9; ++i) {
+                             SceneType::Organic,   SceneType::Dancer};
+    for (int i = 0; i < 8; ++i) {
         LayerData& d = layers_[std::size_t(i)];
         d.layer = ls[i];
         d.type = ts[i];
@@ -66,45 +66,37 @@ Director::Director(std::unique_ptr<Visualizer> vis, const engine::Settings& pref
         if (!d.fn->error().empty())
             rlog("[reforce] %s.Transition.Function \"%s\": %s (using t)\n", engine::layerName(ls[i]),
                          lp.transitionFunction.c_str(), d.fn->error().c_str());
-        if (!opts.scenesDir.empty()) d.catalog = engine::listScenes(opts.scenesDir, ts[i]);
+        if (!opts.scenesDir.empty() && ls[i] != Layer::Object) d.catalog = engine::listScenes(opts.scenesDir, ts[i]);
     }
-    // Solids: reforce's own content (committed), then G-Force-style scenes/, then reforce.Solid.Dir ("Extra/...").
+    // Objects: solids (reforce's own content, then G-Force-style scenes/, then reforce.Solid.Dir as "Extra/...") and
+    // organics (content, then scenes/); the first of an id wins.
     {
-        LayerData& solids = layers_[6];
-        auto add = [&](std::vector<engine::SceneEntry> more) {
+        LayerData& objects = layers_[6];
+        const auto excludeRules = engine::parseExcludeList(prefs.exclude);
+        auto add = [&](std::vector<engine::SceneEntry> more, SceneType type) {
+            engine::removeExcluded(more, type, excludeRules);
             for (auto& e : more) {
-                const bool dup = std::any_of(solids.catalog.begin(), solids.catalog.end(),
+                const bool dup = std::any_of(objects.catalog.begin(), objects.catalog.end(),
                                              [&](const engine::SceneEntry& c) { return lower(c.id) == lower(e.id); });
-                if (!dup) solids.catalog.push_back(std::move(e));
+                if (dup) continue;
+                if (type == SceneType::Solid) objectSolids_.insert(lower(e.id));
+                objects.catalog.push_back(std::move(e));
             }
         };
-        std::vector<engine::SceneEntry> fromScenes = std::move(solids.catalog);
-        solids.catalog.clear();
-        if (!opts.contentDir.empty()) add(engine::listScenes(opts.contentDir, SceneType::Solid));
-        add(std::move(fromScenes));
-        if (!prefs.solidDir.empty()) add(engine::listSceneFolder(prefs.solidDir, SceneType::Solid, "Extra/"));
-        solidInterval_ = prefs.solid.slideshowInterval;
-        if (!solids.catalog.empty())
-            rlog("[reforce] solids: %zu scene file(s)%s%s\n", solids.catalog.size(),
-                 opts.contentDir.empty() ? "" : ", content ", opts.contentDir.string().c_str());
-    }
-    // Organics (PLAN 5N): reforce's own content, then G-Force-style scenes/.
-    {
-        LayerData& organics = layers_[7];
-        std::vector<engine::SceneEntry> fromScenes = std::move(organics.catalog);
-        organics.catalog.clear();
-        if (!opts.contentDir.empty()) organics.catalog = engine::listScenes(opts.contentDir, SceneType::Organic);
-        for (auto& e : fromScenes) {
-            const bool dup = std::any_of(organics.catalog.begin(), organics.catalog.end(),
-                                         [&](const engine::SceneEntry& c) { return lower(c.id) == lower(e.id); });
-            if (!dup) organics.catalog.push_back(std::move(e));
-        }
-        organicInterval_ = prefs.organic.slideshowInterval;
-        if (!organics.catalog.empty()) rlog("[reforce] organics: %zu scene file(s)\n", organics.catalog.size());
+        if (!opts.contentDir.empty()) add(engine::listScenes(opts.contentDir, SceneType::Solid), SceneType::Solid);
+        if (!opts.scenesDir.empty()) add(engine::listScenes(opts.scenesDir, SceneType::Solid), SceneType::Solid);
+        if (!prefs.solidDir.empty())
+            add(engine::listSceneFolder(prefs.solidDir, SceneType::Solid, "Extra/"), SceneType::Solid);
+        if (!opts.contentDir.empty()) add(engine::listScenes(opts.contentDir, SceneType::Organic), SceneType::Organic);
+        if (!opts.scenesDir.empty()) add(engine::listScenes(opts.scenesDir, SceneType::Organic), SceneType::Organic);
+        objectInterval_ = prefs.object.slideshowInterval;
+        if (!objects.catalog.empty())
+            rlog("[reforce] objects: %zu scene file(s) (%zu solids, %zu organics)\n", objects.catalog.size(),
+                 objectSolids_.size(), objects.catalog.size() - objectSolids_.size());
     }
     // Dancers (PLAN 5P): reforce's own content, then G-Force-style scenes/.
     {
-        LayerData& dancers = layers_[8];
+        LayerData& dancers = layers_[7];
         std::vector<engine::SceneEntry> fromScenes = std::move(dancers.catalog);
         dancers.catalog.clear();
         if (!opts.contentDir.empty()) dancers.catalog = engine::listScenes(opts.contentDir, SceneType::Dancer);
@@ -139,8 +131,9 @@ Director::Director(std::unique_ptr<Visualizer> vis, const engine::Settings& pref
             sprites.catalog.push_back(e);
         }
     }
-    for (int i = 0; i < 9; ++i) {
+    for (int i = 0; i < 8; ++i) {
         LayerData& d = layers_[std::size_t(i)];
+        if (d.layer == Layer::Object) continue;  // excluded per scene type while listing
         if (const std::size_t n = engine::removeExcluded(d.catalog, d.type, excludeRules))
             rlog("[reforce] reforce.Exclude: %zu %s(s) skipped\n", n, std::string(scene::sceneTypeName(d.type)).c_str());
     }
@@ -178,14 +171,34 @@ Director::Director(std::unique_ptr<Visualizer> vis, const engine::Settings& pref
     // (sprite params, .png ColorMaps decoded), so switches find them ready.
     // The upcoming ones are moved to the front as the slideshow arms.
     for (LayerData& d : layers_)
-        for (const auto& e : d.catalog) vis_->prefetchConfig(e.path, d.type);
+        for (const auto& e : d.catalog) vis_->prefetchConfig(e.path, entryType(d, e));
+}
+
+double Director::startBars(const LayerData& d, const engine::SceneEntry& e) {
+    if (d.layer != Layer::Object) return 0;
+    const auto it = startBars_.find(e.id);
+    if (it != startBars_.end()) return it->second;
+    double bars = 0;
+    if (auto cfg = vis_->compileFile(e.path, entryType(d, e)))
+        if (const scene::CompiledKey* k = cfg->find("SBAR")) {
+            char* end = nullptr;
+            const double v = std::strtod(k->text.c_str(), &end);
+            if (end != k->text.c_str() && v > 0 && v <= 1024) bars = v;
+        }
+    startBars_[e.id] = bars;
+    return bars;
+}
+
+SceneType Director::entryType(const LayerData& d, const engine::SceneEntry& e) const {
+    if (d.layer != Layer::Object) return d.type;
+    return objectSolids_.count(lower(e.id)) ? SceneType::Solid : SceneType::Organic;
 }
 
 void Director::prefetchNext(LayerData& d, engine::SchedRng& rng) {
     // Peeks with copies: the real shuffle and RNG sequence stay as they are.
     engine::Playlist copy = d.playlist;
     engine::SchedRng r = rng;
-    if (const engine::SceneEntry* e = resolve(d, copy.peek(r))) vis_->prefetchConfig(e->path, d.type, true);
+    if (const engine::SceneEntry* e = resolve(d, copy.peek(r))) vis_->prefetchConfig(e->path, entryType(d, *e), true);
 }
 
 Director::LayerData* Director::data(Layer layer) {
@@ -234,7 +247,10 @@ void Director::applyTheme(const std::string& name) {
         std::vector<std::string> warnings;
         const std::vector<std::string> keepNames =
             d.layer == Layer::Union ? names
-                                    : themes_.filter(theme, std::string(scene::sceneTypeName(d.type)), names, &warnings);
+                                    : themes_.filter(theme,
+                                                     d.layer == Layer::Object ? std::string("Object")
+                                                                              : std::string(scene::sceneTypeName(d.type)),
+                                                     names, &warnings);
         for (const auto& w : warnings) log("theme " + theme_ + ": " + w);
         std::vector<std::string> ids, movies;
         // Sprites: movies go to their own shuffle (own timer); images stay in the layer's.
@@ -259,20 +275,14 @@ void Director::applyTheme(const std::string& name) {
             if (!mcur.empty()) moviePlaylist_.noteCurrent(mcur);
         }
     }
-    // Solids are not in the default slideshow: a theme may start them (Solid.Slideshow.Interval.Duration).
-    LayerData& solids = layers_[6];
-    const double solidEvery = theme && theme->solidInterval ? *theme->solidInterval : solidInterval_;
-    if (solids.slideshow.interval() != solidEvery) {
-        solids.slideshow.setInterval(solidEvery);
-        solids.slideshow.disarm();  // re-armed by the next poll (a first solid one interval from now)
+    // Objects are not in the default slideshow: a theme may start them (Object.Slideshow.Interval.Duration).
+    LayerData& objects = layers_[6];
+    const double objectEvery = theme && theme->objectInterval ? *theme->objectInterval : objectInterval_;
+    if (objects.slideshow.interval() != objectEvery) {
+        objects.slideshow.setInterval(objectEvery);
+        objects.slideshow.disarm();  // re-armed by the next poll (a first object one interval from now)
     }
-    LayerData& organics = layers_[7];
-    const double organicEvery = theme && theme->organicInterval ? *theme->organicInterval : organicInterval_;
-    if (organics.slideshow.interval() != organicEvery) {
-        organics.slideshow.setInterval(organicEvery);
-        organics.slideshow.disarm();
-    }
-    LayerData& dancers = layers_[8];
+    LayerData& dancers = layers_[7];
     const double dancerEvery = theme && theme->dancerInterval ? *theme->dancerInterval : dancerInterval_;
     if (dancers.slideshow.interval() != dancerEvery) {
         dancers.slideshow.setInterval(dancerEvery);
@@ -288,11 +298,9 @@ void Director::applyTheme(const std::string& name) {
             std::to_string(layers_[4].playlist.items().size()) + " Particles, " +
             std::to_string(layers_[5].playlist.items().size()) + " Sprites, " +
             std::to_string(moviePlaylist_.items().size()) + " movie sprites, " +
-            std::to_string(layers_[6].playlist.items().size()) + " Solids, " +
-            std::to_string(layers_[7].playlist.items().size()) + " Organics, " +
-            std::to_string(layers_[8].playlist.items().size()) + " Dancers in the slideshow" +
-            (solidEvery > 0 ? " (a solid every " + std::to_string(int(std::lround(solidEvery))) + " s)" : "") +
-            (organicEvery > 0 ? " (an organic every " + std::to_string(int(std::lround(organicEvery))) + " s)" : "") +
+            std::to_string(layers_[6].playlist.items().size()) + " Objects, " +
+            std::to_string(layers_[7].playlist.items().size()) + " Dancers in the slideshow" +
+            (objectEvery > 0 ? " (an object every " + std::to_string(int(std::lround(objectEvery))) + " s)" : "") +
             (dancerEvery > 0 ? " (a dancer every " + std::to_string(int(std::lround(dancerEvery))) + " s)" : ""));
 }
 
@@ -342,7 +350,7 @@ FadeSpec Director::spawnFade(LayerData& d, bool quick) {
     if (quick) fade.fade = d.slideshow.quickDuration();
     const double base = lp.duration > 0 ? lp.duration
                         : d.layer == Layer::Particle ? 25.0
-                        : d.layer == Layer::Solid || d.layer == Layer::Organic ? 40.0
+                        : d.layer == Layer::Object ? 40.0
                         : d.layer == Layer::Dancer ? 90.0
                                                      : 45.0;
     fade.defaultHold = engine::sampleWithDeviation(base, lp.durationDeviation, spawnRng_.normal(), 0.0);
@@ -371,12 +379,13 @@ bool Director::spawn(LayerData& d, const engine::SceneEntry& e, double t, const 
         auto cfg = vis_->compileFile(e.path, SceneType::Particle);
         if (!cfg) return false;
         vis_->startParticle(std::move(cfg), e.name, t, fade);
-    } else if (d.layer == Layer::Solid) {
-        auto cfg = vis_->compileFile(e.path, SceneType::Solid);
-        if (!cfg || !vis_->startSolid(std::move(cfg), e.name, t, fade)) return false;
-    } else if (d.layer == Layer::Organic) {
-        auto cfg = vis_->compileFile(e.path, SceneType::Organic);
-        if (!cfg || !vis_->startOrganic(std::move(cfg), e.name, t, fade)) return false;
+    } else if (d.layer == Layer::Object) {
+        const SceneType type = entryType(d, e);
+        auto cfg = vis_->compileFile(e.path, type);
+        if (!cfg) return false;
+        if (type == SceneType::Solid ? !vis_->startSolid(std::move(cfg), e.name, t, fade)
+                                     : !vis_->startOrganic(std::move(cfg), e.name, t, fade))
+            return false;
     } else if (d.layer == Layer::Dancer) {
         auto cfg = vis_->compileFile(e.path, SceneType::Dancer);
         if (!cfg || !vis_->startDancer(std::move(cfg), e.name, t, fade)) return false;
@@ -769,8 +778,7 @@ void Director::handle(const engine::Command& c, double t) {
             for (LayerData* d : targets) {
                 const bool spawner = engine::isSpawnLayer(d->layer);
                 if (!(c.value > 0) && !(spawner && c.value == 0)) continue;  // 0 = none: spawn timers only
-                if (d->layer == Layer::Solid) solidInterval_ = c.value;
-                if (d->layer == Layer::Organic) organicInterval_ = c.value;
+                if (d->layer == Layer::Object) objectInterval_ = c.value;
                 if (d->layer == Layer::Dancer) dancerInterval_ = c.value;
                 d->slideshow.setInterval(c.value);
                 if (d->slideshow.armed()) d->slideshow.arm(t, spawner ? spawnRng_ : rng_);
@@ -780,8 +788,7 @@ void Director::handle(const engine::Command& c, double t) {
             if (c.value > 0) {
                 if (c.layer == Layer::Particle) prefs_.particle.duration = c.value;
                 else if (c.layer == Layer::Sprite) prefs_.sprite.duration = c.value;
-                else if (c.layer == Layer::Solid) prefs_.solid.duration = c.value;
-                else if (c.layer == Layer::Organic) prefs_.organic.duration = c.value;
+                else if (c.layer == Layer::Object) prefs_.object.duration = c.value;
                 else if (c.layer == Layer::Dancer) prefs_.dancer.duration = c.value;
             } else if (c.value == 0 && c.layer == Layer::Dancer) {
                 prefs_.dancer.duration = 0;  // forever
@@ -820,12 +827,11 @@ void Director::handle(const engine::Command& c, double t) {
                                       c.text == "images"   ? Visualizer::SpriteKind::Images
                                       : c.text == "movies" ? Visualizer::SpriteKind::Movies
                                                            : Visualizer::SpriteKind::All);
-                else if (d->layer == Layer::Solid) vis_->killSolids(t, d->slideshow.quickDuration());
-                else if (d->layer == Layer::Organic) vis_->killOrganics(t, d->slideshow.quickDuration());
+                else if (d->layer == Layer::Object) vis_->killObjects(t, d->slideshow.quickDuration());
                 else if (d->layer == Layer::Dancer) vis_->killDancers(t, d->slideshow.quickDuration());
                 else if (d->layer == Layer::Union) clearUnion(t);
                 else log(std::string(engine::layerName(d->layer)) +
-                         ": kill applies to particles, sprites, solids, organics, dancers and unions");
+                         ": kill applies to particles, sprites, objects, dancers and unions");
             }
             break;
         case engine::CommandType::SetCrossfader:
@@ -897,20 +903,50 @@ void Director::runSlideshow(double t) {
         }
     }
     // Particles / Sprites / Solids / Organics / Dancers: spawn on their own timers (spawn to spawn).
-    for (int i = 4; i < 9; ++i) {
+    // reforce.Slideshow.OneFeature: solids, organics and movie sprites take turns. While one is at full strength the
+    // slideshow starts none of them (their timers still arm); when it begins fading out, the one due longest goes.
+    const bool oneFeature = prefs_.slideshowOneFeature;
+    const bool featureUp = oneFeature && vis_->featureActive(t);
+    const engine::LayerSlideshow* firstDue = nullptr;
+    if (oneFeature && !featureUp) {
+        auto consider = [&](const engine::LayerSlideshow& s, bool hasItems) {
+            if (hasItems && s.interval() > 0 && s.due(t) && (!firstDue || s.dueAt() < firstDue->dueAt())) firstDue = &s;
+        };
+        for (const LayerData& d : layers_)
+            if (d.layer == Layer::Object) consider(d.slideshow, !d.playlist.empty());
+        if (!vis_->videoSpritesHeld()) consider(movieTimer_, !moviePlaylist_.empty());
+    }
+    // May this feature timer be polled now? (An unarmed one may always arm.)
+    auto featureMay = [&](const engine::LayerSlideshow& s) {
+        return !oneFeature || !s.armed() || (!featureUp && &s == firstDue);
+    };
+    for (int i = 4; i < 8; ++i) {
         LayerData& d = layers_[std::size_t(i)];
         // A movie sprite looping until stopped keeps the screen: no new sprites meanwhile.
         if (d.layer == Layer::Sprite && vis_->videoSpritesHeld()) continue;
         // reforce.Quantize.Spawn: a due spawn waits for the next beat / bar / phrase line.
         const bool waits = d.slideshow.armed() && d.slideshow.due(t) && !linkAllows(prefs_.spawnQuantize);
-        if (!d.playlist.empty() && !waits && engine::pollSpawn(d.slideshow, t, spawnRng_)) {
+        // Solids / organics: a due start also waits while MaxLive are at full strength (until one starts fading out).
+        const bool feature = d.layer == Layer::Object;
+        // An object with SBar starts from the slideshow only on its line (every SBar bars of the phrase clock); the
+        // next one in the shuffle is peeked (copies), so the shuffle itself is unchanged.
+        bool offLine = false;
+        if (feature && phraseOn_ && d.slideshow.armed() && d.slideshow.due(t) && !d.playlist.empty()) {
+            engine::Playlist copy = d.playlist;
+            engine::SchedRng r = spawnRng_;
+            if (const engine::SceneEntry* e = resolve(d, copy.peek(r)))
+                if (const double sb = startBars(d, *e); sb > 0) offLine = !sync::crossedBoundary(barPrev_, barCur_, sb);
+        }
+        if (!d.playlist.empty() && !waits && !offLine && vis_->spawnRoom(d.layer, t) && (!feature || featureMay(d.slideshow)) &&
+            engine::pollSpawn(d.slideshow, t, spawnRng_)) {
             const std::string id = nextId(d, spawnRng_);
             if (const engine::SceneEntry* e = resolve(d, id)) spawn(d, *e, t, "slideshow", false);
         }
         if (d.layer == Layer::Sprite && !moviePlaylist_.empty()) {
             movieTimer_.setEnabled(d.slideshow.enabled());
             movieTimer_.setHeld(d.slideshow.held());
-            if (engine::pollSpawn(movieTimer_, t, spawnRng_)) {
+            // A due movie waits while reforce.MovieSprite.MaxLive movies are at full strength.
+            if (vis_->movieRoom(t) && featureMay(movieTimer_) && engine::pollSpawn(movieTimer_, t, spawnRng_)) {
                 const std::string id = moviePlaylist_.next(spawnRng_);
                 if (const engine::SceneEntry* e = resolve(d, id)) spawn(d, *e, t, "slideshow movie", false);
             }
@@ -988,6 +1024,8 @@ void Director::step(MTL::CommandBuffer* cmd, double t, const audio::AudioFrame* 
         const sync::PhraseState& ps = vis_->phraseState();
         phrasePrev_ = phraseOn_ && ps.on ? phraseCur_ : ps.phrase;
         phraseCur_ = ps.phrase;
+        barPrev_ = phraseOn_ && ps.on ? barCur_ : ps.bar;
+        barCur_ = ps.bar;
         phraseOn_ = ps.on;
     }
     // Drops (PLAN 5O.5): cut FlowField, WaveShape and ColorMap to their next configs.
@@ -1092,8 +1130,7 @@ void Director::publish(double t) {
                                  ? std::max(0.0, movieTimer_.dueAt() - t) : -1;
         }
         if (d.layer == Layer::Particle) ls.alive = vis_->particleNames();
-        else if (d.layer == Layer::Solid) ls.alive = vis_->solidNames();
-        else if (d.layer == Layer::Organic) ls.alive = vis_->organicNames();
+        else if (d.layer == Layer::Object) ls.alive = vis_->objectNames();
         else if (d.layer == Layer::Dancer) ls.alive = vis_->dancerNames();
         else if (d.layer == Layer::Sprite) {
             // The Sprite layer card shows image sprites; movies are in the video state.
