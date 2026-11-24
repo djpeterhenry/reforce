@@ -6,7 +6,7 @@
 //   - any Object whose expressions read BEAT, TEMPO, LINK_* or SYNC_* (scene::usesBeat)
 //   - solids: model scenes with MBar, Move="cuts" or Step keyframes (docs/model-design.md)
 //   - organics, by Kind:
-//       ripples, mandel, phyllotaxis, automaton, life, invaders, hopper, cycles, rocks, bricks, chase: always
+//       ripples, mandel, phyllotaxis, automaton, life, dragon, invaders, hopper, cycles, rocks, bricks, chase: always
 //         (drops, dives, seeds, generations, game moves on the beat)
 //       pendulums, julia: unless Phas sets the phase (else the cycle / the bands follow the bars / beats)
 //       tree: when it uses s (beats since its growth began), SwyB, Vib, Puls, Leaf, Rwir or more than one strike

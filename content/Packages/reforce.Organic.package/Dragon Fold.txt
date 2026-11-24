@@ -1,0 +1,13 @@
+Vers=100
+Meta="reforce organic: the paper-folding (Heighway) dragon. Every two beats the whole curve gets a copy of itself that swings open 90 degrees about its end point, like a folded strip of paper unfolding, and snaps flat exactly on the beat line, the whole curve one even brightness: each new copy swings out as a dim ghost, brightens to a glow just as the next fold starts and settles back over the fold after; the view zooms out to keep it in the frame. Twelve folds (4096 segments), then it folds back up to one line by the 8-bar line. A drop bursts it open at once."
+Kind="dragon"
+PBar="32"
+SBar="8"
+Gens="12"
+Fold="2"
+Cyc="8"
+Back="4"
+Rise=".75"
+Setl=".25"
+Shd="0"
+Flsh="0"

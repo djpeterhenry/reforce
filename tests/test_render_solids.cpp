@@ -13,6 +13,7 @@
 #include <Metal/Metal.hpp>
 
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -37,6 +38,7 @@ MTL::Device* device() {
 struct Box {
     int w = 0, h = 0;
     std::vector<float> lum, alpha, share;  // share: the rubik's sticker share (b)
+    std::vector<float> shade;              // a: coverage x the puzzles' shading
 };
 
 Box drawOne(render::ScenePipeline& scene, render::SolidPipeline& solids, const render::SolidDraw& d,
@@ -61,6 +63,7 @@ Box drawOne(render::ScenePipeline& scene, render::SolidPipeline& solids, const r
         b.lum.push_back(p[i * 4] / 255.0f);
         b.alpha.push_back(p[i * 4 + 1] / 255.0f);
         b.share.push_back(p[i * 4 + 2] / 255.0f);
+        b.shade.push_back(p[i * 4 + 3] / 255.0f);
     }
     buf->release();
     q->release();
@@ -711,5 +714,443 @@ TEST_CASE("solids: fifteen as glass: clear buttons let the frame through, white 
     CHECK(bright > W * H / 2);
     CHECK(at(2, 2, 1) == 255);
     out->release();
+    q->release();
+}
+
+namespace {
+
+// A labyrinth mid-run (board .3, walls .6, ball .9), seen from the front, a little above.
+render::SolidDraw labyrinthDraw(engine::labyrinth::Player& p, int grid, double turn, float tiltGain = 2.0f) {
+    render::SolidDraw d;
+    d.mesh = engine::MeshKind::Labyrinth;
+    d.pose.scale = 0.85;
+    d.pose.rotX = -0.5;
+    d.shading.shade = 0.55f;
+    d.stickers = {0.3f, 0.0f, 0.6f, 0.0f, 0.9f, 0.0f};
+    d.floor = 0.55f;
+    d.tiltGain = tiltGain;
+    d.labyrinth = p.at(4, grid, 32, turn);
+    return d;
+}
+
+}  // namespace
+
+TEST_CASE("solids: labyrinth: a see-through board, solid walls, black holes and the ball; the board tilts") {
+    if (!device()) return;
+    const int W = 640, H = 360;
+    render::ScenePipeline scene(device(), W, H, {});
+    render::SolidPipelineOptions o;
+    o.maxLive = 1;
+    render::SolidPipeline solids(scene, o);
+    engine::labyrinth::Player p(32);
+    // Mid-roll of a segment: the board is tilted.
+    p.at(4, 8, 32, 0);
+    p.planAll();
+    const auto& seg = p.route().segments[2];
+    const double turn = seg.start + 0.6 * (seg.end - seg.start);
+    const render::SolidDraw d = labyrinthDraw(p, 8, turn);
+    REQUIRE(std::hypot(d.labyrinth.tiltX, d.labyrinth.tiltY) > 0.01f);
+    const Box b = drawOne(scene, solids, d);
+    int board = 0, walls = 0, ball = 0, holes = 0;
+    for (std::size_t i = 0; i < b.lum.size(); ++i) {
+        const float a = b.alpha[i], s = b.share[i];
+        if (std::fabs(a - 0.55f) < 0.02f && std::fabs(s - 0.55f) < 0.02f && std::fabs(b.lum[i] / a - 0.3f) < 0.01f)
+            ++board;  // the board's top: its intensity at the board's opacity (premultiplied)
+        if (a < 0.99f) continue;
+        if (s < 0.01f) ++holes;  // black (share 0)
+        else if (std::fabs(b.lum[i] - 0.6f) < 0.01f) ++walls;
+        else if (std::fabs(b.lum[i] - 0.9f) < 0.01f) ++ball;
+    }
+    MESSAGE("labyrinth at 640x360: board " << board << " px, walls " << walls << ", ball " << ball << ", holes "
+                                          << holes);
+    CHECK(board > 20000);
+    CHECK(walls > 5000);
+    CHECK(ball > 60);
+    CHECK(holes > 100);
+    // Drawn level (Tilt 0) the image differs: the tilt shows.
+    const Box flat = drawOne(scene, solids, labyrinthDraw(p, 8, turn, 0.0f));
+    int differ = 0;
+    if (flat.w == b.w && flat.h == b.h) {
+        for (std::size_t i = 0; i < b.lum.size(); ++i) differ += std::fabs(flat.lum[i] - b.lum[i]) > 0.05f;
+    } else {
+        differ = 1000000;
+    }
+    CHECK(differ > 500);
+}
+
+TEST_CASE("solids: labyrinth in color: edges mix their two colors, never the ColorMap's between; holes black") {
+    if (!device()) return;
+    const int W = 640, H = 360;
+    render::ScenePipeline scene(device(), W, H, {});
+    render::SolidPipelineOptions o;
+    o.maxLive = 1;
+    render::SolidPipeline solids(scene, o);
+    engine::labyrinth::Player p(32);
+    const render::SolidDraw d = labyrinthDraw(p, 8, 7.5);
+    // Black at 0, red around the board's .3, blue around the walls' .6, yellow around the ball's .9, green between:
+    // a brightness blend across an edge would show green.
+    engine::Palette pal{};
+    for (int k = 0; k < engine::kPaletteSize; ++k) {
+        engine::PaletteEntry e{0, 1, 0, 1};
+        if (k == 0) e = {0, 0, 0, 1};
+        if (k >= 60 && k <= 95) e = {1, 0, 0, 1};
+        if (k >= 140 && k <= 170) e = {0, 0, 1, 1};
+        if (k >= 215 && k <= 245) e = {1, 1, 0, 1};
+        pal[std::size_t(k)] = e;
+    }
+    engine::MapLut lut{};
+    for (int k = 0; k < engine::kPaletteSize; ++k) lut[std::size_t(k)] = float(k) / 255.f;
+    MTL::CommandQueue* q = device()->newCommandQueue();
+    MTL::TextureDescriptor* td =
+        MTL::TextureDescriptor::texture2DDescriptor(MTL::PixelFormatBGRA8Unorm, NS::UInteger(W), NS::UInteger(H), false);
+    td->setUsage(MTL::TextureUsageRenderTarget | MTL::TextureUsageShaderRead);
+    td->setStorageMode(MTL::StorageModeShared);
+    MTL::Texture* out = device()->newTexture(td);
+    MTL::CommandBuffer* cmd = q->commandBuffer();
+    const render::SolidQuad sq = solids.encode(cmd, 0, d);
+    REQUIRE(sq.visible);
+    render::SpriteQuad c;
+    c.texture = sq.texture;
+    c.cx = sq.cx;
+    c.cy = sq.cy;
+    c.w = sq.w;
+    c.h = sq.h;
+    c.u0 = sq.u0;
+    c.v0 = sq.v0;
+    c.u1 = sq.u1;
+    c.v1 = sq.v1;
+    c.opacity = 1;
+    c.puzzle = 2;
+    c.levels[0] = 0.3f;
+    c.levels[1] = 0.6f;
+    c.levels[2] = 0.9f;
+    scene.encodeColorize(cmd, pal, lut, out, nullptr, nullptr, 0, false, nullptr, 0, &c, 1);
+    cmd->commit();
+    cmd->waitUntilCompleted();
+    std::vector<std::uint8_t> px(std::size_t(W * H * 4));
+    out->getBytes(px.data(), NS::UInteger(W * 4), MTL::Region(0, 0, NS::UInteger(W), NS::UInteger(H)), 0);
+    int red = 0, blue = 0, yellow = 0, white = 0, greenish = 0;
+    for (int i = 0; i < W * H; ++i) {
+        const int b = px[std::size_t(i * 4)], g = px[std::size_t(i * 4 + 1)], r = px[std::size_t(i * 4 + 2)];
+        red += r > 60 && g < 10 && b < 10;
+        blue += b > 60 && r < 10 && g < 10;
+        yellow += r > 120 && g > 120 && b < 10;
+        white += r > 200 && g > 200 && b > 60;  // the ball's highlight: yellow towards white
+        greenish += g > r + 24 && g > b + 24;
+    }
+    MESSAGE("labyrinth in color: board " << red << " px, walls " << blue << ", ball " << yellow << ", highlight "
+                                        << white << ", green " << greenish);
+    CHECK(red > 15000);
+    CHECK(blue > 4000);
+    CHECK(yellow > 40);
+    CHECK(white > 0);
+    CHECK(greenish == 0);
+    out->release();
+    q->release();
+}
+
+TEST_CASE("solids: labyrinth cost at 1920x1080 (12 x 12 maze, the run played); no render-thread allocations") {
+    if (!device()) return;
+    const int W = 1920, H = 1080;
+    render::ScenePipeline scene(device(), W, H, {});
+    render::SolidPipeline solids(scene, {});
+    MTL::CommandQueue* q = device()->newCommandQueue();
+    engine::labyrinth::Player p(32);
+    double gpu = 0, cpuMax = 0;
+    int n = 0;
+    std::uint64_t allocs0 = 0;
+    const int frames = 140, warm = 20;
+    for (int f = 0; f < frames; ++f) {
+        if (f == warm) allocs0 = perf::renderAllocs().load();
+        NS::AutoreleasePool* pool = NS::AutoreleasePool::alloc()->init();
+        const auto t0 = std::chrono::steady_clock::now();
+        render::SolidDraw d = labyrinthDraw(p, 12, 2.0 + f * 0.2);  // a beat every 5 frames: planning as it goes
+        d.pose.scale = 0.95;
+        MTL::CommandBuffer* cmd = q->commandBuffer();
+        const render::SolidQuad sq = solids.encode(cmd, 0, d);
+        const double cpu = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
+        REQUIRE(sq.visible);
+        cmd->commit();
+        cmd->waitUntilCompleted();
+        if (f >= warm) {
+            gpu += (cmd->GPUEndTime() - cmd->GPUStartTime()) * 1000.0;
+            cpuMax = std::max(cpuMax, cpu);
+            ++n;
+        }
+        pool->release();
+    }
+    MESSAGE("labyrinth 12 x 12 at 1920x1080 (msaa " << solids.msaa() << "): solid pass " << gpu / n
+                                                    << " ms GPU; CPU per frame (planning + encode) max " << cpuMax
+                                                    << " ms");
+    PERF_BUDGET(gpu / n < 1.0);
+    PERF_BUDGET(cpuMax < 4.0);
+    CHECK(perf::renderAllocs().load() == allocs0);
+    q->release();
+}
+
+namespace {
+render::SolidDraw knightDraw(double turn, int board, bool web = true) {
+    render::SolidDraw d;
+    d.mesh = engine::MeshKind::Knight;
+    d.pose.rotX = -0.9;
+    d.pose.scale = 0.95;
+    d.shading.shade = 0.75f;
+    if (web) {
+        d.tour = engine::knight::makeTour(7, true);
+        d.prevTour = engine::knight::makeTour(6, true);
+    }
+    d.knight = engine::knight::frameAt(d.tour, d.prevTour, turn);
+    d.knightLook.board = board;
+    return d;
+}
+int countNear(const Box& b, float level, float tol = 0.01f) {
+    int n = 0;
+    for (std::size_t i = 0; i < b.lum.size(); ++i) n += b.alpha[i] > 0.99f && std::fabs(b.lum[i] - level) < tol;
+    return n;
+}
+}  // namespace
+
+TEST_CASE("solids: knight: grid lines with the visuals between them, the web grows hop by hop, the knight is shaded") {
+    if (!device()) return;
+    const int W = 640, H = 360;
+    render::ScenePipeline scene(device(), W, H, {});
+    render::SolidPipelineOptions o;
+    o.maxLive = 1;
+    render::SolidPipeline solids(scene, o);
+    // Grid lines only (Brd 0): most of the board is see-through; the lines are at their level.
+    const Box lines = drawOne(scene, solids, knightDraw(0, 0, false));
+    int clear = 0;
+    for (float a : lines.alpha) clear += a < 0.01f;
+    CHECK(clear > int(lines.alpha.size()) / 2);
+    int lined = 0;  // thin anti-aliased lines: coverage, not exact levels
+    for (std::size_t i = 0; i < lines.alpha.size(); ++i) lined += lines.alpha[i] > 0.5f && lines.lum[i] > 0.15f;
+    CHECK(lined > 1500);
+    // Brd 1 / 2: the light squares, then the dark ones too, are filled.
+    const Box light = drawOne(scene, solids, knightDraw(0, 1, false));
+    const Box both = drawOne(scene, solids, knightDraw(0, 2, false));
+    CHECK(countNear(light, 0.16f) > 10000);
+    CHECK(countNear(light, 0.07f) < 1500);  // only the knight's shading
+    CHECK(countNear(both, 0.07f) > 10000);
+    // The web: more lines lit after more hops; the newest are the brightest (1), the old ones dim towards .68.
+    auto webPixels = [&](double turn) {
+        const Box b = drawOne(scene, solids, knightDraw(turn, 0));
+        int n = 0;
+        for (std::size_t i = 0; i < b.lum.size(); ++i) n += b.alpha[i] > 0.99f && b.lum[i] > 0.6f;
+        return n;
+    };
+    const int w8 = webPixels(8), w32 = webPixels(32), w64 = webPixels(64);
+    CHECK(w32 > w8 + 1000);
+    CHECK(w64 > w32 + 1000);
+    // At turn 0 the previous tour's web is still whole (it unravels during the first hop); half way it is gone.
+    CHECK(webPixels(0) > w32);
+    CHECK(webPixels(0.8) < w8);
+    // Deterministic.
+    const Box a1 = drawOne(scene, solids, knightDraw(20.6, 1)), a2 = drawOne(scene, solids, knightDraw(20.6, 1));
+    CHECK(a1.lum == a2.lum);
+    CHECK(a1.alpha == a2.alpha);
+    // The knight close up (the board follows it to the center): a solid, shaded body there.
+    render::SolidDraw k = knightDraw(5, 0);
+    k.pose.scale = 5.0;
+    k.pose.rotX = -1.25;
+    k.pose.y = -0.6;
+    k.knightLook.follow = 1.0f;
+    render::SolidQuad kq;
+    const Box kb = drawOne(scene, solids, k, &kq);
+    float lo = 1, hi = 0;
+    int body = 0;
+    for (int y = kb.h / 3; y < kb.h * 2 / 3; ++y)
+        for (int x = kb.w / 3; x < kb.w * 2 / 3; ++x) {
+            const std::size_t i = std::size_t(y * kb.w + x);
+            if (kb.alpha[i] < 0.99f) continue;
+            ++body;
+            lo = std::min(lo, kb.lum[i]);
+            hi = std::max(hi, kb.lum[i]);
+        }
+    CHECK(body > kb.w * kb.h / 9 / 3);
+    CHECK(hi - lo > 0.3f);  // shading across the piece
+    // Junk in the frame and look: nothing breaks, nothing NaN.
+    render::SolidDraw j = knightDraw(20, 2);
+    j.knight.x = std::nanf("");
+    j.knight.heading = 1e30f;
+    j.knight.squash = -4;
+    j.knight.landed = 999;
+    j.knightLook.flash = std::nanf("");
+    j.knightLook.orbit = 1e30f;
+    j.knightLook.follow = -3;
+    const Box jb = drawOne(scene, solids, j);
+    for (float v : jb.lum) REQUIRE(std::isfinite(v));
+}
+
+TEST_CASE("solids: knight: cost at 1920x1080 with the whole web; no render-thread allocations") {
+    if (!device()) return;
+    const int W = 1920, H = 1080;
+    render::ScenePipeline scene(device(), W, H, {});
+    render::SolidPipelineOptions o;
+    o.maxLive = 1;
+    render::SolidPipeline solids(scene, o);
+    MTL::CommandQueue* q = device()->newCommandQueue();
+    double sum = 0;
+    int n = 0;
+    std::uint64_t allocs0 = 0;
+    for (int f = 0; f < 80; ++f) {
+        if (f == 20) allocs0 = perf::renderAllocs().load();
+        NS::AutoreleasePool* pool = NS::AutoreleasePool::alloc()->init();
+        render::SolidDraw d = knightDraw(63.0 + 0.01 * (f % 90), 1);
+        d.pose.scale = 1.3;
+        d.pose.rotX = -0.98;
+        d.knightLook.orbit = 0.02f * float(f);
+        MTL::CommandBuffer* cmd = q->commandBuffer();
+        REQUIRE(solids.encode(cmd, 0, d).visible);
+        cmd->commit();
+        cmd->waitUntilCompleted();
+        REQUIRE(cmd->status() != MTL::CommandBufferStatusError);
+        if (f >= 20) {
+            sum += (cmd->GPUEndTime() - cmd->GPUStartTime()) * 1000.0;
+            ++n;
+        }
+        pool->release();
+    }
+    MESSAGE("1920x1080 knight (board, 64-hop web, piece; msaa " << solids.msaa() << "): solid pass " << sum / n
+            << " ms GPU");
+    PERF_BUDGET(sum / n < 1.0);
+    CHECK(perf::renderAllocs().load() == allocs0);
+    q->release();
+}
+
+// ---------------------------------------------------------------- the soma solid (docs/3d-design.md "Soma cube")
+
+namespace {
+render::SolidDraw somaDraw(double turn, double seed = 3, double scale = 0.43) {
+    render::SolidDraw d;
+    d.mesh = engine::MeshKind::Soma;
+    d.pose.rotX = 0.5;
+    d.pose.rotY = 0.8;
+    d.pose.y = 0.07;
+    d.pose.scale = scale;  // content: .43 while the figure stands complete, .36 for the burst, ring and flights
+    d.shading.shade = 0.8f;
+    d.pieces = {0.2f, 0.32f, 0.44f, 0.56f, 0.68f, 0.8f, 0.92f};
+    engine::soma::Player player({0});
+    d.soma = player.frame(seed, turn, engine::soma::Timing{}, 0.0, 0.0, {d.pose.rotY, d.pose.rotX});
+    return d;
+}
+}  // namespace
+
+TEST_CASE("solids: soma: the complete cube shows the pieces in their colors, shaded and grooved; exploded fits its box") {
+    if (!device()) return;
+    const int W = 960, H = 540;
+    render::ScenePipeline scene(device(), W, H, {});
+    render::SolidPipelineOptions o;
+    o.maxLive = 1;
+    render::SolidPipeline solids(scene, o);
+    const render::SolidDraw done = somaDraw(4.0);  // the hold: the cube complete
+    render::SolidQuad cq;
+    const Box b = drawOne(scene, solids, done, &cq);
+    std::array<int, 7> n{};
+    int covered = 0, other = 0, grooves = 0;
+    for (std::size_t i = 0; i < b.lum.size(); ++i) {
+        if (b.alpha[i] < 0.99f) continue;
+        ++covered;
+        CHECK(b.share[i] > 0.99f);  // all color, no plastic
+        bool hit = false;
+        for (int k = 0; k < 7; ++k)
+            if (std::fabs(b.lum[i] - done.pieces[std::size_t(k)]) < 0.006f) ++n[std::size_t(k)], hit = true;
+        other += !hit;
+        grooves += b.shade[i] < 0.45f;
+    }
+    int shown = 0;
+    for (int k = 0; k < 7; ++k) shown += n[std::size_t(k)] > 300;
+    MESSAGE("soma cube: " << covered << " px covered, " << shown << " of 7 pieces in view, " << grooves << " groove px");
+    CHECK(shown >= 5);           // from a 3/4 view most pieces show (one can hide inside or at the back)
+    CHECK(other * 50 < covered);  // flat colors: the intensity is the piece's (shading goes to alpha)
+    CHECK(grooves > 300);         // the grooves between pieces
+    CHECK(grooves * 8 < covered);
+    // Tops are lit brighter than the sides (shading, not hue).
+    float hi = 0, lo = 1;
+    for (std::size_t i = 0; i < b.lum.size(); ++i)
+        if (b.alpha[i] >= 0.99f) hi = std::max(hi, b.shade[i]), lo = std::min(lo, b.shade[i]);
+    CHECK(hi > 0.85f);
+    CHECK(lo < 0.5f);
+    // Exploded (hovering): wider than the cube, and all of it inside the quad.
+    render::SolidQuad hq;
+    const Box h = drawOne(scene, solids, somaDraw(14.0, 3, 0.36), &hq);
+    CHECK(hq.w > 1.6f * cq.w);
+    for (int x = 0; x < h.w; ++x) {
+        CHECK(h.alpha[std::size_t(x)] < 0.5f);
+        CHECK(h.alpha[std::size_t((h.h - 1) * h.w + x)] < 0.5f);
+    }
+    for (int y = 0; y < h.h; ++y) {
+        CHECK(h.alpha[std::size_t(y * h.w)] < 0.5f);
+        CHECK(h.alpha[std::size_t(y * h.w + h.w - 1)] < 0.5f);
+    }
+    // The ring (in the figure's own space, a little below it) never covers the front of the figure being built: over
+    // the lower half of the complete cube's screen box (at the same scale) nothing hovers. (Its back half lies
+    // behind the figure.)
+    render::SolidQuad small;
+    drawOne(scene, solids, somaDraw(4.0, 3, 0.36), &small);
+    int front = 0;
+    for (int y = 0; y < h.h; ++y)
+        for (int x = 0; x < h.w; ++x) {
+            const float fx = hq.cx - hq.w * 0.5f + float(x), fy = hq.cy - hq.h * 0.5f + float(y);
+            const bool inLowerHalf = std::fabs(fx - small.cx) < 0.5f * small.w && fy > small.cy && fy < small.cy + 0.5f * small.h;
+            if (inLowerHalf) front += h.alpha[std::size_t(y * h.w + x)] > 0.5f;
+        }
+    CHECK(front == 0);
+}
+
+TEST_CASE("solids: soma: cost at 1080p, no render-thread allocations") {
+    if (!device()) return;
+    const int W = 1920, H = 1080;
+    render::ScenePipeline scene(device(), W, H, {});
+    scene.setField(engine::identityFlowField(W, H));
+    render::SolidPipeline solids(scene, {});
+    MTL::CommandQueue* q = device()->newCommandQueue();
+    engine::soma::Player player({0, 1, 2});
+    double sumStep = 0, sumSoma = 0;
+    int n = 0;
+    std::uint64_t allocs0 = 0;
+    const int frames = 100, warm = 20;
+    for (int f = 0; f < frames; ++f) {
+        if (f == warm) allocs0 = perf::renderAllocs().load();
+        NS::AutoreleasePool* pool = NS::AutoreleasePool::alloc()->init();
+        render::SolidDraw d;
+        d.mesh = engine::MeshKind::Soma;
+        d.pose.rotX = 0.5;
+        d.pose.rotY = 0.02 * f;
+        d.pose.scale = 0.44;
+        d.shading.shade = 0.8f;
+        d.soma = player.frame(f / 50, (f % 50) * 0.64, engine::soma::Timing{}, 0.0, 0.0, {d.pose.rotY, d.pose.rotX});
+        auto run = [&](bool solid) {
+            MTL::CommandBuffer* cmd = q->commandBuffer();
+            std::vector<render::SpriteQuad> fb;
+            if (solid) {
+                const render::SolidQuad sq = solids.encode(cmd, 0, d);
+                if (sq.visible) {
+                    render::SpriteQuad r;
+                    r.texture = sq.texture;
+                    r.cx = sq.cx; r.cy = sq.cy; r.w = sq.w; r.h = sq.h;
+                    r.u1 = sq.u1; r.v1 = sq.v1;
+                    r.pen = 1;
+                    r.op = int(engine::SpriteOp::KeyedCopy);
+                    fb.push_back(r);
+                }
+            }
+            scene.encodeStep(cmd, nullptr, 0, render::FlowBlend{}, fb.data(), fb.size(), true, nullptr, 0);
+            cmd->commit();
+            cmd->waitUntilCompleted();
+            REQUIRE(cmd->status() != MTL::CommandBufferStatusError);
+            return (cmd->GPUEndTime() - cmd->GPUStartTime()) * 1000.0;
+        };
+        const double a = run(false), s = run(true);
+        if (f >= warm) {
+            sumStep += a;
+            sumSoma += s;
+            ++n;
+        }
+        pool->release();
+    }
+    const double soma = sumSoma / n - sumStep / n;
+    MESSAGE("1920x1080: the soma (27 cubes, MSAA, the hold to the build) drawn and composited " << soma << " ms GPU");
+    PERF_BUDGET(soma < 1.0);
+    CHECK(perf::renderAllocs().load() == allocs0);
     q->release();
 }

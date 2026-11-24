@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <sstream>
 #include <thread>
@@ -42,7 +43,7 @@ bool Visualizer::startOrganic(std::shared_ptr<const scene::CompiledConfig> cfg, 
     const auto kind = engine::organicKind(*cfg, &written);
     if (!kind) {
         rlog("[reforce] Organic \"%s\": unknown Kind \"%s\" (tree, pendulums, phyllotaxis, harmonograph, automaton, "
-             "life, lsystem, attractor, ripples, julia)\n", label.c_str(), written.c_str());
+             "life, lsystem, attractor, dragon, ripples, julia)\n", label.c_str(), written.c_str());
         return false;
     }
     if (*kind == engine::OrganicKind::Field && !fields_) {
@@ -66,6 +67,9 @@ bool Visualizer::startOrganic(std::shared_ptr<const scene::CompiledConfig> cfg, 
                                                     fade.fn, opts_.prefs.organicMaxNodes);
     run->setHold(engine::holdForBars(run->bars(), fade.fade, syncInput(), phrase_.state().bars,
                                      phrase_.state().quantum));  // PBar
+    // ... and keeps ending on those lines of the live clock (tempo changes, phrase re-alignments, a lock arriving).
+    if (std::isfinite(run->bars()) && run->bars() > 0)
+        run->followBars(engine::holdLineBars(run->bars(), phrase_.state().bars));
     if (run->kind() == engine::OrganicKind::Field) {
         // A free slot: there is one, since organics_ holds at most MaxLive now (MaxLive + 1 slots).
         for (int slot = 0; slot < fields_->maxLive() && run->fieldSlot() < 0; ++slot)
@@ -164,7 +168,15 @@ void Visualizer::stepOrganics(double t, const audio::AudioFrame* audio) {
     const engine::SpriteAudio a = spriteAudio(audio);
     const engine::FrameMapping map = engine::organicMapping(double(opts_.width), double(opts_.height));
     // After the WaveShape's and the particles' segments: drawn on top, overwrite (probe #15).
-    for (auto& o : organics_) o->step(t, a, map, lineStyle_, segments_);
+    if (!organicColorsHave_ || std::memcmp(&palette_, &organicPal_, sizeof(engine::Palette)) != 0 ||
+        std::memcmp(&lut_, &organicLut_, sizeof(engine::MapLut)) != 0) {
+        organicPal_ = palette_;
+        organicLut_ = lut_;
+        engine::effectiveColors(palette_, lut_, organicColors_.lab);
+        ++organicColors_.version;
+        organicColorsHave_ = true;
+    }
+    for (auto& o : organics_) o->step(t, a, map, lineStyle_, segments_, &organicColors_);
 }
 
 }  // namespace reforce::app

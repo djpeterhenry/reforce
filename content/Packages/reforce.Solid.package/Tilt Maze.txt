@@ -1,0 +1,32 @@
+Vers=100
+Meta="reforce solid: a wooden tilt maze (11 x 11 cells), one maze per 16-bar phrase: the ball drops into the goal exactly on the phrase line (bar lines from the phrase clock while the beat clock is locked, else 120 BPM from the start). Every tilt starts on a beat and every clack into a wall lands on a beat; on the line the solved maze sinks, a new one rises and the ball pops up out of the start. Seen a little more from above than Tilt Maze, turning slowly; the board is half see-through."
+Mesh="labyrinth"
+Text="2"
+Over="1"
+ColorKey="0"
+Grid="11"
+Beats="64"
+Traps="5"
+// 4 mazes (a maze per phrase), ending on a phrase line of the live clock; started on a 16-bar line (Peter 2026-11-23:
+// a fixed PDur ended mid-tour)
+PBar="64"
+SBar="16"
+B0="t - START_TIME"
+// beats: the beat clock when locked, else 2 per second
+B1="SYNC_ON * SYNC_BEAT + (1 - SYNC_ON) * 2 * B0"
+// beats into the 16-bar run (0..64) and the run number (the maze's seed)
+B2="SYNC_ON * 64 * wrap(SYNC_BAR / 16) + (1 - SYNC_ON) * 64 * wrap(B1 / 64)"
+B3="SYNC_ON * floor(SYNC_BAR / 16) + (1 - SYNC_ON) * floor(B1 / 64)"
+Turn="B2"
+Seed="B3"
+Floor=".5"
+Tilt="2"
+X="0"
+Y="0"
+Z="0"
+Scal=".8 * (1 + .05 * SYNC_DROP)"
+RotX="-.38 + .05 * sin(.09 * B0) + .2 * SYNC_BUILD"
+RotY=".04 * sin(.11 * B0)"
+RotZ=".35 * sin(.023 * B0)"
+Shad=".55"
+Pen="0"

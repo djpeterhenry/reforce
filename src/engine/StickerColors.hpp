@@ -19,6 +19,7 @@
 // the intensities over `ease` seconds when it switches (ColorMap changes and morphs).
 
 #include <array>
+#include <cstdint>
 
 #include "engine/Palette.hpp"
 
@@ -100,6 +101,77 @@ private:
     LabTable lab_{};
     std::array<int, 4> from_{}, to_{};
     float numFrom_ = 0;
+    float score_ = 0;
+    int switches_ = 0;
+};
+
+// The pyramid hopper's top states (docs/arcade-design.md "Pyramid hopper", Peter 2026-11-23: the change of a top was
+// hard to see on some ColorMaps): `n` (2..3) intensity levels, dark .. bright, that read as clearly different colors
+// under the current ColorMap and stay clear of the cubes' seams (`edge`) and sides (`sideL`, `sideR`). Organics are
+// drawn as intensity like the solids, so it is the stickers' problem with fewer colors. `prefer` (the TLo / THi keys)
+// wins whenever it already reads well enough: the pick moves away from it only as far as the map needs.
+struct TopPick {
+    std::array<int, 3> level{};  // level[0..n): dark .. bright, ascending, 0..255
+    int n = 2;
+    float score = 0;  // the smallest net CIELAB distance between two states or a state and a seam / side
+};
+struct TopSpec {
+    int n = 2;
+    std::array<int, 3> prefer{153, 204, 255};  // levels 0..255, ascending
+    int edge = 10, sideL = 56, sideR = 102;
+    bool operator==(const TopSpec&) const = default;
+};
+TopPick pickTops(const LabTable& lab, const TopSpec& spec);
+float topScore(const LabTable& lab, const TopSpec& spec, const std::array<int, 3>& level);  // the raw distance
+
+class TopPicker {
+public:
+    explicit TopPicker(double ease = 0.5) : ease_(ease) {}
+    // `version` changes whenever `lab` does (OrganicColors::version); re-picks at most every `minInterval` seconds.
+    void update(const LabTable& lab, std::uint64_t version, const TopSpec& spec, double t, double minInterval = 0.1);
+    bool have() const { return have_; }
+    std::array<float, 3> levels(double t) const;  // 0..1, eased over `ease` seconds after a switch
+    float score() const { return score_; }
+    int switches() const { return switches_; }
+
+private:
+    double ease_;
+    bool have_ = false;
+    std::uint64_t version_ = 0;
+    TopSpec spec_{};
+    double lastT_ = -1e30, switchT_ = -1e30;
+    std::array<int, 3> from_{}, to_{};
+    float score_ = 0;
+    int switches_ = 0;
+};
+
+// The labyrinth's three colors: its board, walls and ball (docs/3d-design.md "Labyrinth"). Three intensities as far
+// apart as possible (net CIELAB distance, wobble as for the stickers), each also clear of black (the holes); the
+// darkest goes to the board, the lightest to the walls (their lit tops read against the board), the third to the
+// ball. TrioPicker: hysteresis and easing as StickerPicker.
+struct TrioPick {
+    std::array<int, 3> level{};  // board, walls, ball (intensity * 255)
+    float score = 0;
+};
+TrioPick pickTrio(const LabTable& lab);
+float trioScore(const LabTable& lab, const std::array<int, 3>& level);
+
+class TrioPicker {
+public:
+    explicit TrioPicker(double ease = 0.5) : ease_(ease) {}
+    void update(const Palette& palette, const MapLut& lut, double t, double minInterval = 0.1);
+    std::array<float, 3> levels(double t) const;  // board, walls, ball 0..1
+    float score() const { return score_; }
+    int switches() const { return switches_; }
+
+private:
+    double ease_;
+    bool have_ = false;
+    double lastT_ = -1e30, switchT_ = -1e30;
+    Palette lastPal_{};
+    MapLut lastLut_{};
+    LabTable lab_{};
+    std::array<int, 3> from_{}, to_{};
     float score_ = 0;
     int switches_ = 0;
 };

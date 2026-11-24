@@ -39,6 +39,21 @@ the hitch count and a small histogram. Example:
 build/reforce.app/Contents/MacOS/reforce --no-audio --render-size 3840x2160 --stress --perf-report 180
 ```
 
+**Objects sweep** (`scripts/perf-sweep.py`, Peter 2026-11-23): every Object (solid or organic) on its own, offline
+and in the background (a running reforce is untouched), 20 s each at 1080p (reforce's render size) by default,
+after a visuals-only baseline,
+then all of them in a row with crossfades. It reads the objects from `content/Categories/Object/`, so a new object
+added to a group is swept with no change to the script, and a listed scene that no longer starts fails. Per run: GPU
+and CPU ms per frame (average, 99th percentile, worst) against the 60 fps budget: `OVER` (a 99th percentile or the
+worst frame over 16.7 ms; exit status 1), `WARN` (a 99th percentile over half of it), `ok`. Report as JSON plus the
+logs in `build/perf-sweep/`. Run it on a quiet machine after adding objects:
+
+```sh
+scripts/perf-sweep.py                                   # everything, 1080p
+scripts/perf-sweep.py --size 3840x2160                  # a stress run at 4K
+scripts/perf-sweep.py --size 1920x1080 --only Rain      # a quick look at some
+```
+
 ## Install (launch from the Dock)
 
 ```sh
@@ -93,6 +108,14 @@ Behavior for Dock launches:
 - **Window.** Size, position and screen are restored. reforce always opens windowed, even if you quit
   while in full screen (Cmd+Ctrl+F enters it). Only an explicit `"reforce.Window.StartFullScreen": 1` in settings.json
   starts in full screen.
+- **Start Like This** (View menu; Peter 2026-11-23). Set reforce up once the way you play: on the display you want, full
+  screen or not, the control panel opened (⌘K). Then View › Start Like This saves that to settings.json, and every
+  launch (from the Dock too) opens on that display, goes full screen there if it was, and opens the control panel in
+  the browser if you had it open. Keys: `reforce.Window.Screen` (the display's name as macOS shows it, or
+  `external` for the first display that is not built in; empty = where the window was last),
+  `reforce.Window.StartFullScreen`, `reforce.UI.OpenOnLaunch`. If the display is not connected, reforce opens in a
+  window where it was (never full screen on a display you did not pick). View › Don't Start Like This turns all three
+  off.
 - **Trail buffer.** `"reforce.Intensity": "hq"` in settings.json uses a 16-bit float trail buffer instead of
   G-Force's 8-bit one (`"gforce"`, the default): no banding, no "stuck" trails in slow flows, but trails can look a bit
   different. `--intensity gforce|hq` on the command line overrides it. `reforce.FlowRounding` applies only to `gforce`.
@@ -108,7 +131,7 @@ Behavior for Dock launches:
 - **Menus.**
   - *reforce*: About, Quit.
   - *View*: Full Screen (⌃⌘F), Open Control Panel… (⌘K) opens the web UI, with its token in
-    `--ui-lan` mode.
+    `--ui-lan` mode; Start Like This / Don't Start Like This (above).
   - *Scene*: Next WaveShape / ColorMap / FlowField, Hold / Release All, Start Particle, Start
     Sprite, Look A/B. These send the same commands as the window hotkeys.
   - *Audio*: Default Input (the input chosen in System Settings → Sound, named in brackets), Everything the
@@ -363,10 +386,23 @@ lock; also in WaveShapes, Particles and Sprites). Ours are committed in `content
 | Prism Flyby | swoops in from deep space, skims past the camera left to right and back right to left with barrel rolls, then dives at you and shoots past; repeats every 20 s |
 | Octahedron Mirror | `Text=1`: the frame on its faces |
 | Fifteen Glass | a 15 puzzle solved on every 8-bar line: on the line the tiles leap into a scramble, then slide back one tile per beat (31 slides), the last landing on the next 8-bar line. Clear 3D glass buttons over the visuals, which show through, bent by the buttons' shape; etched white numbers |
+| Knight's Tour | a chess knight visits all 64 squares, one hop per beat, so the tour fills the 16-bar phrase and its 64th hop lands back on its first square on the phrase line, leaving a web of lines; then the web unravels and the next tour begins. Board from three quarters, slowly orbiting; a drop lights up the web, a build makes the knight float |
+| Knight's Web | the same with half-turn symmetric tours (a symmetric web), the board as grid lines only, seen from higher up |
+| Rain Downpour | rain on glass over the visuals: the frame is a window pane, the visuals a little behind it. Drops land on the beat (a cluster on every bar line, a drizzle on the 16ths), sit as beads that show the visuals upside down and small (each is a little lens), merge and, once big, run down with stick-slip motion, leaving droplets and a clear streak through the condensation fog; on phrase lines the big drops let go together. Downpour: twice the rain, thicker fog |
+| Rain Floor | rain on a glass floor seen from above, the visuals below: drops strike puddles on the beat, rings spread, cross and interfere (a damped wave equation with capillary dispersion) and bend the visuals; beads on the dry glass between the puddles; the puddles show (a bright edge, a dark contact line, deeper inside) and their ripples bounce off the edges |
+| Rain Pool | the same floor all under water (Wet 1): every drop strikes the water and throws a crown; the rings spread, cross and interfere over the whole frame, no beads |
 | Rubik Cube | solved on every 8-bar line: scrambles itself in two beats (30 turns), then undoes one turn per beat so the last lands on the next 8-bar line. Sticker colors are picked from the current ColorMap; `ColorKey=0` keeps the whole cube opaque over the camera |
+| Tilt Maze | a wooden tilt maze (11 x 11, one maze per 16-bar phrase, turning slowly) with a steel ball that rolls for real: the board tilts on the beats, the ball clacks into the walls on the beats and drops into the goal hole exactly on the next 8-bar line; then the maze sinks, a new one rises and the ball pops up out of the start. Board, walls and ball take three ColorMap colors; the board is half see-through |
+| Soma Cube | the seven Soma pieces build the 3 x 3 x 3 cube on the beat: one flies in every two beats and locks on the beat, the last on the 8-bar line; the cube stands for two bars, bursts into a ring of hovering pieces and builds again; no two pieces ever pass through each other (a different solution each round). Seven piece colors picked from the current ColorMap |
+| Jigsaw | a jigsaw of the live frame, solved on every 8-bar line: on beat 4 the finished picture breaks apart into 32 pieces that scatter, turned, over the empty table (the frame frosted and dimmed); they fly home corners and border first, each snapping in on a beat (two per beat at first), the last on the next 8-bar line. Every piece keeps showing the visuals from its home place. A drop pops the picture apart; a build makes the pile tremble |
+| Jigsaw Mini | the same with 12 big pieces growing from a corner, over a gray table, breaking apart on beat 8 |
+| Sierpinski Apex | an endless zoom onto the tip of a Sierpinski pyramid from outside: every 2 bars twice as close and a third of the way round, which is exactly where it started, so it loops on the bar line with no seam (docs/3d-design.md "Fractal zoom"). Surges after each bar line, glows on the beats, rushes in at a drop, slows in a build |
+| Sierpinski Vortex | the same kind of endless zoom, spiralling into the gaps of a Sierpinski tetrahedron: every 4 bars four times as close and a third of a turn |
+| Menger Tunnels | an endless flight down the tunnels of a Menger sponge: every 4 bars nine times as close |
 
 **Starting them:** as Objects (above): the **Objects** card, `switch:object:NAME`, or the `Objects: Solids` /
-`Objects: Puzzles` themes, which start one every ~30 s.
+`Objects: Puzzles` themes, which start one every ~30 s (the rain scenes are in the Water group, `Objects: Water`; the three fractal zooms in the
+Fractals group, `Objects: Fractals`).
 
 ```sh
 curl -s -X POST -H 'Content-Type: application/json' localhost:8411/api/command -d '{"layer":"object","action":"switch","config":"Icosahedron Drift"}'
@@ -452,8 +488,9 @@ committed in `content/Packages/reforce.Organic.package/`:
 | Rule 30 | a 1D cellular automaton, a row per 8th, scrolling up |
 | Game of Life | a generation per beat, a fresh soup every phrase |
 | Clifford Attractor | a strange attractor whose parameters glide over 24-40 bars |
-| Kick Ripples, Rain on a Pond, Ripple Ring | water (GPU wave equation): a drop on every beat / bar / 8th note, rings that spread, cross and fade |
+| Ripples Kick, Ripples Pond, Ripples Ring | water (GPU wave equation): a drop on every beat / bar / 8th note, rings that spread, cross and fade |
 | Julia Drift, Julia Pulse, Julia Bands | Julia sets (GPU): morphing once per phrase, swelling on the beat, bands flowing on the beat |
+| Dragon Fold, Dragon Rounded | the paper-folding dragon: every 2 beats the whole curve gets a copy that swings open 90 degrees about its end and snaps flat on the line, up to 4096 segments, then folds back up by the 8-bar line; rounded corners with a band running along it; a drop bursts it open |
 | Mandelbrot Dive | a Mandelbrot zoom (GPU): one slow dive of `Dive` bars (32; its length, the zoom is paced to fill it) toward one of 14 endings of four kinds taking turns (seahorse spirals with 2-5 arms, elephant lace, a mini-Mandelbrot standing upright, the ring of decorations around a mini), up to 2^32 deep, then 4 bars rushing back out; from the slideshow on a phrase line, by hand at once (catching up from the whole set); bands flow in on the beat, kicks push the zoom, a drop pulls it out |
 
 Kinds other than trees and their keys: docs/scene-format.md §5.8 and docs/rhythm-design.md.

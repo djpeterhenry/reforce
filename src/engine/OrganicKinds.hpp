@@ -12,6 +12,7 @@
 //   lsystem       an L-system (literal Axm, R1..R4 rules "F=FF"), one generation per Rate bars, each new generation
 //                 traced over its first bar
 //   attractor     a Clifford attractor (PA, PB, PC, PD per frame): Num points per frame as dots
+//   dragon        the paper-folding dragon unfolding one generation per fold line (engine/Dragon.hpp)
 //   invaders, hopper, cycles, rocks, bricks, chase   arcade games (engine/arcade, docs/arcade-design.md)
 
 #include <memory>
@@ -20,6 +21,7 @@
 
 #include "engine/LineGeometry.hpp"
 #include "engine/Sprites.hpp"
+#include "engine/StickerColors.hpp"
 #include "scene/Evaluate.hpp"
 
 namespace reforce::engine {
@@ -73,6 +75,13 @@ private:
     float path_;
 };
 
+// The current ColorMap's colors (what colorize gives each intensity, in CIELAB), for a body that picks its intensities
+// so they read under any map (the pyramid hopper's tops). `version` changes whenever `lab` does.
+struct OrganicColors {
+    LabTable lab{};
+    std::uint64_t version = 0;
+};
+
 // What a body gets each step.
 struct OrganicStep {
     double t = 0, age = 0, dt = 0;  // sim time, age of the organic, seconds since the last step
@@ -82,6 +91,8 @@ struct OrganicStep {
     double pen = 1;                 // Pen x FADER
     const scene::OrganicFrame* frame = nullptr;
     const SpriteAudio* audio = nullptr;
+    const OrganicColors* colors = nullptr;  // null: unknown (tests, no ColorMap yet)
+    bool ending = false;  // fading out (past full strength): a body may hold still rather than start something new
 };
 
 class OrganicBody {

@@ -1,0 +1,34 @@
+Vers=100
+Meta="reforce solid: a knight's tour. A chess knight visits all 64 squares of a board (grid lines, the visuals showing through every square) seen from three quarters, one hop per beat, so a tour fills the 16-bar phrase; the 64th hop takes it back to its first square (a closed tour) exactly on the phrase line, leaving a web of lines through every square. Then the web unravels and a new tour begins from the same square. Hops land on the beats: the knight settles, turns towards the next square, crouches and flies in an arc. The newest lines are the brightest. A drop lights up the whole web; a build makes the knight float. Below 90 BPM it hops twice per beat (two tours per phrase). Bar lines from the phrase clock while the beat clock is locked, else 120 BPM from the start."
+Mesh="knight"
+Text="2"
+// any closed tour (Sym 0), the board as grid lines (Brd 0; the filled squares smeared into stair steps in the trails,
+// Peter 2026-11-23)
+Sym="0"
+Brd="0"
+// 4 tours (a tour per phrase), ending on a phrase line of the live clock; started on a 16-bar line (Peter 2026-11-23:
+// a fixed PDur ended mid-tour)
+PBar="64"
+SBar="16"
+B0="t - START_TIME"
+// tours per phrase: 1, or 2 at slow tempos
+B1="1 + (SYNC_BPM > 0) * (SYNC_BPM < 90)"
+// phrases (tours) so far: the phrase clock when locked, else 120 BPM from the start (a tour per 32 s)
+B2="SYNC_ON * B1 * SYNC_PHRASE + (1 - SYNC_ON) * B0 / 32"
+// hops into this tour (0..64, landing on the whole numbers = the beats) and the tour's number
+Turn="64 * wrap(B2)"
+Seed="floor(B2)"
+Flsh="SYNC_DROP"
+Hovr="SYNC_BUILD"
+// the board seen from three quarters, slowly orbiting; it slides a little after the knight
+X="0"
+Y=".06 + .02 * sin(.13 * B0)"
+Z="0"
+Scal="1.18"
+RotX="-.98 + .06 * sin(.09 * B0)"
+Orbt=".045 * B0 + .6"
+Folw=".18"
+Shad=".75"
+// into the feedback (trails, the palette) and crisp on top
+Pen="1"
+EPen="1"

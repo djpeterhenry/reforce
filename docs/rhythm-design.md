@@ -129,6 +129,76 @@ docs/scene-format.md §5.8.
 | `life` | Game of Life | one generation per beat, a fresh soup every 16 bars (phrase lines) |
 | `lsystem` | (none: Fern and Bush removed 2026-11-22; the kind stays) | one generation per 1-2 bars, each traced in over its first bar |
 | `attractor` | Clifford Attractor | parameters glide over 24-40 bars |
+| `dragon` | Dragon Fold, Dragon Rounded | a fold every 2 beats, landing on the line; unfold, hold and refold every 8 bars (Peter 2026-11-23; Dragon Pinwheel, four dragons tail to tail, removed the same day: `Num` stays) |
+
+## Dragon (5O.9, engine/Dragon)
+
+Peter 2026-11-23: "a 'dragon' fractal ... the pattern you get with iterative copies and rotations of 90 degree
+angles". The Heighway (paper-folding) dragon: generation n + 1 is generation n plus a copy of it turned 90 degrees
+about its end point, so its turns are the regular paper-folding sequence and generation n has 2^n unit segments on
+the square lattice (it touches itself only at corners, never along an edge).
+
+- **The fold.** The copy starts folded back onto the curve, like a strip of paper folded in half, and swings open
+  about the end point over the last `Swng` (half) of a fold interval, accelerating (angle x s^2) and snapping flat
+  at exactly `Angl` (90) degrees **on the fold line** (a beat line with `Fold` 1). Then the next copy waits folded
+  until its own swing. The newest copy flashes as it lands (`Flsh`, fading over a beat), or (`Rise`, Dragon Fold; Peter 2026-11-23)
+  swings out dim and brightens smoothly once landed, full just as the next fold starts to swing. Dragon Fold (Peter
+  2026-11-23, "settle"): one even level for the whole curve (`Shd` 0) and `Setl` .25: a segment's brightness only
+  depends on how long ago it landed: a ghost at 1 - `Rise` of the level while it swings, rising past the level to a
+  glow (full; the level is 1 / (1 + `Setl`)) just as the next fold starts to swing, then settling back to the level
+  over the next fold interval. So at most two halves differ from the level: the newest rising, the one before it
+  settling. (Before: the generation shading was relative to the current generation, so every old segment dimmed a
+  little with every fold, under the rise; Peter found it weird.) How much the glow shows depends on the ColorMap. Dragon Rounded (Peter 2026-11-23): the same even level (`Shd` 0, `Flsh` 0)
+  with only the running band (`Run` .45) over it.
+- **Always phrase-aligned** (Peter 2026-11-23: "anything that moves where we are in a dragon phrase should update the
+  dragon"). The cycle is a pure function of the phrase-aligned bar clock, so a deck start, a phrase re-alignment, a
+  hot cue moving Link's timeline or the lock arriving puts the dragon at the right place in its cycle on the next
+  frame. The end follows too: an organic's PBar keeps ending on a phrase line of the live clock
+  (`OrganicRun::followBars`; bars left counted as the clock runs, so tempo changes move it, the end snapped every
+  frame to the nearest line), and a dragon fading out from a cycle line stays one still segment (`OrganicStep::ending`)
+  instead of showing the next cycle's first fold.
+- **The cycle** (`Cyc` bars, 4; on the phrase-aligned bar clock, so cycles start on phrase lines): fold k lands on
+  beat k x `Fold` of the cycle, up to `Gens` (12: 4096 segments) or as many as fit before the refold; it holds full
+  grown; over the last `Back` beats (2) every generation folds back up (smoothly, all the way, newest first) and the
+  cycle line itself shows one segment. The content: 8-bar cycles at a fold every 2 beats (Peter 2026-11-23), so Dragon Fold unfolds 12
+  generations over 24 beats, holds 4 and refolds over the last 4; two cycles a phrase.
+  Each cycle is mirrored and/or turned half way round (seeded), so consecutive dragons differ.
+- **The view.** Each generation's chord (start to end) is turned 45 degrees from the last and sqrt 2 longer; with
+  `Spin` 0 (default) the view turns with it, so every generation sits the same way, as large as fits (the angle
+  that fills a 16:9 frame best, found once at the start: the chord about 11 degrees off horizontal for one dragon).
+  So on screen a fold opens like a book: the old half turns one way as the copy swings the other. `Spin` 1 keeps the
+  view of the full-grown curve: the old half stands still and only the copy moves, but the young generations sit
+  at 45-degree steps and fill less of the frame. The scale moves geometrically from one generation's fit to the
+  next's through the swing, but never so far that the swinging copy leaves the frame (its box is larger
+  mid-swing): a slight breath on each fold.
+- **Intensity.** By the generation a segment was born in (`Shd`): the newest copy brightest, the first segment
+  dimmest, so the nested halves of the fold read in the ColorMap. Lines thin as segments shrink on screen (`Thin`
+  LWdt per pixel of segment, at most `Wdth`), so the folds stay apart at 4096 segments.
+- **Variants.** `Num` 2 (the twindragon), 3 or 4 dragons tail to tail about one point (four tile the plane around
+  it), each at its own intensity (`Sprd`; neighbors at least a third of it apart), all folding together (a
+  pinwheel), or each `Stag` fold intervals after the last (on the 16ths with `Stag` .25: busier, tried and not used
+  in the content). `Rnd` rounds the corners (a quadratic curve through each corner, `Rnd` x the segment back from
+  it), so the curve never touches itself and reads as one winding line. `Angl` other than 90 folds at that angle
+  (120 makes overlapping lace; not the terdragon, which is a different construction). `Run`: a bright band runs
+  along the curve once per bar (the rest dims by up to half to make room). Its place (Peter 2026-11-23) is measured
+  along a length that grows smoothly with the unfolding (2^G segments, G the continuous generations), so it never
+  jumps when a swinging copy appears or a refold takes one away and slides from the old curve onto the opening copy;
+  and it runs from three widths before the start (just after the bar line) to three widths past the end (just before
+  the next), so there is one band a bar, never split across the two ends.
+- **Drops and breakdowns.** A drop (`SYNC_DROP` rising past .5) collapses it to one segment and bursts every
+  generation open within `Brst` beats (1), fastest at first, everything flashing with the drop; it then stays open
+  until the refold. In a breakdown (`SYNC_BUILD`) the flap trembles as it swings (up to 9 degrees x build, six times
+  a beat), still landing exactly on the line.
+- **Cost.** The points are made once for the last generation (with a fixed angle every generation is a prefix of the
+  next), so a frame turns only the moving half and fits the view; the schedule is a pure function of the clock, so a
+  jump of any size costs one frame. At most 16,384 segments (Num x 2^Gens), 2 per segment more with `Rnd`. Release,
+  per step: 14 generations (16,384 segments) 0.18 ms; four dragons at 12 0.18 ms; four rounded at 12 (32,764) 0.33
+  ms; offline at 1920 x 1080 the whole frame's GPU time stays about 2 ms at most.
+
+Tests: tests/test_engine_dragon.cpp (the turns against the paper-folding sequence, 2^n unit lattice segments, the
+end at (1 - i)^n, prefixes, no edge twice; every fold landing on its line, the swing, hold and refold; the copy at
+90 degrees just before the line; the frame fit; determinism and a 4e9-beat jump; drops; variants, junk keys, huge
+or broken clocks; cost).
 
 ## GPU kinds (5O.6, render/FieldPipeline)
 
@@ -141,8 +211,8 @@ envelope and trails. Slots = `reforce.Object.MaxLive` + 1 (the spare for a cross
   a displacement (added in one substep, taken back from the next, so it has no velocity; the first version pushed and
   the water kept rising). Drops land on the beat lines (`Rate` per beat), at `DX`, `DY` or at random; `Rain` adds
   small ones. Drawn: the crests plus a slope highlight from the top left, minus a floor (.15) so the old rings'
-  chatter stays dark. Content: Kick Ripples (a drop per beat), Rain on a Pond (a big drop per bar, rain thickening
-  through a breakdown, reflecting walls), Ripple Ring (drops on the 8ths stepping round a ring every 2 bars).
+  chatter stays dark. Content: Ripples Kick (a drop per beat), Ripples Pond (a big drop per bar, rain thickening
+  through a breakdown, reflecting walls), Ripples Ring (drops on the 8ths stepping round a ring every 2 bars).
 - **julia**: one pass per frame, smooth escape-time shading; the set is dark. Content: Julia Drift (c runs once per
   phrase along the outside of the Mandelbrot set's main cardioid: always connected, so never dust), Julia Pulse
   (San Marco, swelling on every beat), Julia Bands (escape-count bands flowing in once per beat).

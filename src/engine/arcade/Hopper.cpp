@@ -620,10 +620,27 @@ public:
         const int R = game_.rows(), k = game_.landing();
 
         const double pen = s.pen;
-        auto fpen = [&](const char* key, double fb) { return std::clamp(frameNum(inst_, key, fb), 0.0, 1.0) * pen; };
-        const double edge = fpen("EDGE", 0.04), sideL = fpen("SIDL", 0.22), sideR = fpen("SIDR", 0.4);
-        const double topLo = fpen("TLO", 0.6), topHi = fpen("THI", 1.0);
-        const double body = fpen("CPEN", 0.9), ballPen = fpen("BPEN", 0.72);
+        auto rel = [&](const char* key, double fb) { return std::clamp(frameNum(inst_, key, fb), 0.0, 1.0); };
+        const double rEdge = rel("EDGE", 0.04), rSideL = rel("SIDL", 0.22), rSideR = rel("SIDR", 0.4);
+        const double edge = rEdge * pen, sideL = rSideL * pen, sideR = rSideR * pen;
+        const double body = rel("CPEN", 0.9) * pen, ballPen = rel("BPEN", 0.72) * pen;
+        // The tops' states, dark .. bright: TLo / THi, or (TAut, the default) picked for the current ColorMap so the
+        // states read as clearly different colors, as near TLo / THi as the map allows (engine::TopPicker).
+        const int L = game_.levels(), steps = L - 1;
+        const double rLo = rel("TLO", 0.6), rHi = rel("THI", 1.0);
+        double lv[3] = {rLo, 0.5 * (rLo + rHi), rHi};
+        if (s.colors && frameNum(inst_, "TAUT", 1) >= 0.5) {
+            TopSpec sp;
+            sp.n = L;
+            auto idx = [](double v) { return int(std::lround(v * 255)); };
+            sp.prefer = {idx(lv[0]), idx(lv[1]), idx(lv[2])};
+            sp.edge = idx(rEdge), sp.sideL = idx(rSideL), sp.sideR = idx(rSideR);
+            tops_.update(s.colors->lab, s.colors->version, sp, s.t);
+            const auto l = tops_.levels(s.t);
+            lv[0] = l[0], lv[1] = L == 3 ? l[1] : 0.5 * (l[0] + l[1]), lv[2] = L == 3 ? l[2] : l[1];
+        }
+        auto topOf = [&](int st) { return pen * (st <= 0 ? lv[0] : st >= steps ? lv[2] : lv[1]); };
+        const double topHi = topOf(steps);
         const double hop = std::clamp(frameNum(inst_, "HOP", 0.55), 0.0, 4.0) * (1 + 1.6 * build);
 
         // Fit: R rows plus headroom over the apex for the hops, in 1.78 x 3.3 tree units at 16:9 (the width follows the
@@ -659,10 +676,21 @@ public:
         // on the 16ths), then the tops go dark again in a quick cascade down the rows, before the first landing.
         const bool flash = hc < 0.5 && (int(std::floor(hc * 8)) & 1) == 0;
         const int landed = plan.pos[std::size_t(k)];
+        topDraws_.clear();
         for (int i = 0; i < game_.cubes(); ++i) {
             const int r = hopper::rowOf(i), col = hopper::colOf(i);
             const double x = hopper::topX(i), y = hopper::topY(i);
-            double top = lerp(topLo, topHi, double(game_.state(i)) / (game_.levels() - 1));
+            const int st = game_.state(i);
+            double top = topOf(st);
+            // The state in the shape too, so it reads on any ColorMap: a dark top is a rim around a hollow in the
+            // seam color, a middle one (Levels 3) has a filled center, a bright one is filled; a step grows the fill
+            // out from the center over the first kFill of a beat.
+            auto fillOf = [&](int q) { return double(std::clamp(q, 0, steps)) / steps; };
+            double fill = fillOf(st);
+            if (st > 0 && plan.stepAt.size() == std::size_t(game_.cubes() * steps)) {
+                const double since = hc - plan.stepAt[std::size_t(i * steps + st - 1)];
+                if (since >= 0 && since < kFill) fill = lerp(fillOf(st - 1), fill, 1 - std::pow(1 - since / kFill, 3));
+            }
             double l = sideL, rr = sideR;
             if (build > 0)  // shimmer: a glint running over the tops, only ever brighter (a darker top looks unturned)
                 top = lerp(top, pen, 0.45 * build * std::pow(0.5 + 0.5 * std::sin(2 * kPi * (hc + 0.17 * r - 0.31 * col)), 4));
@@ -670,6 +698,7 @@ public:
             if (hc < 1) {
                 const double down = 0.5 + 0.35 * r / std::max(1, R - 1);  // this row's tops go dark here
                 top = lerp(topHi, top, smooth((hc - down) / 0.1));
+                fill = lerp(1.0, fill, smooth((hc - down) / 0.1));
                 if (flash) {
                     l = lerp(l, pen, 0.6);
                     rr = lerp(rr, pen, 0.6);
@@ -685,12 +714,26 @@ public:
             double tx[4] = {x, x + 0.5, x, x - 0.5}, ty[4] = {y + 0.25, y, y - 0.25, y};
             inset(tx, ty, 4, gap);
             bd.poly(tx, ty, 4, std::clamp(top, 0.0, 1.0));
+            if (fill < 0.999) topDraws_.push_back({x, y, fill, std::clamp(top, 0.0, 1.0)});
             double lx[4] = {x - 0.5, x, x, x - 0.5}, ly[4] = {y, y - 0.25, y - 0.75, y - 0.5};
             inset(lx, ly, 4, gap);
             bd.poly(lx, ly, 4, l);
             double rx[4] = {x + 0.5, x, x, x + 0.5}, ry[4] = {y, y - 0.25, y - 0.75, y - 0.5};
             inset(rx, ry, 4, gap);
             bd.poly(rx, ry, 4, rr);
+        }
+
+        // The hollows (over the tops: a new path overwrites), then the growing fills over them.
+        if (!topDraws_.empty()) {
+            auto diamond = [&](double x, double y, double k, double p) {
+                const double dx[4] = {x, x + 0.5 * k, x, x - 0.5 * k}, dy[4] = {y + 0.25 * k, y, y - 0.25 * k, y};
+                bd.poly(dx, dy, 4, p);
+            };
+            c.newPath();
+            for (const auto& d : topDraws_) diamond(d.x, d.y, kHollow, edge);
+            c.newPath();
+            for (const auto& d : topDraws_)
+                if (d.fill > 0.001) diamond(d.x, d.y, kHollow * d.fill, d.pen);
         }
 
         // Balls: a dark rim, the ball, a highlight; a burst is a ring of sparks.
@@ -730,6 +773,13 @@ public:
 
 private:
     static constexpr int kMaxSil = 3 * hopper::kMaxRows + 2;
+    static constexpr double kHollow = 0.62;  // the hollow's size relative to the top (the rim is the rest)
+    static constexpr double kFill = 0.2;     // beats a step's fill takes to grow out to the rim
+    struct TopDraw {
+        double x, y, fill, pen;
+    };
+    std::vector<TopDraw> topDraws_;  // this frame's tops that are not (yet) filled
+    TopPicker tops_;
 
     hopper::Config config(scene::OrganicInstance& in, std::uint64_t seed) {
         hopper::Config c;

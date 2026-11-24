@@ -539,6 +539,21 @@ fragment float4 solid_color_fs(SOut in [[stage_in]], texture2d<float> tex [[text
         const float3 tile = color_of(t.r / c, pal, lut);
         const float3 num = mix(tile * 0.15f, mix(tile, float3(1.0f), 0.8f), saturate(P.threshold));
         col = (f * tile + (c - f) * num) / c;
+    } else if (P.mode == 2) {
+        // labyrinth: the colors by share, the rest (the holes) black; shading a / c is stored halved (0..2): above 1
+        // it mixes towards white (the ball's highlight). The board's top has partial coverage (Floor): see-through.
+        // An anti-aliased edge between two of its three intensities (P.black / white / gamma) mixes their two colors
+        // rather than passing through the ColorMap's colors in between (no dark or odd fringe around the ball).
+        const float lo = min(P.black, min(P.white, P.gamma)), hi = max(P.black, max(P.white, P.gamma));
+        const float mid = P.black + P.white + P.gamma - lo - hi;
+        float3 base;
+        if (L <= mid)
+            base = mix(color_of(lo, pal, lut), color_of(mid, pal, lut), saturate((L - lo) / max(mid - lo, 1e-4f)));
+        else
+            base = mix(color_of(mid, pal, lut), color_of(hi, pal, lut), saturate((L - mid) / max(hi - mid, 1e-4f)));
+        const float s2 = 2.0f * shade;
+        const float3 lit = mix(base * min(s2, 1.0f), float3(1.0f), saturate(s2 - 1.0f));
+        return float4(lit * (f / c), saturate(c * P.opacity));
     } else {
         col = (f * color_of(L, pal, lut) + (c - f) * color_of(0.0f, pal, lut)) / c;
     }
@@ -1699,7 +1714,8 @@ void ScenePipeline::encodeColorize(MTL::CommandBuffer* cmd, const engine::Palett
         auto it = spriteTex_.find(q.texture);
         if (it == spriteTex_.end() || !it->second.tex || q.w <= 0 || q.h <= 0 || !(q.opacity > 0)) continue;
         SpriteP sp{{float(width_), float(height_)}, {q.cx, q.cy}, {q.w * 0.5f, q.h * 0.5f}, 1.0f, q.opacity,
-                   q.puzzle, 0, q.numeral, 0, 0, 0, 0.0f, 0, 0.0f, 1.0f, 1.0f, 0, {q.u0, q.v0, q.u1, q.v1}};
+                   q.puzzle, 0, q.numeral, 0, 0, 0, 0.0f, 0, q.levels[0], q.levels[1], q.levels[2], 0,
+                   {q.u0, q.v0, q.u1, q.v1}};  // (black, white, gamma carry the labyrinth's three levels)
         enc->setRenderPipelineState(trackAlpha && q.opaque ? solidColorOpaquePso_ : solidColorPso_);
         enc->setVertexBytes(&sp, sizeof(sp), 0);
         enc->setFragmentBytes(&sp, sizeof(sp), 0);

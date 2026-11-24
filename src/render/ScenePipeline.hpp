@@ -187,9 +187,12 @@ struct SpriteQuad {
     // Full-color movie sprites: opaque in the Syphon alpha (the movie's ColorKey = 0) while it is tracked.
     bool opaque = false;
     // Puzzle solids drawn in color (encodeColorize's colorSolids): 0 rubik (stickers and plastic), 1 fifteen (tiles
-    // with numbers in a contrasting shade).
+    // with numbers in a contrasting shade), 2 labyrinth (board, walls, ball; black holes; highlights to white).
     int puzzle = 0;
     float numeral = 0;  // fifteen: the numbers 0 = dark .. 1 = light (engine::TilePicker::numeral)
+    // labyrinth (puzzle 2): the board, walls and ball intensities; an edge pixel between two of them takes a mix of
+    // their two colors (not the ColorMap colors in between)
+    float levels[3] = {0.0f, 1.0f, 1.0f};
 };
 
 // Color video layer for one colorize pass (Phase 5F): outgoing source A and

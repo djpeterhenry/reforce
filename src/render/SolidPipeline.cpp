@@ -133,6 +133,124 @@ fragment float4 fifteen_fs(SolidOut in [[stage_in]], constant FifteenF& U [[buff
     return float4(saturate(lum), 1.0f, share, saturate(shade));
 }
 
+// Knight's tour (MeshKind::Knight; docs/3d-design.md "Knight's tour"). part 0: the piece (level x shading, plus a rim
+// where the surface turns away from the viewer); 1: a board square (uv across it, edge 1 = light): its fill and grid
+// lines `width` wide (uv units), nothing where both are dark (the visuals show through); 2: flat at level (web).
+struct KnightF { float4 light; float level; float shade; int part; float line; float lightFill; float darkFill;
+                 float width; float rim; };
+
+fragment float4 knight_fs(SolidOut in [[stage_in]], constant KnightF& U [[buffer(0)]]) {
+    float lum = U.level;
+    if (U.part == 0) {
+        const float3 n = normalize(in.n);
+        lum = U.level * mix(1.0f, max(0.0f, dot(n, U.light.xyz)), U.shade);
+        lum += U.rim * U.level * pow(1.0f - saturate(n.z), 3.0f);
+    } else if (U.part == 1) {
+        const float2 uv = in.uv;
+        const float d = min(min(uv.x, 1.0f - uv.x), min(uv.y, 1.0f - uv.y));
+        const float aa = max(fwidth(d), 1e-4f);
+        const float line = 1.0f - smoothstep(U.width - aa, U.width + aa, d);
+        const float fill = in.edge > 0.5f ? U.lightFill : U.darkFill;
+        lum = max(fill, U.line * line);
+        if (lum < 0.004f) discard_fragment();
+    }
+    return float4(saturate(lum), 1.0f, 0.0f, 0.0f);
+}
+
+// ---- labyrinth (MeshKind::Labyrinth): the board, walls, holes and ball, each drawn with its own transform --------
+// `local` takes the mesh into board units (untilted: z = 0 is the board's top), for the ball's shadow.
+struct LabV { float4x4 mvp; float4 n0; float4 n1; float4 n2; float4x4 local; };
+struct LabOut { float4 position [[position]]; float3 n; float2 uv; float3 local; };
+// ball: x, y (board units), height of its center above the board, radius. part: 0 board, 1 walls / rings, 2 ball,
+// 3 hole (black).
+struct LabF { float4 light; float4 ball; float level; float shade; int part; float alpha; float flash; float shadow;
+              float pad0; float pad1; };
+
+vertex LabOut labyrinth_vs(uint vid [[vertex_id]], const device MeshVertex* v [[buffer(0)]],
+                           constant LabV& U [[buffer(1)]]) {
+    const MeshVertex m = v[vid];
+    const float4 p = float4(float3(m.pos), 1.0f);
+    LabOut o;
+    o.position = U.mvp * p;
+    const float3 n = float3(m.normal);
+    o.n = U.n0.xyz * n.x + U.n1.xyz * n.y + U.n2.xyz * n.z;
+    o.uv = float2(m.uv);
+    o.local = (U.local * p).xyz;
+    return o;
+}
+
+// As the puzzles: r = intensity x share, g = coverage, b = share (0 = black: the holes), a = coverage x shading / 2
+// (shading 0..2: above 1 the color pass mixes towards white, the ball's highlight). The board's top writes its
+// opacity (Floor) as coverage, premultiplied, so the visuals show through it in the color pass.
+fragment float4 labyrinth_fs(LabOut in [[stage_in]], constant LabF& U [[buffer(0)]]) {
+    const float3 n = normalize(in.n);
+    const float lambert = max(0.0f, dot(n, U.light.xyz));
+    float s = mix(1.0f, lambert, U.shade);
+    float a = 1.0f, share = 1.0f;
+    if (U.part == 0) {
+        if (in.uv.x >= 0.0f) {  // the top: translucent, with the ball's soft shadow
+            a = U.alpha;
+            const float h = max(U.ball.z, 0.0f);
+            const float2 sp = U.ball.xy - U.light.xy / max(U.light.z, 0.3f) * h;
+            const float d = length(in.local.xy - sp);
+            s *= 1.0f - 0.55f * U.shadow * (1.0f - smoothstep(0.4f * U.ball.w, 1.25f * U.ball.w, d));
+        } else {
+            s *= 0.8f;  // the board's edges
+        }
+    } else if (U.part == 2) {
+        // Polished steel in the ball's color: a bright sky above, darker below, a white highlight, and a glint
+        // around the rim just after a clack.
+        const float3 r = reflect(float3(0.0f, 0.0f, -1.0f), n);
+        float env = mix(0.28f, 1.0f, smoothstep(-0.35f, 0.75f, r.y));
+        env *= 0.55f + 0.45f * lambert;
+        const float spec = pow(max(dot(r, U.light.xyz), 0.0f), 40.0f);
+        const float rim = pow(1.0f - saturate(n.z), 2.0f);
+        s = env + 1.1f * spec + U.flash * 0.8f * rim;
+    } else if (U.part == 3) {
+        share = 0.0f;
+        s = 0.0f;
+    }
+    return float4(saturate(U.level) * share * a, a, share * a, saturate(0.5f * s) * a);
+}
+
+// Soma cube (MeshKind::Soma): uv 0..1 across the face, edge = the face direction d; codes = the face borders
+// (engine::soma::edgeCodes: 2 = the piece's outer edge, 1 = a seam inside the piece, 0 = none); col = the cube's world
+// rotation (its local axes), for the borders' directions.
+struct SomaF { float4 light; float4 col0; float4 col1; float4 col2;
+               float level; float shade; float flash; float bevel; uint codes0; uint codes1; float ambient; float pad; };
+
+fragment float4 soma_fs(SolidOut in [[stage_in]], constant SomaF& U [[buffer(0)]]) {
+    const int d = clamp(int(in.edge + 0.5f), 0, 5);
+    const uint codes = (d < 3 ? (U.codes0 >> (8 * d)) : (U.codes1 >> (8 * (d - 3)))) & 0xFFu;
+    int ua = (d / 2 + 1) % 3, va = (d / 2 + 2) % 3;
+    if (d % 2) { const int k = ua; ua = va; va = k; }
+    const float3 cols[3] = {U.col0.xyz, U.col1.xyz, U.col2.xyz};
+    const float3 uw = cols[ua], vw = cols[va];
+    const float dist[4] = {in.uv.x, 1.0f - in.uv.x, in.uv.y, 1.0f - in.uv.y};
+    const float3 dirs[4] = {-uw, uw, -vw, vw};
+    float3 n = normalize(in.n);
+    float line = 1.0f;
+    for (int e = 0; e < 4; ++e) {
+        const uint code = (codes >> (2 * e)) & 3u;
+        const float x = dist[e];
+        const float aa = max(fwidth(x), 1e-4f);
+        if (code == 2u) {
+            // A rounded outer edge: the normal turns towards the edge (about 45 degrees at it), and a groove where
+            // two pieces meet.
+            const float t = saturate(1.0f - x / max(U.bevel, 1e-3f));
+            n += dirs[e] * (t * t * 1.2f);
+            line *= mix(0.4f, 1.0f, smoothstep(0.012f - aa, 0.012f + aa, x));
+        } else if (code == 1u) {
+            line *= mix(0.82f, 1.0f, smoothstep(0.008f - aa, 0.008f + aa, x));  // a faint seam
+        }
+    }
+    n = normalize(n);
+    const float lam = U.ambient + (1.0f - U.ambient) * max(0.0f, dot(n, U.light.xyz));
+    float shade = mix(1.0f, lam, U.shade);
+    shade = mix(shade, 1.0f, 0.45f * saturate(U.flash)) * line;  // a lock lights the piece up for a moment
+    return float4(saturate(U.level), 1.0f, 1.0f, saturate(shade));
+}
+
 // ---- glass (encodeGlass) -----------------------------------------------------------------------------------------
 struct FullOut { float4 position [[position]]; float2 uv; };
 vertex FullOut glass_full_vs(uint vid [[vertex_id]]) {
@@ -300,12 +418,41 @@ struct FifteenF {
     int32_t number;
 };
 static_assert(sizeof(FifteenF) == 32, "FifteenF must match the MSL struct");
+struct KnightF {
+    float light[4];
+    float level, shade;
+    int32_t part;
+    float line, lightFill, darkFill, width, rim;
+};
+static_assert(sizeof(KnightF) == 48, "KnightF must match the MSL struct");
+struct LabV {
+    float mvp[16];
+    float n0[4], n1[4], n2[4];
+    float local[16];
+};
+static_assert(sizeof(LabV) == 176, "LabV must match the MSL struct");
+struct LabF {
+    float light[4];
+    float ball[4];
+    float level, shade;
+    int32_t part;
+    float alpha, flash, shadow, pad0, pad1;
+};
+static_assert(sizeof(LabF) == 64, "LabF must match the MSL struct");
+struct SomaF {
+    float light[4];
+    float col0[4], col1[4], col2[4];
+    float level, shade, flash, bevel;
+    uint32_t codes0, codes1;
+    float ambient, pad;
+};
+static_assert(sizeof(SomaF) == 96, "SomaF must match the MSL struct");
 struct FrameTileP {
     float crop[2];
     float texel[2];  // source pixels per tile pixel, in source UV
 };
 
-constexpr int kMeshKinds = int(engine::MeshKind::Model) + 1;  // Model: empty (render/ModelPipeline draws it)
+constexpr int kMeshKinds = int(engine::MeshKind::Fractal) + 1;  // Model, Rain, Fractal: empty (their own pipelines)
 
 // Right-handed rotation about `axis` (as engine::solidModel's).
 engine::Mat4 axisRotation(int axis, double a) {
@@ -333,10 +480,18 @@ engine::Mat4 uniformScale(float k) {
 // The rubik cube spans [-1.5, 1.5]^3 in cubie units; this makes its circumradius 1 (Scal = circumradius, as for
 // the other meshes).
 const float kRubikUnit = float(1.0 / (1.5 * std::sqrt(3.0)));
+// The soma in cell units: a 3 x 3 x 3 figure's circumradius is 1 (Scal), like the rubik.
+const float kSomaUnit = float(1.0 / (1.5 * std::sqrt(3.0)));
+// Towards the soma's light (world, before normalizing): upper left, from the front, so tops are the brightest.
+constexpr float kSomaLight[3] = {-0.35f, 0.9f, 0.5f};
+constexpr float kSomaAmbient = 0.38f, kSomaBevel = 0.09f;
+
 // The 15 puzzle in board units: cells 1 apart, tiles .94 square and .4 thick (no tray: the gaps and the blank show the
 // visuals); a 4.3 square around the board is the circumradius 1 and the screen box.
 constexpr float kTray = 4.3f, kTileSize = 0.94f, kTileThick = 0.4f;
 const float kFifteenUnit = float(1.0 / (kTray * 0.5 * std::sqrt(2.0)));
+// The labyrinth's board: the slab reaches kLabyrinthRim beyond the outer walls' center lines and is this thick.
+constexpr float kLabyrinthRim = 0.2f, kLabyrinthSlab = 0.3f;
 engine::Mat4 boxScale(float x, float y, float z) {
     engine::Mat4 t = engine::Mat4::identity();
     t.m[0] = x;
@@ -344,6 +499,11 @@ engine::Mat4 boxScale(float x, float y, float z) {
     t.m[10] = z;
     return t;
 }
+// The knight's board in board units (1 per square): the board's corner (4, 4) is the circumradius 1. The piece is
+// drawn kPieceScale squares per mesh unit (its base .82 of a square wide, 1.18 squares high).
+const float kKnightUnit = float(1.0 / (4.0 * std::sqrt(2.0)));
+constexpr float kPieceScale = 1.1f;
+constexpr float kKnightTop = 2.6f;  // above the board: the highest hop plus the piece (screen box)
 
 std::array<float, 3> normalized(const std::array<float, 3>& v) {
     const float l = std::sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
@@ -485,7 +645,7 @@ bool parseSolidTest(const std::string& spec, SolidTestSpec& out, std::string* er
     parts.push_back(cur);
     const auto kind = engine::parseMeshKind(parts[0]);
     if (!kind) return fail("unknown mesh \"" + parts[0] + "\" (tetrahedron, cube, octahedron, dodecahedron, "
-                           "icosahedron, sphere, torus, prism, rubik, fifteen)");
+                           "icosahedron, sphere, torus, prism, rubik, fifteen, labyrinth, knight, soma)");
     s.draw.mesh = *kind;
     for (std::size_t i = 1; i < parts.size(); ++i) {
         if (parts[i].empty()) continue;
@@ -524,6 +684,17 @@ bool parseSolidTest(const std::string& spec, SolidTestSpec& out, std::string* er
         else if (k == "moves") s.moves = int(x);
         else if (k == "shuf") s.shuffle = x;
         else if (k == "glass") s.glass = x != 0;
+        else if (k == "sym") s.sym = x;
+        else if (k == "hover") s.hover = x;
+        else if (k == "board") s.draw.knightLook.board = int(x);
+        else if (k == "orbit") s.draw.knightLook.orbit = float(x);
+        else if (k == "follow") s.draw.knightLook.follow = float(x);
+        else if (k == "flash") s.draw.knightLook.flash = float(x);
+        else if (k == "grid") s.grid = int(std::clamp(x, -1e6, 1e6));
+        else if (k == "beats") s.beats = int(std::clamp(x, -1e6, 1e6));
+        else if (k == "traps") s.traps = int(std::clamp(x, -1e6, 1e6));
+        else if (k == "floor") s.draw.floor = float(std::clamp(x, 0.0, 1.0));
+        else if (k == "figure") s.figure = int(std::clamp(x, 0.0, 99.0));
         else if (k == "text") {
             if (x != 0 && x != 1 && x != 2) return fail("text must be 0, 1 or 2: " + parts[i]);
             s.draw.text = SolidText(int(x));
@@ -538,6 +709,24 @@ bool parseSolidTest(const std::string& spec, SolidTestSpec& out, std::string* er
         const int moves = std::clamp(s.moves, 1, engine::fifteen::kMaxMoves);
         s.draw.fifteen = engine::fifteen::frameAt(uint64_t(std::max(0.0, s.seed)), moves, s.turn < 0 ? double(moves) : s.turn,
                                                   s.shuffle);
+    }
+    if (s.draw.mesh == engine::MeshKind::Knight) {
+        const uint64_t seed = uint64_t(std::clamp(s.seed, 0.0, 1e15));
+        s.draw.tour = engine::knight::makeTour(seed, s.sym != 0);
+        if (seed > 0) s.draw.prevTour = engine::knight::makeTour(seed - 1, s.sym != 0);
+        s.draw.knight = engine::knight::frameAt(s.draw.tour, seed > 0 ? s.draw.prevTour : s.draw.tour,
+                                                s.turn < 0 ? double(engine::knight::kSquares) : s.turn, s.hover);
+    }
+    if (s.draw.mesh == engine::MeshKind::Labyrinth) {
+        engine::labyrinth::Player player(s.beats);
+        const double turn = s.turn < 0 ? double(s.beats) : s.turn;
+        s.draw.labyrinth = player.at(uint64_t(std::clamp(s.seed, 0.0, 1e15)), s.grid, s.beats, turn, s.traps);
+    }
+    if (s.draw.mesh == engine::MeshKind::Soma) {
+        engine::soma::Player player({std::clamp(s.figure, 0, engine::soma::figureCount() - 1)});
+        const engine::soma::Timing tm;
+        s.draw.soma = player.frame(s.seed, s.turn < 0 ? tm.len : s.turn, tm, 0.0, 0.0,
+                                   {s.draw.pose.rotY, s.draw.pose.rotX});
     }
     out = s;
     return true;
@@ -558,6 +747,20 @@ SolidPipeline::SolidPipeline(ScenePipeline& scene, const SolidPipelineOptions& o
         meshes_.push_back(engine::makeMesh(engine::MeshKind(k)));
         ranges_.push_back({uint32_t(all.size()), uint32_t(meshes_.back().vertices.size())});
         all.insert(all.end(), meshes_.back().vertices.begin(), meshes_.back().vertices.end());
+    }
+    // The knight's board and web parts (engine/Knight.hpp), after the MeshKind ranges.
+    auto extra = [&](const engine::Mesh& em, Range& r) {
+        r = {uint32_t(all.size()), uint32_t(em.vertices.size())};
+        all.insert(all.end(), em.vertices.begin(), em.vertices.end());
+    };
+    extra(engine::knight::makeBoard(), knightBoard_);
+    extra(engine::knight::makeSegmentQuad(), knightSegment_);
+    extra(engine::knight::makeDisc(24, 0.0), knightDisc_);
+    extra(engine::knight::makeDisc(48, 0.82), knightRing_);
+    for (Range* r : {&discRange_, &ringRange_}) {  // the labyrinth's holes (disc) and start / goal rings
+        const engine::Mesh ring = engine::makeFlatRing(r == &discRange_ ? 0.0 : 0.8);
+        *r = {uint32_t(all.size()), uint32_t(ring.vertices.size())};
+        all.insert(all.end(), ring.vertices.begin(), ring.vertices.end());
     }
     vertices_ = device_->newBuffer(all.data(), NS::UInteger(all.size() * sizeof(engine::MeshVertex)),
                                    MTL::ResourceStorageModeShared);
@@ -617,6 +820,57 @@ SolidPipeline::SolidPipeline(ScenePipeline& scene, const SolidPipelineOptions& o
         if (!fifteenPso_)
             throw std::runtime_error(std::string("pipeline 'solid fifteen' failed: ") +
                                      (ferr ? ferr->localizedDescription()->utf8String() : "?"));
+        MTL::Function* kvs = loadFunction(lib, "solid_vs");
+        MTL::Function* kfs = loadFunction(lib, "knight_fs");
+        MTL::RenderPipelineDescriptor* kd = MTL::RenderPipelineDescriptor::alloc()->init();
+        kd->setLabel(NS::String::string("solid knight", NS::UTF8StringEncoding));
+        kd->setVertexFunction(kvs);
+        kd->setFragmentFunction(kfs);
+        kd->colorAttachments()->object(0)->setPixelFormat(MTL::PixelFormatRGBA8Unorm);
+        kd->setDepthAttachmentPixelFormat(MTL::PixelFormatDepth32Float);
+        kd->setRasterSampleCount(NS::UInteger(msaa_));
+        NS::Error* kerr = nullptr;
+        knightPso_ = device_->newRenderPipelineState(kd, &kerr);
+        kd->release();
+        kvs->release();
+        kfs->release();
+        if (!knightPso_)
+            throw std::runtime_error(std::string("pipeline 'solid knight' failed: ") +
+                                     (kerr ? kerr->localizedDescription()->utf8String() : "?"));
+        MTL::Function* lvs = loadFunction(lib, "labyrinth_vs");
+        MTL::Function* lfs = loadFunction(lib, "labyrinth_fs");
+        MTL::RenderPipelineDescriptor* ld = MTL::RenderPipelineDescriptor::alloc()->init();
+        ld->setLabel(NS::String::string("solid labyrinth", NS::UTF8StringEncoding));
+        ld->setVertexFunction(lvs);
+        ld->setFragmentFunction(lfs);
+        ld->colorAttachments()->object(0)->setPixelFormat(MTL::PixelFormatRGBA8Unorm);
+        ld->setDepthAttachmentPixelFormat(MTL::PixelFormatDepth32Float);
+        ld->setRasterSampleCount(NS::UInteger(msaa_));
+        NS::Error* lerr = nullptr;
+        labyrinthPso_ = device_->newRenderPipelineState(ld, &lerr);
+        ld->release();
+        lvs->release();
+        lfs->release();
+        if (!labyrinthPso_)
+            throw std::runtime_error(std::string("pipeline 'solid labyrinth' failed: ") +
+                                     (lerr ? lerr->localizedDescription()->utf8String() : "?"));
+        MTL::Function* svs = loadFunction(lib, "solid_vs");
+        MTL::Function* sfs = loadFunction(lib, "soma_fs");
+        MTL::RenderPipelineDescriptor* sd = MTL::RenderPipelineDescriptor::alloc()->init();
+        sd->setLabel(NS::String::string("solid soma", NS::UTF8StringEncoding));
+        sd->setVertexFunction(svs);
+        sd->setFragmentFunction(sfs);
+        sd->colorAttachments()->object(0)->setPixelFormat(MTL::PixelFormatRGBA8Unorm);
+        sd->setDepthAttachmentPixelFormat(MTL::PixelFormatDepth32Float);
+        sd->setRasterSampleCount(NS::UInteger(msaa_));
+        NS::Error* serr = nullptr;
+        somaPso_ = device_->newRenderPipelineState(sd, &serr);
+        sd->release();
+        svs->release();
+        sfs->release();
+        if (!somaPso_)
+            throw std::runtime_error(std::string("pipeline 'solid soma' failed: ") +
+                                     (serr ? serr->localizedDescription()->utf8String() : "?"));
     }
     {
         // Glass: the half-size blur chain and the tile pipeline (straight alpha over the BGRA frame; the opaque
@@ -810,6 +1064,9 @@ SolidPipeline::~SolidPipeline() {
     if (pso_) pso_->release();
     if (rubikPso_) rubikPso_->release();
     if (fifteenPso_) fifteenPso_->release();
+    if (knightPso_) knightPso_->release();
+    if (labyrinthPso_) labyrinthPso_->release();
+    if (somaPso_) somaPso_->release();
     for (auto* p : {downPso_, blurPso_, glassPso_, glassCompositePso_, glassCompositeOpaquePso_})
         if (p) p->release();
     if (glassVertices_) glassVertices_->release();
@@ -861,7 +1118,49 @@ SolidQuad SolidPipeline::encode(MTL::CommandBuffer* cmd, int slot, const SolidDr
     const engine::Mat4 mvp = vp * model;
     const bool rubik = d.mesh == engine::MeshKind::Rubik;
     const bool fifteen = d.mesh == engine::MeshKind::Fifteen;
-    const engine::Mat4 boardModel = fifteen ? model * uniformScale(kFifteenUnit) : model;
+    const bool labyrinth = d.mesh == engine::MeshKind::Labyrinth;
+    const bool knight = d.mesh == engine::MeshKind::Knight;
+    // The labyrinth: board units (a cell is 1), the board's corner at the circumradius, tilted about its center.
+    const int labN = std::clamp(d.labyrinth.maze.n, engine::labyrinth::kMinGrid, engine::labyrinth::kMaxGrid);
+    const float labHalf = 0.5f * float(labN) + kLabyrinthRim;
+    engine::Mat4 boardModel = model;
+    if (fifteen) boardModel = model * uniformScale(kFifteenUnit);
+    if (labyrinth) {
+        const double gain = std::isfinite(d.tiltGain) ? std::clamp(double(d.tiltGain), 0.0, 4.0) : 1.0;
+        auto angle = [&](float s) { return gain * std::asin(std::clamp(std::isfinite(s) ? double(s) : 0.0, -0.5, 0.5)); };
+        boardModel = model * uniformScale(float(1.0 / (labHalf * std::sqrt(2.0)))) *
+                     axisRotation(1, angle(d.labyrinth.tiltX)) * axisRotation(0, -angle(d.labyrinth.tiltY));
+    }
+    // The knight's board: board units (a square is 1), turned about its normal (Orbt), sliding after the knight (Folw).
+    if (knight) {
+        const engine::knight::Frame& kn = d.knight;
+        const float follow = std::isfinite(d.knightLook.follow) ? std::clamp(d.knightLook.follow, 0.0f, 1.0f) : 0.0f;
+        const float orbit = std::isfinite(d.knightLook.orbit) ? std::fmod(d.knightLook.orbit, 6.2831853f) : 0.0f;
+        const float knX = std::isfinite(kn.x) ? std::clamp(kn.x, -4.0f, 4.0f) : 0.0f;
+        const float knY = std::isfinite(kn.y) ? std::clamp(kn.y, -4.0f, 4.0f) : 0.0f;
+        boardModel = model * uniformScale(kKnightUnit) * axisRotation(2, orbit) *
+                     translation(-follow * knX, -follow * knY, 0.0f);
+    }
+    const bool soma = d.mesh == engine::MeshKind::Soma;
+    // The soma turns about its own vertical first (RotY), then RotX, RotZ, so the figure orbits upright.
+    const engine::Mat4 somaTurn =
+        axisRotation(2, d.pose.rotZ) * axisRotation(0, d.pose.rotX) * axisRotation(1, d.pose.rotY);
+    const engine::Mat4 somaModel = translation(float(d.pose.x * aspect), float(d.pose.y), float(d.pose.z)) * somaTurn *
+                                   uniformScale(float(d.pose.scale) * kSomaUnit);
+    auto somaPiece = [&](int p) {  // the piece's place: rot (row-major) and pos, in cell units
+        const engine::soma::PieceFrame& pf = d.soma.pieces[std::size_t(p)];
+        engine::Mat4 m = engine::Mat4::identity();
+        for (int r = 0; r < 3; ++r)
+            for (int c = 0; c < 3; ++c) {
+                const float v = pf.rot[std::size_t(r * 3 + c)];
+                m.m[c * 4 + r] = std::isfinite(v) ? std::clamp(v, -1.0f, 1.0f) : (r == c ? 1.0f : 0.0f);
+            }
+        for (int k = 0; k < 3; ++k) {
+            const float v = pf.pos[std::size_t(k)];
+            m.m[12 + k] = std::isfinite(v) ? std::clamp(v, -100.0f, 100.0f) : 0.0f;
+        }
+        return m;
+    };
     const engine::Mat4 cubeModel = rubik ? model * uniformScale(kRubikUnit) : model;
     const engine::Mat4 turnRot =
         rubik && d.rubik.turning ? axisRotation(d.rubik.move.axis, d.rubik.angle) : engine::Mat4::identity();
@@ -899,15 +1198,50 @@ SolidQuad SolidPipeline::encode(MTL::CommandBuffer* cmd, int slot, const SolidDr
             b.y1 = std::min(y1, 1.0f);
             b.visible = b.x1 > b.x0 && b.y1 > b.y0;
         }
-    } else if (fifteen) {
-        // The board's square and everything above it (tiles, the shuffle's hop).
+    } else if (soma) {
+        // Every cube's corners.
+        const engine::Mat4 smvp = vp * somaModel;
+        float x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
+        bool any = false;
+        for (int p = 0; p < engine::soma::kPieces; ++p) {
+            const engine::Mat4 pm = smvp * somaPiece(p);
+            const engine::soma::Piece& pc = engine::soma::pieces()[std::size_t(p)];
+            for (int i = 0; i < pc.count; ++i)
+                for (int k = 0; k < 8; ++k) {
+                    const engine::soma::Cell& cell = pc.cells[std::size_t(i)];
+                    const auto c = engine::transform(pm, {cell.x + (k & 1 ? 0.5f : -0.5f), cell.y + (k & 2 ? 0.5f : -0.5f),
+                                                          cell.z + (k & 4 ? 0.5f : -0.5f), 1.0f});
+                    if (c[3] <= 1e-6f) continue;
+                    x0 = std::min(x0, c[0] / c[3]);
+                    x1 = std::max(x1, c[0] / c[3]);
+                    y0 = std::min(y0, c[1] / c[3]);
+                    y1 = std::max(y1, c[1] / c[3]);
+                    any = true;
+                }
+        }
+        if (any && !(x1 < -1 || x0 > 1 || y1 < -1 || y0 > 1)) {
+            b.x0 = std::max(x0, -1.0f);
+            b.y0 = std::max(y0, -1.0f);
+            b.x1 = std::min(x1, 1.0f);
+            b.y1 = std::min(y1, 1.0f);
+            b.visible = b.x1 > b.x0 && b.y1 > b.y0;
+        }
+    } else if (fifteen || labyrinth || knight) {
+        // The board's square and everything above it (tiles, the shuffle's hop; the board's slab, walls and ball; the
+        // knight and its hops).
         const engine::Mat4 bmvp = vp * boardModel;
         float x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
         bool any = false;
         for (int k = 0; k < 8; ++k) {
-            const float h = kTray * 0.5f;
-            const auto c = engine::transform(bmvp, {k & 1 ? h : -h, k & 2 ? h : -h, k & 4 ? 1.4f : 0.0f, 1.0f});
-            if (c[3] <= 1e-6f) continue;
+            const float h = labyrinth ? labHalf : knight ? 4.1f : kTray * 0.5f;
+            const float z = labyrinth ? (k & 4 ? 1.0f : -kLabyrinthSlab) : knight ? (k & 4 ? kKnightTop : 0.0f)
+                                                                                : (k & 4 ? 1.4f : 0.0f);
+            const auto c = engine::transform(bmvp, {k & 1 ? h : -h, k & 2 ? h : -h, z, 1.0f});
+            if (c[3] <= 1e-6f) {
+                // A corner at or behind the camera (a close-up of the knight's board): the whole frame.
+                if (knight) x0 = y0 = -1.0f, x1 = y1 = 1.0f, any = true;
+                continue;
+            }
             x0 = std::min(x0, c[0] / c[3]);
             x1 = std::max(x1, c[0] / c[3]);
             y0 = std::min(y0, c[1] / c[3]);
@@ -1047,6 +1381,150 @@ SolidQuad SolidPipeline::encode(MTL::CommandBuffer* cmd, int slot, const SolidDr
             draw(translation(t.x, t.y, kTileThick * 0.5f + t.z) * boxScale(kTileSize, kTileSize, kTileThick),
                  t.number, level);
         }
+    } else if (knight) {
+        encodeKnight(enc, d, boardModel, adj * vp, l);
+    } else if (labyrinth) {
+        namespace lab = engine::labyrinth;
+        const lab::Frame& L = d.labyrinth;
+        enc->setRenderPipelineState(labyrinthPso_);
+        auto level = [&](int k) { return std::clamp(d.stickers[std::size_t(k)], 0.0f, 1.0f); };
+        LabF lf{};
+        for (int k = 0; k < 3; ++k) lf.light[k] = l[std::size_t(k)];
+        lf.shade = d.shading.shade;
+        lf.alpha = std::clamp(d.floor, 0.0f, 1.0f);
+        lf.flash = std::clamp(L.flash, 0.0f, 1.0f);
+        const float bz = std::isfinite(L.ballZ) ? L.ballZ : 0.0f;
+        lf.ball[0] = L.ballX;
+        lf.ball[1] = L.ballY;
+        lf.ball[2] = float(lab::kBall) + bz;
+        lf.ball[3] = float(lab::kBall);
+        lf.shadow = std::clamp(1.0f + bz / float(lab::kBall), 0.0f, 1.0f);
+        auto draw = [&](const Range& rg, const engine::Mat4& local, int part, float lv) {
+            const engine::Mat4 cm = boardModel * local;
+            LabV cv{};
+            const engine::Mat4 cf = adj * vp * cm;
+            std::copy(std::begin(cf.m), std::end(cf.m), cv.mvp);
+            std::copy(std::begin(local.m), std::end(local.m), cv.local);
+            float cn[3][3];
+            normalMatrix(cm, cn);
+            for (int k = 0; k < 3; ++k) {
+                cv.n0[k] = cn[0][k];
+                cv.n1[k] = cn[1][k];
+                cv.n2[k] = cn[2][k];
+            }
+            lf.part = part;
+            lf.level = lv;
+            enc->setVertexBytes(&cv, sizeof(cv), 1);
+            enc->setFragmentBytes(&lf, sizeof(lf), 0);
+            enc->drawPrimitives(MTL::PrimitiveTypeTriangle, NS::UInteger(rg.first), NS::UInteger(rg.count));
+        };
+        const float floorLv = level(kLabyrinthFloor), wallLv = level(kLabyrinthWalls), ballLv = level(kLabyrinthBall);
+        // The board.
+        draw(r, translation(0, 0, -0.5f * kLabyrinthSlab) * boxScale(2 * labHalf, 2 * labHalf, kLabyrinthSlab), 0,
+             floorLv);
+        // Walls of a maze at a height fraction: runs of walls along each grid line, one box per run.
+        auto walls = [&](const lab::Maze& m, float frac) {
+            const float h = float(lab::kWallHeight) * std::clamp(frac, 0.0f, 1.0f);
+            if (m.n != labN || h < 0.004f) return;
+            const float w = float(lab::kWall), o = 0.5f * float(m.n - 1);
+            for (int vertical = 0; vertical < 2; ++vertical)
+                for (int k = 0; k <= m.n; ++k) {
+                    int run = -1;
+                    for (int i = 0; i <= m.n; ++i) {
+                        bool on = false;
+                        if (i < m.n) {
+                            // horizontal line k: above row k (the last: below row n - 1); vertical: left of column k
+                            const int cell = vertical ? i * m.n + std::min(k, m.n - 1) : std::min(k, m.n - 1) * m.n + i;
+                            const int side = vertical ? (k < m.n ? lab::West : lab::East) : (k < m.n ? lab::North : lab::South);
+                            on = m.wall(cell, side);
+                        }
+                        if (on && run < 0) run = i;
+                        if (!on && run >= 0) {
+                            const float len = float(i - run) + w, mid = 0.5f * float(run + i - 1) - o;
+                            const float line = float(k) - 0.5f * float(m.n);
+                            if (vertical) draw(r, translation(line, -mid, 0.5f * h) * boxScale(w, len, h), 1, wallLv);
+                            else draw(r, translation(mid, -line, 0.5f * h) * boxScale(len, w, h), 1, wallLv);
+                            run = -1;
+                        }
+                    }
+                }
+        };
+        // Holes (black discs) and rings of a maze at a size fraction: the goal ringed in the ball's color, the start
+        // (a small ball return the ball pops out of) ringed in the walls' color, the traps.
+        auto holes = [&](const lab::Maze& m, float frac) {
+            const float s = std::clamp(frac, 0.0f, 1.0f);
+            if (m.n != labN || s < 0.01f) return;
+            const float R = float(lab::kHole) * s;
+            auto ring = [&](int cell, float radius, float lv) {
+                draw(ringRange_,
+                     translation(float(m.cellX(cell)), float(m.cellY(cell)), 0.012f) * boxScale(radius, radius, 1), 1,
+                     lv);
+            };
+            auto disc = [&](int cell, float radius) {
+                draw(discRange_,
+                     translation(float(m.cellX(cell)), float(m.cellY(cell)), 0.02f) * boxScale(radius, radius, 1), 3,
+                     0.0f);
+            };
+            disc(m.goal, R);
+            ring(m.goal, R + 0.09f * s, ballLv);
+            disc(m.start, 0.2f * s);
+            ring(m.start, 0.3f * s, wallLv);
+            for (int i = 0; i < std::clamp(m.trapCount, 0, lab::kMaxTraps); ++i) {
+                disc(m.traps[std::size_t(i)], R);
+                ring(m.traps[std::size_t(i)], R + 0.05f * s, wallLv);
+            }
+        };
+        holes(L.maze, L.holes);
+        holes(L.previous, L.oldHoles);
+        walls(L.maze, L.rise);
+        walls(L.previous, L.sink);
+        if (bz > -2.2f * float(lab::kBall))
+            draw(ranges_[std::size_t(engine::MeshKind::Sphere)],
+                 translation(L.ballX, L.ballY, float(lab::kBall) + bz) * uniformScale(float(lab::kBall)), 2, ballLv);
+    } else if (soma) {
+        enc->setRenderPipelineState(somaPso_);
+        SomaF sf{};
+        const auto sl = normalized({kSomaLight[0], kSomaLight[1], kSomaLight[2]});
+        for (int k = 0; k < 3; ++k) sf.light[k] = sl[std::size_t(k)];
+        sf.shade = std::clamp(d.shading.shade, 0.0f, 1.0f);
+        sf.bevel = kSomaBevel;
+        sf.ambient = kSomaAmbient;
+        for (int p = 0; p < engine::soma::kPieces; ++p) {
+            const engine::soma::PieceFrame& pf = d.soma.pieces[std::size_t(p)];
+            const engine::Mat4 place = somaPiece(p);
+            // The cube's world rotation (its axes), for the borders' directions: the turn x the piece's rotation.
+            engine::Mat4 rot = place;
+            rot.m[12] = rot.m[13] = rot.m[14] = 0.0f;
+            const engine::Mat4 wr = somaTurn * rot;
+            for (int k = 0; k < 3; ++k) {
+                sf.col0[k] = wr.m[0 * 4 + k];
+                sf.col1[k] = wr.m[1 * 4 + k];
+                sf.col2[k] = wr.m[2 * 4 + k];
+            }
+            sf.level = std::clamp(d.pieces[std::size_t(p)], 0.0f, 1.0f);
+            sf.flash = std::isfinite(pf.flash) ? std::clamp(pf.flash, 0.0f, 1.0f) : 0.0f;
+            const engine::soma::Piece& pc = engine::soma::pieces()[std::size_t(p)];
+            for (int i = 0; i < pc.count; ++i) {
+                const engine::soma::Cell& cell = pc.cells[std::size_t(i)];
+                const engine::Mat4 cm = somaModel * place * translation(float(cell.x), float(cell.y), float(cell.z));
+                SolidV cv{};
+                const engine::Mat4 cf = adj * vp * cm;
+                std::copy(std::begin(cf.m), std::end(cf.m), cv.mvp);
+                float cn[3][3];
+                normalMatrix(cm, cn);
+                for (int k = 0; k < 3; ++k) {
+                    cv.n0[k] = cn[0][k];
+                    cv.n1[k] = cn[1][k];
+                    cv.n2[k] = cn[2][k];
+                }
+                const auto codes = engine::soma::edgeCodes(p, i);
+                sf.codes0 = codes[0];
+                sf.codes1 = codes[1];
+                enc->setVertexBytes(&cv, sizeof(cv), 1);
+                enc->setFragmentBytes(&sf, sizeof(sf), 0);
+                enc->drawPrimitives(MTL::PrimitiveTypeTriangle, NS::UInteger(r.first), NS::UInteger(r.count));
+            }
+        }
     } else {
         enc->drawPrimitives(MTL::PrimitiveTypeTriangle, NS::UInteger(r.first), NS::UInteger(r.count));
     }
@@ -1065,6 +1543,149 @@ SolidQuad SolidPipeline::encode(MTL::CommandBuffer* cmd, int slot, const SolidDr
     return q;
 }
 
+void SolidPipeline::encodeFrost(MTL::CommandBuffer* cmd, MTL::Texture* output, float frost) {
+    if (!output) return;
+    const float W = float(output->width()), H = float(output->height());
+    auto pass = [&](MTL::Texture* target, const char* label) {
+        MTL::RenderPassDescriptor* rp = MTL::RenderPassDescriptor::renderPassDescriptor();
+        auto* a = rp->colorAttachments()->object(0);
+        a->setTexture(target);
+        a->setLoadAction(MTL::LoadActionDontCare);
+        a->setStoreAction(MTL::StoreActionStore);
+        MTL::RenderCommandEncoder* enc = makeRenderEncoder(cmd, rp);
+        enc->setLabel(NS::String::string(label, NS::UTF8StringEncoding));
+        return enc;
+    };
+    // The frame at half size, then a separable Gaussian (sigma = frost at 1080p, scaled to this frame).
+    {
+        MTL::RenderCommandEncoder* enc = pass(halfSharp_, "glass downsample");
+        enc->setRenderPipelineState(downPso_);
+        const float texel[2] = {1.0f / W, 1.0f / H};
+        enc->setFragmentTexture(output, 0);
+        enc->setFragmentBytes(texel, sizeof(texel), 0);
+        enc->drawPrimitives(MTL::PrimitiveTypeTriangle, NS::UInteger(0), NS::UInteger(3));
+        enc->endEncoding();
+    }
+    const float hw = float(halfSharp_->width()), hh = float(halfSharp_->height());
+    const float sigma = std::max(0.5f, (std::isfinite(frost) ? frost : 12.0f) * (H / 1080.0f) * 0.5f);  // half-size texels
+    const float step = std::max(1.0f, sigma / 3.0f);
+    struct {
+        float dir[2];
+        float sigma, step;
+    } bp{};
+    for (int axis = 0; axis < 2; ++axis) {
+        MTL::RenderCommandEncoder* enc = pass(axis == 0 ? halfScratch_ : halfBlur_, axis == 0 ? "glass blur x" : "glass blur y");
+        enc->setRenderPipelineState(blurPso_);
+        bp.dir[0] = axis == 0 ? 1.0f / hw : 0.0f;
+        bp.dir[1] = axis == 0 ? 0.0f : 1.0f / hh;
+        bp.sigma = sigma;
+        bp.step = step;
+        enc->setFragmentTexture(axis == 0 ? halfSharp_ : halfScratch_, 0);
+        enc->setFragmentBytes(&bp, sizeof(bp), 0);
+        enc->drawPrimitives(MTL::PrimitiveTypeTriangle, NS::UInteger(0), NS::UInteger(3));
+        enc->endEncoding();
+    }
+}
+
+void SolidPipeline::encodeKnight(MTL::RenderCommandEncoder* enc, const SolidDraw& d, const engine::Mat4& board,
+                                 const engine::Mat4& viewProj, const std::array<float, 3>& light) {
+    namespace kt = engine::knight;
+    const KnightLook& look = d.knightLook;
+    const kt::Frame& kn = d.knight;
+    auto fin = [](float v, float lo, float hi, float fb) { return std::isfinite(v) ? std::clamp(v, lo, hi) : fb; };
+    const float flash = fin(look.flash, 0.0f, 1.0f, 0.0f);
+    KnightF kf{};
+    for (int k = 0; k < 3; ++k) kf.light[k] = light[std::size_t(k)];
+    kf.shade = std::clamp(d.shading.shade, 0.0f, 1.0f);
+    kf.line = fin(look.line, 0.0f, 1.0f, 0.34f) * (1.0f + 0.5f * flash);
+    const int style = std::clamp(look.board, 0, 2);
+    kf.lightFill = style >= 1 ? fin(look.lightFill, 0.0f, 1.0f, 0.16f) : 0.0f;
+    kf.darkFill = style >= 2 ? fin(look.darkFill, 0.0f, 1.0f, 0.07f) : 0.0f;
+    kf.width = 0.022f;
+    kf.rim = 0.25f;
+    auto draw = [&](const engine::Mat4& local, const Range& r, int part, float level) {
+        const engine::Mat4 cm = board * local;
+        SolidV cv{};
+        const engine::Mat4 cf = viewProj * cm;
+        std::copy(std::begin(cf.m), std::end(cf.m), cv.mvp);
+        float cn[3][3];
+        normalMatrix(cm, cn);
+        for (int k = 0; k < 3; ++k) {
+            cv.n0[k] = cn[0][k];
+            cv.n1[k] = cn[1][k];
+            cv.n2[k] = cn[2][k];
+        }
+        kf.part = part;
+        kf.level = std::clamp(level, 0.0f, 1.0f);
+        enc->setVertexBytes(&cv, sizeof(cv), 1);
+        enc->setFragmentBytes(&kf, sizeof(kf), 0);
+        enc->drawPrimitives(MTL::PrimitiveTypeTriangle, NS::UInteger(r.first), NS::UInteger(r.count));
+    };
+    enc->setRenderPipelineState(knightPso_);
+    enc->setCullMode(MTL::CullModeNone);  // the flat parts show from below too
+    draw(engine::Mat4::identity(), knightBoard_, 1, 0.0f);
+
+    // The web: lines between the square centers, slightly above the board, each newer one a little higher so it
+    // stays on top where lines cross.
+    const float width = fin(look.width, 0.005f, 0.5f, 0.075f) * (1.0f + 0.7f * flash);
+    const float web = fin(look.web, 0.0f, 1.0f, 0.68f);
+    int order = 0;
+    auto segment = [&](int a, int b, float part, float level) {
+        const float ax = kt::squareX(a), ay = kt::squareY(a);
+        const float dx = kt::squareX(b) - ax, dy = kt::squareY(b) - ay;
+        const float len = std::sqrt(dx * dx + dy * dy) * part;
+        if (!(len > 1e-4f)) return;
+        const float z = 0.012f + 0.0002f * float(order++);
+        draw(translation(ax, ay, z) * axisRotation(2, std::atan2(dy, dx)) * boxScale(len, width, 1.0f), knightSegment_,
+             2, level);
+    };
+    auto disc = [&](int s, float radius, float z, float level, const Range& r) {
+        draw(translation(kt::squareX(s), kt::squareY(s), z) * boxScale(radius, radius, 1.0f), r, 2, level);
+    };
+    const bool valid = kt::isClosedTour(d.tour);
+    const int landed = std::clamp(kn.landed, 0, kt::kSquares);
+    const float since = fin(kn.since, 0.0f, 1.0f, 0.0f);
+    // What is left of the previous tour's web: it unravels from its first segment over the first .75 of hop 1.
+    if (landed == 0 && kt::isClosedTour(d.prevTour)) {
+        const float cut = float(kt::kSquares) * std::clamp(since / 0.75f, 0.0f, 1.0f);
+        for (int i = 1; i <= kt::kSquares; ++i)
+            if (float(i) > cut)
+                segment(d.prevTour[std::size_t(i - 1)], d.prevTour[std::size_t(i % kt::kSquares)], 1.0f,
+                        web + (1.0f - web) * flash);
+    }
+    if (valid) {
+        for (int i = 1; i <= landed; ++i) {
+            const float age = float(landed - i) + since;
+            float level = web + (1.0f - web) * std::exp(-age / 6.0f);
+            level += (1.0f - level) * flash;
+            segment(d.tour[std::size_t(i - 1)], d.tour[std::size_t(i % kt::kSquares)], 1.0f, level);
+        }
+        if (landed < kt::kSquares && kn.grow > 0.0f)
+            segment(d.tour[std::size_t(landed)], d.tour[std::size_t((landed + 1) % kt::kSquares)],
+                    std::clamp(kn.grow, 0.0f, 1.0f), 1.0f);
+        // Visited squares: a dot each (joining the lines), the start square a ring as well.
+        const float dot = width * 1.3f;
+        for (int i = 0; i <= std::min(landed, kt::kSquares - 1); ++i)
+            disc(d.tour[std::size_t(i)], dot, 0.03f, 0.85f + 0.15f * flash, knightDisc_);
+        disc(d.tour[0], dot * 2.6f, 0.028f, 0.8f, knightRing_);
+        // The landing: a ring spreads from the square over half a hop.
+        if (since < 0.5f && (landed > 0 || kt::isClosedTour(d.prevTour))) {
+            const float u = since / 0.5f;
+            disc(d.tour[std::size_t(landed % kt::kSquares)], 0.18f + 0.42f * u, 0.026f, 1.0f - u, knightRing_);
+        }
+    }
+    // The knight, lifted a hair off the board so its foot doesn't cut into the squares in a jagged line.
+    const float sq = fin(kn.squash, 0.5f, 1.5f, 1.0f);
+    const float side = 1.0f / std::sqrt(sq);
+    const engine::Mat4 piece =
+        translation(fin(kn.x, -8.0f, 8.0f, 0.0f), fin(kn.y, -8.0f, 8.0f, 0.0f), fin(kn.z, -2.0f, 4.0f, 0.0f) + 0.012f) *
+        axisRotation(2, fin(kn.heading, -100.0f, 100.0f, 0.0f)) * translation(0.0f, 0.0f, 0.5f) *
+        axisRotation(1, -fin(kn.pitch, -1.5f, 1.5f, 0.0f)) * translation(0.0f, 0.0f, -0.5f) *
+        boxScale(side, side, sq) * uniformScale(kPieceScale);
+    enc->setCullMode(cullBack_ ? MTL::CullModeBack : MTL::CullModeNone);
+    draw(piece, ranges_[std::size_t(engine::MeshKind::Knight)], 0, fin(look.piece, 0.0f, 1.0f, 1.0f));
+}
+
 void SolidPipeline::encodeGlass(MTL::CommandBuffer* cmd, MTL::Texture* output, const GlassDraw& g, bool trackAlpha) {
     if (!output || !(g.opacity > 0)) return;
     const float W = float(output->width()), H = float(output->height());
@@ -1078,36 +1699,8 @@ void SolidPipeline::encodeGlass(MTL::CommandBuffer* cmd, MTL::Texture* output, c
         enc->setLabel(NS::String::string(label, NS::UTF8StringEncoding));
         return enc;
     };
-    // 1. The frame at half size, then a separable Gaussian (sigma = Fros at 1080p, scaled to this frame).
-    {
-        MTL::RenderCommandEncoder* enc = pass(halfSharp_, MTL::LoadActionDontCare, "glass downsample");
-        enc->setRenderPipelineState(downPso_);
-        const float texel[2] = {1.0f / W, 1.0f / H};
-        enc->setFragmentTexture(output, 0);
-        enc->setFragmentBytes(texel, sizeof(texel), 0);
-        enc->drawPrimitives(MTL::PrimitiveTypeTriangle, NS::UInteger(0), NS::UInteger(3));
-        enc->endEncoding();
-    }
-    const float hw = float(halfSharp_->width()), hh = float(halfSharp_->height());
-    const float sigma = std::max(0.5f, g.frost * (H / 1080.0f) * 0.5f);  // half-size texels
-    const float step = std::max(1.0f, sigma / 3.0f);
-    struct {
-        float dir[2];
-        float sigma, step;
-    } bp{};
-    for (int axis = 0; axis < 2; ++axis) {
-        MTL::RenderCommandEncoder* enc =
-            pass(axis == 0 ? halfScratch_ : halfBlur_, MTL::LoadActionDontCare, axis == 0 ? "glass blur x" : "glass blur y");
-        enc->setRenderPipelineState(blurPso_);
-        bp.dir[0] = axis == 0 ? 1.0f / hw : 0.0f;
-        bp.dir[1] = axis == 0 ? 0.0f : 1.0f / hh;
-        bp.sigma = sigma;
-        bp.step = step;
-        enc->setFragmentTexture(axis == 0 ? halfSharp_ : halfScratch_, 0);
-        enc->setFragmentBytes(&bp, sizeof(bp), 0);
-        enc->drawPrimitives(MTL::PrimitiveTypeTriangle, NS::UInteger(0), NS::UInteger(3));
-        enc->endEncoding();
-    }
+    // 1. The frame at half size, sharp and frosted (encodeFrost).
+    encodeFrost(cmd, output, g.frost);
     // 2. The buttons in 3D, 4x MSAA with depth, into the puzzle's slot target (cleared; resolved premultiplied).
     if (g.slot < 0 || g.slot >= maxLive()) return;
     MTL::Texture* target = slots_[std::size_t(g.slot)].tex;

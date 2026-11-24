@@ -10,6 +10,33 @@ double FadeEnvelope::total() const {
     return 2.0 * fade + hold;
 }
 
+double holdLineBars(double bars, int phraseBars) {
+    const int pb = std::max(1, phraseBars);
+    const double rounded = std::round(bars);
+    return (std::abs(bars - rounded) < 1e-9 && rounded >= pb && std::fmod(rounded, double(pb)) == 0.0) ? double(pb)
+                                                                                                        : 1.0;
+}
+
+void BarHold::follow(FadeEnvelope& env, double age, const scene::SyncInput& sy) {
+    if (!(unit > 0) || env.earlyOut >= 0 || !(age < env.fade + env.hold)) return;  // off, or the end is set
+    const bool clock = sy.on > 0 && std::isfinite(sy.bpm) && sy.bpm > 1 && std::isfinite(sy.bar);
+    constexpr double kBars = 1e12;
+    const double bar = clock ? std::clamp(sy.bar, -kBars, kBars) : 0.5 * age;
+    const double secPerBar = clock ? 240.0 / std::min(sy.bpm, 1000.0) : 2.0;
+    if (!std::isfinite(left)) {
+        left = (env.fade + env.hold - age) / secPerBar;  // the end holdForBars chose
+    } else {
+        const double d = bar - last;
+        if (d > 0 && d < 0.5) left -= d;  // the clock running; a jump (either way) is not time passing
+    }
+    last = bar;
+    if (!std::isfinite(left)) return;
+    left = std::clamp(left, 0.0, 1e6);
+    const double end = std::round((bar + left) / unit) * unit;
+    const double secs = std::max(0.0, (end - bar) * secPerBar);
+    env.hold = std::clamp(age + secs - env.fade, 0.0, 24.0 * 3600.0);
+}
+
 double holdForBars(double bars, double fade, const scene::SyncInput& sync, int phraseBars, double beatsPerBar) {
     if (!(std::isfinite(bars) && bars > 0)) return std::nan("");
     bars = std::min(bars, 10000.0);
@@ -18,10 +45,7 @@ double holdForBars(double bars, double fade, const scene::SyncInput& sync, int p
     if (!(std::isfinite(beatsPerBar) && beatsPerBar > 0)) beatsPerBar = 4.0;
     const double secPerBar = beatsPerBar * 60.0 / (clock ? sync.bpm : 120.0);
     if (!clock) return bars * secPerBar;
-    const int pb = std::max(1, phraseBars);
-    const double rounded = std::round(bars);
-    const double unit = (std::abs(bars - rounded) < 1e-9 && rounded >= pb && std::fmod(rounded, double(pb)) == 0.0)
-                            ? double(pb) : 1.0;
+    const double unit = holdLineBars(bars, phraseBars);
     // Bar (on SYNC_BAR) where full strength would end, snapped to the nearest line.
     const double want = sync.bar + fade / secPerBar + bars;
     double end = std::round(want / unit) * unit;

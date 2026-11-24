@@ -282,3 +282,70 @@ TEST_CASE("fifteen tiles: light rows with dark numbers, dark rows only on a map 
     CHECK(pk.switches() == sw);
     CHECK(pk.levels(5.0) == before);
 }
+
+
+namespace {
+// Black to white over the lower half, then white: .6 and 1 (the hopper's default tops) are both white.
+Palette flatTopPalette() {
+    Palette p{};
+    for (int k = 0; k < kPaletteSize; ++k) {
+        const float v = std::min(1.0f, float(k) / 127.0f);
+        p[std::size_t(k)] = {v, v, v, 1.0f};
+    }
+    return p;
+}
+}  // namespace
+
+TEST_CASE("hopper tops: picked so the states read where the fixed levels look the same") {
+    const MapLut lut = identityLut();
+    LabTable lab{};
+    effectiveColors(flatTopPalette(), lut, lab);
+    TopSpec sp;  // prefer .6 / 1, seams .04, sides .22 / .4
+    sp.prefer = {153, 204, 255};
+    const float fixed = topScore(lab, sp, {153, 255, 255});
+    const TopPick p = pickTops(lab, sp);
+    CHECK(fixed < 5.0f);
+    CHECK(p.score > 20.0f);
+    CHECK(p.level[0] < p.level[1]);
+    CHECK(lab[std::size_t(p.level[1])].l >= lab[std::size_t(p.level[0])].l);  // bright looks at least as light
+    // Three states.
+    sp.n = 3;
+    const TopPick p3 = pickTops(lab, sp);
+    CHECK(p3.level[0] < p3.level[1]);
+    CHECK(p3.level[1] < p3.level[2]);
+    CHECK(p3.score > 8.0f);
+    // Never worse than the preferred levels, on any of these maps.
+    for (const Palette& pal : {flatTopPalette(), rampPalette(0, 0, 0, 1, 1, 1), hsvRainbow(), rampPalette(0.2f, 0, 0.4f, 1, 0.8f, 0)}) {
+        effectiveColors(pal, lut, lab);
+        for (int n : {2, 3}) {
+            sp.n = n;
+            const std::array<int, 3> pref = n == 2 ? std::array<int, 3>{153, 255, 255} : sp.prefer;
+            CHECK(pickTops(lab, sp).score >= topScore(lab, sp, pref) - 1e-3f);
+        }
+    }
+}
+
+TEST_CASE("hopper tops: the picker keeps its levels on small changes and eases to new ones") {
+    const MapLut lut = identityLut();
+    LabTable gray{}, flat{};
+    effectiveColors(rampPalette(0, 0, 0, 1, 1, 1), lut, gray);
+    effectiveColors(flatTopPalette(), lut, flat);
+    TopSpec sp;
+    TopPicker pk(0.5);
+    CHECK(!pk.have());
+    pk.update(gray, 1, sp, 0.0);
+    REQUIRE(pk.have());
+    const auto a = pk.levels(0.0);
+    pk.update(gray, 1, sp, 0.5);  // same version: nothing to do
+    CHECK(pk.switches() == 0);
+    pk.update(flat, 2, sp, 1.0);
+    CHECK(pk.switches() == 1);
+    const auto mid = pk.levels(1.25), b = pk.levels(2.0);
+    CHECK(a[0] != b[0]);
+    CHECK(((mid[0] - a[0]) * (b[0] - mid[0]) > 0));  // on the way
+    // Within the minimum interval a new version waits for a later call.
+    pk.update(gray, 3, sp, 1.05);
+    CHECK(pk.switches() == 1);
+    pk.update(gray, 3, sp, 3.0);
+    CHECK(pk.levels(10.0)[0] * 255 == doctest::Approx(double(pickTops(gray, sp).level[0])).epsilon(0.01));
+}

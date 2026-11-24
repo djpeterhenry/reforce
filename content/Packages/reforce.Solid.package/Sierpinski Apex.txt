@@ -1,0 +1,14 @@
+Vers=100
+Meta="reforce solid: an endless zoom onto the tip of a Sierpinski pyramid, seen from outside. Every two bars the camera has come twice as close and turned a third of the way round the pyramid's axis, which is exactly where it started (the pyramid is the same at every size), so the zoom loops on the bar line with no seam, for ever. The zoom surges after each bar line, the edges glow on the beats, a drop rushes it two steps in, a build slows it down."
+Mesh="fractal"
+Frac="sierpinski"
+Path="apex"
+// one step (twice as close, a third of a turn) every 2 bars; most of each bar's motion right after its bar line
+ZBar="2"
+Puls=".5"
+Over="1"
+// 24 zoom steps (one per 2 bars), ending on a phrase line of the live clock; started on a 2-bar line (Peter 2026-11-23:
+// a fixed PDur ended mid-tour)
+PBar="48"
+SBar="2"
+Glow=".7"

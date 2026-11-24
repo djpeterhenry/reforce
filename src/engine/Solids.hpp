@@ -6,7 +6,8 @@
 // Pen / EPen / Flag pick the sprite layering and blend of its composite. The GPU side is render/SolidPipeline.
 //
 // Scene keys (docs/scene-format.md "Solids"):
-//   Mesh   literal: tetrahedron | cube | octahedron | dodecahedron | icosahedron | sphere | torus | prism
+//   Mesh   literal: tetrahedron | cube | octahedron | dodecahedron | icosahedron | sphere | torus | prism | rubik |
+//          fifteen | labyrinth | knight | soma | model
 //          (default icosahedron)
 //   Text   0 = the current WaveShape on the faces (default), 1 = the previous frame, 2 = flat
 //   Pers   1 = perspective (default), 0 = orthographic
@@ -19,8 +20,21 @@
 //   not keyed out where its colors are dark).
 //   Over (load, default 0): 1 = Pen / EPen draw the solid opaque over the frame, its coverage as alpha (exact
 //   intensities, dark parts included), instead of the sprite blend that Flag picks.
+//   fractal (docs/3d-design.md "Fractal zoom"): Frac, Path (literals), ZBar Puls Drop DrpB Hovr Stpb Res Detl Stps
+//   (load), Zoom Orbt LkX LkY Roll Fov Fog Glow (per frame).
 //   rubik / fifteen: Moves (load, 30; rubik 1..32, fifteen 1..64), Turn and Seed per frame (engine/Rubik.hpp,
 //   engine/Fifteen.hpp frameAt; no Turn = solved); fifteen: Shuf per frame (1).
+//   rain (engine/Rain.hpp): Rain (literal window | floor), Slid, Bead, Wipe, Max, Seed at load; per frame Dens, Size,
+//   Drz, Clus, Wet, Fog, Refg, Fros, Dpth, Spec, Rim, Spd, Dcay.
+//   knight: Sym, Brd (load), Orbt, Folw, Flsh, Hovr per frame; Turn in hops 0..64, Seed (engine/Knight.hpp).
+//   labyrinth (engine/Labyrinth.hpp): Grid, Beats, Traps (load: cells per side 4..12, 8; beats per run 8..128, 32;
+//   trap holes 0..6, 3), Turn (beats into the run; the ball drops into the goal at Turn = Beats) and Seed (the run:
+//   a new maze) per frame, Floor per frame (the board's opacity, .55: the visuals show through).
+//   soma (engine/Soma.hpp): Figs (literal: "all" or figure names in round order; "cube"), Len / Hold / Each (load,
+//   beats: 32 / 8 / 2), Turn (beats into the round; no Turn = complete) and Seed (the round) per frame, Expl and Tens
+//   per frame (0).
+//   jigsaw (engine/Jigsaw.hpp, docs/3d-design.md "Jigsaw"): Pcs, Ordr, Cycl, Brk, Gap (load); Turn (beats into the
+//   cycle; no Turn = whole), Seed, Kick, Shak, Dim, Fros per frame.
 
 #include <algorithm>
 #include <cmath>
@@ -29,8 +43,13 @@
 #include <string>
 
 #include "engine/CameraMoves.hpp"
+#include "engine/Labyrinth.hpp"
+#include "engine/Jigsaw.hpp"
+#include "engine/FractalZoom.hpp"
 #include "engine/Meshes.hpp"
 #include "engine/Particles.hpp"
+#include "engine/Soma.hpp"
+#include "engine/Rain.hpp"
 #include "engine/Sprites.hpp"
 #include "scene/Evaluate.hpp"
 
@@ -54,12 +73,50 @@ struct SolidSpec {
     double turn = 60, seed = 0;
     double shuffle = 1;  // fifteen: Shuf
     bool glass = false;  // fifteen: Glas = 1, drawn as glass over the colorized frame
+    // labyrinth: this frame (the maze, the ball, the board's tilt) and the board's opacity (Floor)
+    labyrinth::Frame labyrinth;
+    double floor = 0.55;
+    double tiltGain = 1;  // Tilt: the board's drawn tilt x this (1 = as the physics tilts it)
     double frost = 12, tint = 0.35, bend = 1;
+    // knight (engine/Knight.hpp, docs/3d-design.md "Knight's tour"): Sym, Brd (load); Orbt, Folw, Flsh, Hovr (frame).
+    // Turn = hops into the tour (0..64; absent: 64, the whole web), Seed picks the tour.
+    bool symmetric = true;
+    int board = 1;
+    double orbit = 0, follow = 0.15, flash = 0, hover = 0;
+    // mesh == Soma (engine/Soma.hpp): the pieces this frame.
+    soma::Frame soma;
+    // mesh == Jigsaw: the puzzle's settings (load) and this frame's position in the cycle; the empty table's look
+    // (Gap preset, Dim: NaN = the preset's) and blur (frost, here 10 by default).
+    jigsaw::Config jigsaw;
+    jigsaw::Input jigsawIn;
+    int gap = 0;
+    double dim = std::nan("");
     // mesh == Model (docs/model-design.md): the shot this frame and the look.
     ModelShot shot;
     double spin = 0, bank = 0;     // the model's turn about its up axis (radians, Spin x age) and roll (Bank)
     double glow = 1, bloom = 0.6, exposure = 1;
     std::array<double, 3> light{-0.45, 0.6, 0.65};  // towards the key light, camera space (x right, y up, z back)
+    // mesh == Rain (docs/3d-design.md "Rain on glass"): the simulation, stepped to this frame by evaluate(), its look,
+    // and whether this was its first step (the GPU fields start afresh).
+    std::shared_ptr<const rain::Sim> rain;
+    rain::Look rainLook;
+    bool rainReset = false;
+    // mesh == Fractal (docs/3d-design.md "Fractal zoom"): the camera at this frame's zoom (glow: Glow x the beat
+    // pulse; fill / shade: the fractal's defaults .06 / .85 unless the scene sets them).
+    FractalCamera fractalCam;
+    double zoom = 0;  // 0..1 through the step
+    double fog = 3;
+};
+
+// Load-time settings of a fractal solid (Mesh="fractal").
+struct FractalSettings {
+    FractalKind kind = FractalKind::Sierpinski;
+    const FractalPath* path = nullptr;  // null: an unknown Frac or Path (`error` says which)
+    FractalTiming timing;               // ZBar, Puls, Drop, DrpB, Hovr, Stpb
+    double res = 0.5;                   // Res: render scale .25 .. 1
+    double detail = 2.5;                // Detl: the smallest pieces' size in pixels
+    int steps = 120;                    // Stps: raymarching steps per pixel
+    std::string error;
 };
 
 // Load-time settings of a model solid (Mesh="model"): its File, Look, axes and camera move.
@@ -100,20 +157,39 @@ public:
     bool fadingOut(double t) const { return env_.fadingOut(t - start_); }
     // PBar (NaN when absent) and an explicit hold in seconds (PBar through engine::holdForBars).
     double bars() const { return inst_->bars(); }
+    // After setHold(holdForBars(...)): keep ending on the live clock's lines (engine::BarHold, as organics).
+    void followBars(double unitBars) {
+        barHold_.unit = std::isfinite(unitBars) && unitBars > 0 ? std::min(unitBars, 4096.0) : 0.0;
+    }
     void setHold(double seconds) {
         if (std::isfinite(seconds) && seconds >= 0) env_.hold = std::min(seconds, 24.0 * 3600.0);
     }
 
     SolidSpec evaluate(double t, const SpriteAudio& audio = {});
 
+    // Soma solids (mesh() == Soma): the figures (Figs) and the round's beats (Len, Hold, Each); null otherwise.
+    const soma::Player* soma() const { return soma_.get(); }
+    const soma::Timing& somaTiming() const { return somaTiming_; }
+    const std::string& somaUnknown() const { return somaUnknown_; }  // Figs names not found (for the log)
+
     // Model solids (mesh() == Model).
     const ModelSettings& model() const { return model_; }
+    // Fractal solids (mesh() == Fractal).
+    const FractalSettings& fractal() const { return fractal_; }
     bool hasDuration() const { return std::isfinite(inst_->duration()) || std::isfinite(inst_->bars()); }
     // The Move preset's keyframes (the caller finds and loads it); the scene's own Ease / Step / Rand / Push win.
     void setCameraPath(CameraPath p);
     void setMoveSeconds(double s) {
         if (std::isfinite(s) && s > 0.1) model_.moveSeconds = s;
     }
+
+    // Rain solids (mesh() == Rain): the frame's aspect (width / height) the drops live in; set before the first
+    // evaluate (default 16:9).
+    void setAspect(double aspect) {
+        if (std::isfinite(aspect) && aspect > 0.1 && aspect < 10 && !rain_) aspect_ = aspect;
+    }
+    const rain::Settings& rainSettings() const { return rainSettings_; }
+    const rain::Sim* rainSim() const { return rain_.get(); }
 
 private:
     std::shared_ptr<const scene::CompiledConfig> cfg_;
@@ -122,7 +198,21 @@ private:
     MeshKind mesh_;
     double start_ = 0;
     FadeEnvelope env_;
+    BarHold barHold_;  // followBars
     ModelSettings model_;
+    rain::Settings rainSettings_;
+    std::shared_ptr<rain::Sim> rain_;
+    double aspect_ = 16.0 / 9.0;
+    // Labyrinth solids: the planned runs (made at the start, so frames allocate nothing) and the load-time keys.
+    std::unique_ptr<labyrinth::Player> labyrinth_;
+    int grid_ = 8, beats_ = 32, traps_ = 3;
+    bool catchUpLogged_ = false;
+    std::unique_ptr<soma::Player> soma_;
+    soma::Timing somaTiming_;
+    std::string somaUnknown_;
+    FractalSettings fractal_;
+    FractalClock fractalClock_;
+    double lastT_ = std::nan("");
 };
 
 }  // namespace reforce::engine

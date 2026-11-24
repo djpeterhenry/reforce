@@ -3,6 +3,7 @@
 // (Cocoa + CAMetalLayer); everything outside src/platform talks to it through
 // this header, which has no Objective-C in it.
 
+#include <functional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -18,6 +19,18 @@ struct WindowConfig {
     std::string title = "reforce";
     std::string controlPanelUrl;   // View > Open Control Panel (empty: item disabled)
     bool startFullScreen = false;  // settings reforce.Window.StartFullScreen
+    // reforce.Window.Screen: the display to open on (macOS's name for it, or "external" = the first display that is
+    // not built in); "" = where the window was last. Full screen at launch only happens when this display is there
+    // (or none is named): otherwise reforce opens windowed where it was.
+    std::string screen;
+    bool openPanelOnLaunch = false;  // reforce.UI.OpenOnLaunch: open controlPanelUrl in the browser at launch
+    // View > Start Like This / Don't Start Like This: saves the setup to the settings (null: the items are disabled).
+    struct StartSetup {
+        std::string screen;  // "" = none
+        bool fullScreen = false;
+        bool openPanel = false;
+    };
+    std::function<bool(const StartSetup&, std::string* error)> saveStartSetup;
     // Simulation rate: the display link is pinned to it when the screen
     // refreshes at a whole multiple (0 = every refresh).
     double targetFrameRate = 0;

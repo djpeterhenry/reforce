@@ -150,6 +150,11 @@ struct Settings {
     std::string scenesDir;                    // reforce.ScenesDir (scene root holding Packages/; set by
                                               //   scripts/install-app.sh; --scenes overrides)
     bool startFullScreen = false;             // reforce.Window.StartFullScreen
+    // "Start Like This" (View menu, Peter 2026-11-23): the display reforce opens on (its name as macOS shows it, or
+    // "external": the first display that is not built in; "" = where the window was last), and the control panel
+    // opened in the browser at launch.
+    std::string windowScreen;                 // reforce.Window.Screen
+    bool openPanelOnLaunch = false;           // reforce.UI.OpenOnLaunch
 
     // reforce-only: video (Phase 5F).
     std::string externalSpritesDir;           // reforce.ExternalSpritesDir: extra sprite folder (images and

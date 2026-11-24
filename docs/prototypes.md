@@ -51,9 +51,9 @@ The seven trees from earlier (Oak … Radial Bloom) are unchanged. In a scene:
 
 | Config | Group | What it does with the beat |
 |---|---|---|
-| Kick Ripples | Water | a stone dropped in still water on every beat, at a random spot; the rings spread and run off the frame |
-| Rain on a Pond | Water | light rain and a big drop on every bar; the edges reflect; the rain thickens through a breakdown |
-| Ripple Ring | Water | drops on the 8th notes stepping round a ring every 2 bars, so the rings chase each other |
+| Ripples Kick | Water | a stone dropped in still water on every beat, at a random spot; the rings spread and run off the frame |
+| Ripples Pond | Water | light rain and a big drop on every bar; the edges reflect; the rain thickens through a breakdown |
+| Ripples Ring | Water | drops on the 8th notes stepping round a ring every 2 bars, so the rings chase each other |
 | Julia Drift | Fractals | c travels once per phrase along the Mandelbrot set's edge: cauliflower, spirals, snowflakes |
 | Julia Pulse | Fractals | the "San Marco" set, swelling on every beat |
 | Julia Bands | Fractals | a spiral set drawn as bands that flow inward once per beat |

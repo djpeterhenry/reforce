@@ -1,4 +1,4 @@
 ThemeName = "Objects: Puzzles"
-About = "reforce: everything as in (Standard), plus a puzzle solving itself on the 8-bar lines (the Rubik cube, the glass 15 puzzle) every 30 seconds or so."
+About = "reforce: everything as in (Standard), plus a puzzle solving itself on the 8-bar lines (the Rubik cube, the glass 15 puzzle, the Soma cube, the jigsaw of the frame) or a knight's tour on the phrase lines every 30 seconds or so."
 Object.CategoryExpr = "+Puzzles"
 Object.Slideshow.Interval.Duration = 30

@@ -1,4 +1,5 @@
 #include "engine/Meshes.hpp"
+#include "engine/Knight.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -306,6 +307,30 @@ Mesh puzzleTile() {
     return m;
 }
 
+// One soma cube (see MeshKind::Soma): a full unit cube, per face uv along its axes and edge = the face direction.
+Mesh somaCube() {
+    Mesh m;
+    m.kind = MeshKind::Soma;
+    m.convex = true;
+    for (int d = 0; d < 6; ++d) {
+        const int a = d / 2;
+        const double s = d % 2 == 0 ? 1.0 : -1.0;
+        int ua = 0, va = 0;
+        somaFaceAxes(d, ua, va);
+        V3 n{0, 0, 0}, u{0, 0, 0}, v{0, 0, 0};
+        n[std::size_t(a)] = s;
+        u[std::size_t(ua)] = 1;
+        v[std::size_t(va)] = 1;
+        const double cu[4] = {-1, 1, 1, -1}, cv[4] = {-1, -1, 1, 1};
+        V3 c[4];
+        for (int k = 0; k < 4; ++k)
+            for (int j = 0; j < 3; ++j)
+                c[k][std::size_t(j)] = 0.5 * (n[std::size_t(j)] + u[std::size_t(j)] * cu[k] + v[std::size_t(j)] * cv[k]);
+        for (int q : {0, 1, 2, 0, 2, 3}) m.vertices.push_back(vert(c[q], n, 0.5 * (cu[q] + 1), 0.5 * (cv[q] + 1), double(d)));
+    }
+    return m;
+}
+
 }  // namespace
 
 std::optional<MeshKind> parseMeshKind(std::string_view name) {
@@ -316,7 +341,10 @@ std::optional<MeshKind> parseMeshKind(std::string_view name) {
         {"tetrahedron", MeshKind::Tetrahedron}, {"cube", MeshKind::Cube},       {"octahedron", MeshKind::Octahedron},
         {"dodecahedron", MeshKind::Dodecahedron}, {"icosahedron", MeshKind::Icosahedron}, {"sphere", MeshKind::Sphere},
         {"torus", MeshKind::Torus},             {"prism", MeshKind::Prism},           {"rubik", MeshKind::Rubik},
-        {"fifteen", MeshKind::Fifteen},           {"model", MeshKind::Model}};
+        {"fifteen", MeshKind::Fifteen},           {"labyrinth", MeshKind::Labyrinth},   {"knight", MeshKind::Knight},
+        {"soma", MeshKind::Soma},                     {"jigsaw", MeshKind::Jigsaw},
+        {"model", MeshKind::Model},                   {"rain", MeshKind::Rain},
+        {"fractal", MeshKind::Fractal}};
     for (const auto& [n, k] : kNames)
         if (s == n) return k;
     return std::nullopt;
@@ -334,7 +362,13 @@ const char* meshKindName(MeshKind k) {
         case MeshKind::Prism: return "prism";
         case MeshKind::Rubik: return "rubik";
         case MeshKind::Fifteen: return "fifteen";
+        case MeshKind::Knight: return "knight";
+        case MeshKind::Labyrinth: return "labyrinth";
+        case MeshKind::Soma: return "soma";
+        case MeshKind::Jigsaw: return "jigsaw";
         case MeshKind::Model: return "model";
+        case MeshKind::Rain: return "rain";
+        case MeshKind::Fractal: return "fractal";
     }
     return "?";
 }
@@ -345,9 +379,19 @@ Mesh makeMesh(MeshKind kind, int detail) {
         case MeshKind::Torus: return torus(detail);
         case MeshKind::Rubik: return cubie();
         case MeshKind::Fifteen: return puzzleTile();
-        case MeshKind::Model: {
+        case MeshKind::Knight: return knight::makePiece();
+        case MeshKind::Labyrinth: {
+            Mesh m = puzzleTile();  // the board, its walls and the hole markers are boxes and flat rings
+            m.kind = MeshKind::Labyrinth;
+            return m;
+        }
+        case MeshKind::Soma: return somaCube();
+        case MeshKind::Jigsaw:  // drawn by render/JigsawPipeline over the colorized frame: no mesh
+        case MeshKind::Model:
+        case MeshKind::Rain:
+        case MeshKind::Fractal: {
             Mesh m;
-            m.kind = MeshKind::Model;
+            m.kind = kind;
             m.convex = false;
             return m;
         }
@@ -452,6 +496,34 @@ ScreenBox projectBounds(const Mesh& mesh, const Mat4& mvp) {
     b.y1 = std::min(y1, 1.0f);
     b.visible = b.x1 > b.x0 && b.y1 > b.y0;
     return b;
+}
+
+Mesh makeFlatRing(double inner, int segments) {
+    Mesh m;
+    m.kind = MeshKind::Labyrinth;
+    segments = std::max(3, segments);
+    inner = std::clamp(inner, 0.0, 0.999);
+    const V3 n{0, 0, 1};
+    const double tau = 2.0 * std::acos(-1.0);
+    for (int i = 0; i < segments; ++i) {
+        const double a0 = tau * i / segments, a1 = tau * (i + 1) / segments;
+        const V3 o0{std::cos(a0), std::sin(a0), 0}, o1{std::cos(a1), std::sin(a1), 0};
+        const V3 i0 = mul(o0, inner), i1 = mul(o1, inner);
+        auto put = [&](const V3& p) { m.vertices.push_back(vert(p, n, 0.5 + 0.5 * p[0], 0.5 + 0.5 * p[1], 1.0)); };
+        if (inner <= 0) {
+            put({0, 0, 0});
+            put(o0);
+            put(o1);
+        } else {
+            put(i0);
+            put(o0);
+            put(o1);
+            put(i0);
+            put(o1);
+            put(i1);
+        }
+    }
+    return m;
 }
 
 Mesh makeGlassButton(double half, double corner, double height, double bevel, int cornerSegments, int bevelSegments) {

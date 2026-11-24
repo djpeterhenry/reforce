@@ -190,10 +190,13 @@ main { padding: 14px 16px 24px; max-width: 1500px; margin: 0 auto; }
 .list li .star { color: var(--faint); cursor: pointer; flex: none; width: 1.1em; text-align: center; }
 .list li .star:hover { color: var(--text, inherit); }
 .list li .star.on { color: var(--beat); }
-.favs { display: flex; gap: 8px; align-items: center; padding: 8px 16px; flex-wrap: wrap;
+.favs { display: flex; gap: 6px; align-items: center; padding: 8px 16px; flex-wrap: wrap;
   border-bottom: 1px solid var(--line); }
 .favs-title { color: var(--beat); font-size: 16px; }
-.fav-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+/* The favorites flow in the row itself (Peter 2026-11-23: as one box, a second line of favorites pushed the box onto
+   its own line, leaving the star alone above it and Clear sprites alone below): the star starts the first line, Clear
+   sprites ends the last one. */
+.fav-buttons { display: contents; }
 .fav-buttons button { display: inline-flex; gap: 6px; align-items: baseline; }
 .fav-buttons button .kind { color: var(--muted); font-size: 11px; }
 /* A favorite whose scene is gone: grayed out, dashed, with a ✕ that removes it. */

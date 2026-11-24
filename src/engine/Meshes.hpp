@@ -22,6 +22,7 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <utility>
 #include <string_view>
 #include <vector>
 
@@ -32,11 +33,36 @@ namespace reforce::engine {
 // pass draws it once per cubie with its own transform and sticker colors; Scal is the whole cube's circumradius.
 // Fifteen: one tile of the 15-puzzle solid (engine/Fifteen.hpp), a unit box [-.5, .5]^3 whose +z face has uv 0..1
 // (u right, v up, seen from +z) and whose other faces have uv (-1, -1). Drawn once per tile and once for the tray.
+// Soma: one unit cube of the soma solid (engine/Soma.hpp), [-.5, .5]^3, full size (cubes of a piece meet flush); per
+// face direction d (+x, -x, +y, -y, +z, -z) uv 0..1 along the face's axes (somaFaceAxes) and edge = d, so soma_fs knows
+// which face and which of its four borders a fragment is near. Drawn once per cube of each piece.
 // Model: a user-supplied glTF model (engine/ModelFile, render/ModelPipeline; docs/model-design.md). makeMesh gives an
 // empty mesh: its geometry comes from the scene's File, not from here.
-enum class MeshKind { Tetrahedron, Cube, Octahedron, Dodecahedron, Icosahedron, Sphere, Torus, Prism, Rubik, Fifteen, Model };
-// The puzzles (rubik, fifteen): drawn in their own colors (engine/StickerColors, the colorize pass's color overlay).
-inline bool isPuzzleMesh(MeshKind k) { return k == MeshKind::Rubik || k == MeshKind::Fifteen; }
+// Rain: rain on glass over the frame (engine/Rain, render/RainPipeline; docs/3d-design.md "Rain on glass"). makeMesh
+// gives an empty mesh.
+// Labyrinth: the tilt maze solid (engine/Labyrinth.hpp): its mesh is the Fifteen box (the board, the walls); the
+// solid pass also draws the sphere (the ball) and makeFlatRing discs / rings (the holes, the start).
+// Fractal: a self-similar zoom into a 3D fractal (engine/FractalZoom, render/FractalPipeline; docs/3d-design.md
+// "Fractal zoom"), raymarched: makeMesh gives an empty mesh.
+// Knight: the chess knight of the knight's-tour solid (engine/Knight.hpp makePiece): z up, facing +x, base on z = 0.
+// Jigsaw: the jigsaw of the live frame (engine/Jigsaw.hpp, render/JigsawPipeline over the colorized frame): no mesh.
+enum class MeshKind {
+    Tetrahedron, Cube, Octahedron, Dodecahedron, Icosahedron, Sphere, Torus, Prism, Rubik, Fifteen, Labyrinth, Knight,
+    Soma, Jigsaw, Model, Rain, Fractal
+};
+// The puzzles (rubik, fifteen, labyrinth, soma): drawn in their own colors (engine/StickerColors, engine/PieceColors,
+// the colorize pass's color overlay).
+inline bool isPuzzleMesh(MeshKind k) {
+    return k == MeshKind::Rubik || k == MeshKind::Fifteen || k == MeshKind::Labyrinth || k == MeshKind::Soma;
+}
+// A face's in-plane axes (the soma mesh's uv): face d (+x, -x, +y, -y, +z, -z) has u along axis (a + 1) % 3 and v
+// along (a + 2) % 3 (a = d / 2), swapped on the negative faces, so u x v points out of the face.
+inline void somaFaceAxes(int d, int& u, int& v) {
+    const int a = d / 2;
+    u = (a + 1) % 3;
+    v = (a + 2) % 3;
+    if (d % 2) std::swap(u, v);
+}
 std::optional<MeshKind> parseMeshKind(std::string_view name);  // case-insensitive; "tetrahedron", "cube", ...
 const char* meshKindName(MeshKind k);
 
@@ -62,6 +88,9 @@ struct Mesh {
 // normals, triangles counter-clockwise from outside; uv = the vertex's x, y (tile units), edge = 1 on the cap.
 Mesh makeGlassButton(double half = 0.47, double corner = 0.17, double height = 0.32, double bevel = 0.13,
                      int cornerSegments = 8, int bevelSegments = 6);
+
+// A flat ring in the z = 0 plane facing +z, outer radius 1, inner radius `inner` (0: a disc), uv = 0.5 + 0.5 xy.
+Mesh makeFlatRing(double inner, int segments = 48);
 
 // detail: sphere subdivisions (0 = icosahedron, 2 = 320 triangles) / torus segments scale. Ignored for polyhedra.
 Mesh makeMesh(MeshKind kind, int detail = 2);

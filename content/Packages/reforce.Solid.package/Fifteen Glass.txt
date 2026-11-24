@@ -9,7 +9,10 @@ Tint=".15"
 Bend="1"
 ColorKey="0"
 Moves="31"
-PDur="120"
+// 4 solves (one per 8 bars), ending on a phrase line of the live clock; started on a 8-bar line (Peter 2026-11-23:
+// a fixed PDur ended mid-tour)
+PBar="32"
+SBar="8"
 B0="t - START_TIME"
 // beats: the beat clock when locked, else 2 per second
 B1="SYNC_ON * SYNC_BEAT + (1 - SYNC_ON) * 2 * B0"

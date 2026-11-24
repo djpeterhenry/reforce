@@ -113,14 +113,53 @@ bool Visualizer::startSolid(std::shared_ptr<const scene::CompiledConfig> cfg, co
     const auto mesh = engine::solidMesh(*cfg, &written);
     if (!mesh) {
         rlog("[reforce] Solid \"%s\": unknown Mesh \"%s\" (tetrahedron, cube, octahedron, dodecahedron, icosahedron, "
-             "sphere, torus, prism, rubik, fifteen, model)\n", label.c_str(), written.c_str());
+             "sphere, torus, prism, rubik, fifteen, labyrinth, knight, soma, jigsaw, model, rain, fractal)\n",
+             label.c_str(), written.c_str());
+        return false;
+    }
+    if (*mesh == engine::MeshKind::Jigsaw && !jigsaws_) {
+        rlog("[reforce] Solid \"%s\": the jigsaw is unavailable\n", label.c_str());
         return false;
     }
     if (*mesh == engine::MeshKind::Model && !modelLoader_) {
         rlog("[reforce] Solid \"%s\": 3D models are unavailable\n", label.c_str());
         return false;
     }
+    if (*mesh == engine::MeshKind::Fractal) {
+        if (!fractals_) {
+            rlog("[reforce] Solid \"%s\": fractal zooms are unavailable\n", label.c_str());
+            return false;
+        }
+        // An unknown Frac or Path refuses to start (before anything else makes room for it).
+        auto literal = [&](const char* key) {
+            const scene::CompiledKey* k = cfg->find(key);
+            return k ? k->text : std::string();
+        };
+        const auto kind = engine::parseFractalKind(literal("FRAC"));
+        if (!kind || !engine::findFractalPath(*kind, literal("PATH"))) {
+            rlog("[reforce] Solid \"%s\": unknown %s \"%s\" (%s)\n", label.c_str(), kind ? "Path" : "Frac",
+                 (kind ? literal("PATH") : literal("FRAC")).c_str(),
+                 kind ? engine::fractalPathNames(*kind).c_str() : "sierpinski, menger");
+            return false;
+        }
+    }
     const auto keepCfg = cfg;
+    if (*mesh == engine::MeshKind::Rain) {
+        if (!rain_) {
+            rlog("[reforce] Solid \"%s\": rain is unavailable\n", label.c_str());
+            return false;
+        }
+        // One rain at a time (its height fields are shared): a newer one replaces an older one at once.
+        for (auto it = liveSolids_.begin(); it != liveSolids_.end();) {
+            if (it->run->mesh() == engine::MeshKind::Rain) {
+                rlog("[reforce] Solid \"%s\" replaced by \"%s\" (one rain at a time)\n", it->run->name().c_str(),
+                     label.c_str());
+                it = liveSolids_.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
     makeRoomForObject(t, fade.fade, label);
     int slot = freeSolidSlot();
     if (slot < 0) {
@@ -143,6 +182,9 @@ bool Visualizer::startSolid(std::shared_ptr<const scene::CompiledConfig> cfg, co
                                                   fade.fn);
     run->setHold(engine::holdForBars(run->bars(), fade.fade, syncInput(), phrase_.state().bars,
                                      phrase_.state().quantum));  // PBar
+    // ... and keeps ending on those lines of the live clock (tempo changes, phrase re-alignments, a lock arriving).
+    if (std::isfinite(run->bars()) && run->bars() > 0)
+        run->followBars(engine::holdLineBars(run->bars(), phrase_.state().bars));
     LiveSolid live;
     if (*mesh == engine::MeshKind::Model) {
         // The move's length: MBar on the beat clock (whole bars at the clock's tempo), else MDur. Without PDur /
@@ -191,11 +233,34 @@ bool Visualizer::startSolid(std::shared_ptr<const scene::CompiledConfig> cfg, co
              path.filename().c_str(), ms.look ? "B (color)" : "A (visuals)",
              ms.ownPath ? "own keyframes" : ms.freeCamera ? "free" : presetNote.empty() ? "default view" : presetNote.c_str(),
              ms.moveSeconds, slot, live.waiting ? ", waiting for the model to load" : "");
+    } else if (*mesh == engine::MeshKind::Rain) {
+        run->setAspect(double(opts_.width) / double(std::max(1u, unsigned(opts_.height))));
+        const auto& e = run->envelope();
+        const auto& rs = run->rainSettings();
+        rlog("[reforce] Solid \"%s\" starts: rain (%s), seed %llu, slot %d, fade %.2f s, hold %.2f s\n", label.c_str(),
+             engine::rain::modeName(rs.mode), static_cast<unsigned long long>(rs.seed), slot, e.fade, e.hold);
+    } else if (*mesh == engine::MeshKind::Fractal) {
+        const engine::FractalSettings& fs = run->fractal();
+        if (!fs.path) return false;  // (checked above)
+        const auto& e = run->envelope();
+        rlog("[reforce] Solid \"%s\" starts: fractal %s, path %s (x%.3g per step, %.3g bars a step), res %.2f, slot %d, "
+             "fade %.2f s, hold %.2f s\n",
+             label.c_str(), engine::fractalKindName(fs.kind), fs.path->name, 1.0 / fs.path->g.lambda,
+             fs.timing.barsPerStep, fs.res, slot, e.fade, e.hold);
     } else {
         const auto& e = run->envelope();
         rlog("[reforce] Solid \"%s\" starts: %s, Text=%d, slot %d, fade %.2f s, hold %.2f s\n", label.c_str(),
              engine::meshKindName(*mesh), run->text(), slot, e.fade, e.hold);
+        if (const engine::soma::Player* sp = run->soma()) {
+            std::string figs;
+            for (int f : sp->figures()) figs += std::string(figs.empty() ? "" : " ") + engine::soma::figure(f).name;
+            const auto& tm = run->somaTiming();
+            rlog("[reforce] Solid \"%s\": soma figures %s, rounds of %.0f beats (hold %.1f, a lock every %.2f)%s%s\n",
+                 label.c_str(), figs.c_str(), tm.len, tm.hold, tm.each, run->somaUnknown().empty() ? "" : "; unknown Figs: ",
+                 run->somaUnknown().c_str());
+        }
     }
+    if (*mesh == engine::MeshKind::Jigsaw) live.jigsaw = std::make_unique<engine::jigsaw::Solver>();
     live.run = std::move(run);
     live.slot = slot;
     liveSolids_.push_back(std::move(live));
@@ -230,7 +295,7 @@ void Visualizer::addSolidQuads(const render::SolidQuad& sq, const engine::Sprite
         plan = engine::SpriteLayerPlan{};
         plan.feedbackBeforeLines = beforeLines;
         const engine::SpriteLayerDraw d{engine::SpriteOp::Blend, engine::SpriteBlend::AlphaBlend, 0.0, 0.0};
-        if (ds.hasPen) {
+        if (ds.hasPen && ds.pen > 0.0) {  // (Pen 0: nothing into the feedback, rather than a dark copy)
             plan.feedback[plan.feedbackCount++] = d;
             plan.feedback[plan.feedbackCount - 1].pen = ds.pen;
         }
@@ -284,6 +349,8 @@ void Visualizer::stepModel(MTL::CommandBuffer* cmd, LiveSolid& s, double t, cons
                                                       s.fade.fade, s.fade.defaultHold, s.fade.fn);
         run->setHold(engine::holdForBars(run->bars(), s.fade.fade, syncInput(), phrase_.state().bars,
                                          phrase_.state().quantum));
+        if (std::isfinite(run->bars()) && run->bars() > 0)
+            run->followBars(engine::holdLineBars(run->bars(), phrase_.state().bars));
         run->setMoveSeconds(before.moveSeconds);
         if (!before.ownPath && !before.freeCamera) run->setCameraPath(before.path);  // the preset loaded at the start
         if (!run->hasDuration()) run->setHold(std::max(0.0, before.moveSeconds - 2.0 * s.fade.fade));
@@ -352,6 +419,8 @@ void Visualizer::stepSolids(MTL::CommandBuffer* cmd, double t, const audio::Audi
     opaqueSolids_.clear();
     colorSolids_.clear();
     glassDraws_.clear();
+    jigsawDraws_.clear();
+    rainDraws_.clear();
     modelColorDraws_.clear();
     for (auto it = liveSolids_.begin(); it != liveSolids_.end();) {
         if (it->run->expired(t)) {
@@ -364,19 +433,26 @@ void Visualizer::stepSolids(MTL::CommandBuffer* cmd, double t, const audio::Audi
     if (liveSolids_.empty() && solidTests_.empty()) return;
     // Face sources (PLAN 5L.3), once per step and only when a live solid uses them.
     bool wave = false, frame = false;
-    bool rubik = false, fifteen = false;
+    bool rubik = false, fifteen = false, maze = false, soma = false;
     for (const auto& s : solidTests_) {
         const bool r = engine::isPuzzleMesh(s.spec.draw.mesh);
         rubik = rubik || s.spec.draw.mesh == engine::MeshKind::Rubik;
+        maze = maze || s.spec.draw.mesh == engine::MeshKind::Labyrinth;
         fifteen = fifteen || s.spec.draw.mesh == engine::MeshKind::Fifteen;
+        soma = soma || s.spec.draw.mesh == engine::MeshKind::Soma;
         wave = wave || (!r && s.spec.draw.text == render::SolidText::Wave);
         frame = frame || (!r && s.spec.draw.text == render::SolidText::Frame);
     }
     for (const auto& s : liveSolids_) {
-        if (s.run->mesh() == engine::MeshKind::Model) continue;  // models wear their own textures
+        if (s.run->mesh() == engine::MeshKind::Model || s.run->mesh() == engine::MeshKind::Jigsaw ||
+            s.run->mesh() == engine::MeshKind::Rain || s.run->mesh() == engine::MeshKind::Fractal)
+            continue;  // models wear their own textures; the jigsaw and rain show the colorized frame;
+                       // fractals are raymarched
         const bool r = engine::isPuzzleMesh(s.run->mesh());
         rubik = rubik || s.run->mesh() == engine::MeshKind::Rubik;
+        maze = maze || s.run->mesh() == engine::MeshKind::Labyrinth;
         fifteen = fifteen || s.run->mesh() == engine::MeshKind::Fifteen;
+        soma = soma || s.run->mesh() == engine::MeshKind::Soma;
         wave = wave || (!r && s.run->text() == int(render::SolidText::Wave));
         frame = frame || (!r && s.run->text() == int(render::SolidText::Frame));
     }
@@ -409,6 +485,35 @@ void Visualizer::stepSolids(MTL::CommandBuffer* cmd, double t, const audio::Audi
                  to[2], to[3], tilePicker_.light() ? "light" : "dark", tilePicker_.score());
         }
     }
+    // The labyrinth: board, walls and ball, engine::TrioPicker, in the slots render::kLabyrinth* name.
+    std::array<float, 6> mazeColors = stickers;
+    if (maze) {
+        trioPicker_.update(palette_, lut_, t);
+        const auto c = trioPicker_.levels(t);
+        mazeColors[std::size_t(render::kLabyrinthFloor)] = c[0];
+        mazeColors[std::size_t(render::kLabyrinthWalls)] = c[1];
+        mazeColors[std::size_t(render::kLabyrinthBall)] = c[2];
+        const int sw = trioPicker_.switches();
+        if (sw != trioLogged_ && trioPicker_.score() >= 2.0f) {
+            trioLogged_ = sw;
+            const auto to = trioPicker_.levels(t + 3600.0);
+            rlog("[reforce] Labyrinth colors: board %.2f, walls %.2f, ball %.2f (closest pair %.1f CIELAB)\n", to[0],
+                 to[1], to[2], trioPicker_.score());
+        }
+    }
+    // The soma: seven piece colors (engine::PiecePicker), light enough to shade.
+    std::array<float, engine::soma::kPieces> pieceLevels{};
+    if (soma) {
+        piecePicker_.update(palette_, lut_, t);
+        pieceLevels = piecePicker_.levels(t);
+        const int sw = piecePicker_.switches();
+        if (sw != pieceLogged_ && piecePicker_.score() >= 2.0f) {
+            pieceLogged_ = sw;
+            const auto to = piecePicker_.levels(t + 3600.0);
+            rlog("[reforce] Soma colors: %.2f %.2f %.2f %.2f %.2f %.2f %.2f (closest pair %.1f CIELAB)\n", to[0], to[1],
+                 to[2], to[3], to[4], to[5], to[6], piecePicker_.score());
+        }
+    }
     if (wave) {
         tileSegments_.clear();
         if (wsOutValid_) appendTileSegments(wsOut_, tileSegments_);
@@ -431,8 +536,13 @@ void Visualizer::stepSolids(MTL::CommandBuffer* cmd, double t, const audio::Audi
         o.v1 = sq.v1;
         o.opacity = float(std::clamp(opacity, 0.0, 1.0));
         o.opaque = opaque;
-        o.puzzle = mesh == engine::MeshKind::Fifteen ? 1 : 0;
+        o.puzzle = mesh == engine::MeshKind::Fifteen ? 1 : mesh == engine::MeshKind::Labyrinth ? 2 : 0;
         o.numeral = o.puzzle == 1 ? tilePicker_.numeral(t) : 0.0f;
+        if (o.puzzle == 2) {
+            o.levels[0] = mazeColors[std::size_t(render::kLabyrinthFloor)];
+            o.levels[1] = mazeColors[std::size_t(render::kLabyrinthWalls)];
+            o.levels[2] = mazeColors[std::size_t(render::kLabyrinthBall)];
+        }
         colorSolids_.push_back(o);
     };
     // A glass 15 puzzle (Glas = 1): not drawn into the visuals; colorize draws it over the frame (encodeGlass).
@@ -463,7 +573,9 @@ void Visualizer::stepSolids(MTL::CommandBuffer* cmd, double t, const audio::Audi
         if (s.start < 0) s.start = t;
         render::SolidDraw d = s.spec.draw;
         if (d.mesh == engine::MeshKind::Rubik) d.stickers = stickers;
+        if (d.mesh == engine::MeshKind::Labyrinth) d.stickers = mazeColors;
         if (d.mesh == engine::MeshKind::Fifteen) d.stickers = tiles;
+        if (d.mesh == engine::MeshKind::Soma) d.pieces = pieceLevels;
         const double age = t - s.start;
         d.pose.rotX += s.spec.spin[0] * age;
         d.pose.rotY += s.spec.spin[1] * age;
@@ -501,8 +613,36 @@ void Visualizer::stepSolids(MTL::CommandBuffer* cmd, double t, const audio::Audi
                 stepModel(cmd, s, t, a);
                 continue;
             }
+            if (s.run->mesh() == engine::MeshKind::Fractal) {
+                stepFractal(cmd, s, t, a);
+                continue;
+            }
             const engine::SolidSpec sp = s.run->evaluate(t, a);
+            if (sp.mesh == engine::MeshKind::Rain) {
+                // Rain: its waves / fog step on the GPU every step (from the first, even while invisible); colorize
+                // lays it over the frame.
+                if (rain_ && sp.rain) {
+                    rain_->encodeStep(cmd, *sp.rain, sp.rainLook, sp.rainReset);
+                    if (sp.opacity > 0) rainDraws_.push_back({sp.rain, sp.rainLook});
+                }
+                continue;
+            }
             if (!(sp.opacity > 0)) continue;
+            if (sp.mesh == engine::MeshKind::Jigsaw) {
+                // Not drawn into the visuals: colorize cuts it from the finished frame (JigsawPipeline::encode).
+                if (!s.jigsaw) continue;
+                engine::jigsaw::Config jc = sp.jigsaw;
+                jc.aspect = double(opts_.width) / double(std::max(1u, opts_.height));
+                const double seed = std::isfinite(sp.seed) ? std::fabs(std::floor(sp.seed)) : 0.0;
+                render::JigsawDraw& jd = jigsawDraws_.emplace_back();
+                jd.frame = s.jigsaw->frame(uint64_t(std::min(seed, 1e15)), jc, sp.jigsawIn);
+                jd.table = render::jigsawTable(sp.gap);
+                if (std::isfinite(sp.dim)) jd.table.dim = float(sp.dim);
+                jd.frost = float(sp.frost);
+                jd.opacity = float(std::clamp(sp.opacity, 0.0, 1.0));
+                jd.opaque = !sp.colorKey;
+                continue;
+            }
             render::SolidDraw d;
             d.mesh = sp.mesh;
             d.pose = sp.pose;
@@ -527,6 +667,25 @@ void Visualizer::stepSolids(MTL::CommandBuffer* cmd, double t, const audio::Audi
                 d.stickers = tiles;
                 d.body = 0.0f;
                 d.shading.shade = float(sp.shade);
+            } else if (sp.mesh == engine::MeshKind::Knight) {
+                // The tour of this Seed and the one before (its web unravels during the first hop).
+                const double seed = std::isfinite(sp.seed) ? std::fabs(std::floor(sp.seed)) : 0.0;
+                const uint64_t sd = uint64_t(std::min(seed, 1e15));
+                d.tour = knightTours_.get(sd, sp.symmetric);
+                d.prevTour = sd > 0 ? knightTours_.get(sd - 1, sp.symmetric) : engine::knight::Tour{};
+                d.knight = engine::knight::frameAt(d.tour, sd > 0 ? d.prevTour : d.tour, sp.turn, sp.hover);
+                d.knightLook.board = sp.board;
+                d.knightLook.orbit = float(sp.orbit);
+                d.knightLook.follow = float(sp.follow);
+                d.knightLook.flash = float(sp.flash);
+            } else if (sp.mesh == engine::MeshKind::Labyrinth) {
+                d.labyrinth = sp.labyrinth;
+                d.floor = float(sp.floor);
+                d.tiltGain = float(sp.tiltGain);
+                d.stickers = mazeColors;
+            } else if (sp.mesh == engine::MeshKind::Soma) {
+                d.soma = sp.soma;
+                d.pieces = pieceLevels;
             }
             const render::SolidQuad sq = solids_->encode(cmd, s.slot, d);
             if (!sq.visible) continue;

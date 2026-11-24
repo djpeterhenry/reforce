@@ -2,4 +2,10 @@ CategoryTitle = "Puzzles"
 Include.List = "
 Rubik Cube
 Fifteen Glass
+Knight's Tour
+Knight's Web
+Tilt Maze
+Soma Cube
+Jigsaw
+Jigsaw Mini
 "

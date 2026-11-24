@@ -1,0 +1,41 @@
+Vers=100
+Meta="reforce solid: the Soma cube, built on the beat. Seven pieces (the L-tricube and the six tetracubes, each in its own color picked from the ColorMap) fly in one every two beats, turning into place on the way, and lock on the beat with a small thump, so the cube is complete on every 8-bar line (bar lines from the phrase clock while the beat clock is locked, else 120 BPM from the start). It stands complete and turning for two bars, bursts into a ring of hovering, tumbling pieces, and builds again: a different solution each round (there are 240). A drop (SYNC_DROP) blows it apart and lets it snap back; a build-up (SYNC_BUILD) makes the hovering pieces tremble. Over 1 draws it opaque, ColorKey 0 keeps it solid over the camera."
+Mesh="soma"
+Text="2"
+Over="1"
+ColorKey="0"
+Figs="cube"
+// beats per round, beats the finished figure stands, beats between locks
+Len="32"
+Hold="8"
+Each="2"
+// 4 rounds (one per 8 bars), ending on a phrase line of the live clock; started on a 8-bar line (Peter 2026-11-23:
+// a fixed PDur ended mid-tour)
+PBar="32"
+SBar="8"
+B0="t - START_TIME"
+// beats: the beat clock when locked, else 2 per second
+B1="SYNC_ON * SYNC_BEAT + (1 - SYNC_ON) * 2 * B0"
+// beats into the 8-bar round (0..32) and the round number (the figure and its solution)
+B2="SYNC_ON * 32 * wrap(SYNC_BAR / 8) + (1 - SYNC_ON) * 32 * wrap(B1 / 32)"
+B3="SYNC_ON * floor(SYNC_BAR / 8) + (1 - SYNC_ON) * floor(B1 / 32)"
+Turn="B2"
+Seed="B3"
+Expl="SYNC_DROP"
+Tens="SYNC_BUILD"
+// a three-quarter view from a little above, slowly orbiting (soma: RotY turns about the figure's own vertical, then
+// RotX tilts it towards the viewer); the orbit lingers on the diagonal views and hurries past the flat, face-on ones
+B4=".16 * B0 + .785"
+// close in on the complete cube while it stands (beats 0..8 of the round), pulled back for the burst, the ring of
+// hovering pieces and the flights over the top
+B5="clamp(B2) * clamp(8 - B2)"
+X="0"
+Y=".07"
+Z="0"
+Scal=".36 + .07 * B5 * B5 * (3 - 2 * B5)"
+RotX=".5 + .05 * sin(.19 * B0)"
+RotY="B4 + .2 * sin(4 * B4)"
+RotZ="0"
+Shad=".8"
+Pen="1"
+EPen="1"

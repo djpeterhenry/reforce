@@ -113,8 +113,12 @@ namespace {
 // Literal (text) keys of model solids (docs/model-design.md): the model file, the camera move, the front / up axes.
 bool isSolidLiteral(const std::string& key) {
     if (key == "FILE" || key == "MOVE" || key == "FRONT" || key == "UP") return true;
+    if (key == "FIGS") return true;  // soma: the figures, by name (engine/Soma.hpp)
+    if (key == "RAIN") return true;  // rain: window | floor
     // Camera path keyframes and options (engine/CameraMoves.hpp): K1, K2, ..., Ease, Step, Rand, Push.
     if (key == "EASE" || key == "STEP" || key == "RAND" || key == "PUSH") return true;
+    // Fractal solids (docs/3d-design.md "Fractal zoom"): the fractal and its zoom path.
+    if (key == "FRAC" || key == "PATH") return true;
     return key.size() >= 2 && key[0] == 'K' &&
            key.find_first_not_of("0123456789", 1) == std::string::npos;
 }
@@ -175,19 +179,31 @@ Tier tierFor(SceneType type, const std::string& key, int& family, int& index, bo
         if (key == "X" || key == "Y" || key == "Z" || key == "SCAL" || key == "ROTX" || key == "ROTY" ||
             key == "ROTZ" || key == "FILL" || key == "SHAD" || key == "EDGE" || key == "PEN" || key == "EPEN" ||
             key == "TURN" || key == "SEED" || key == "SHUF" ||
-            key == "FROS" || key == "TINT" || key == "BEND")
+            key == "FROS" || key == "TINT" || key == "BEND" || key == "EXPL" || key == "TENS")
             return Tier::FrameOutput;
+        // The knight's tour (docs/3d-design.md "Knight's tour"): Sym and Brd are Pre.
+        if (key == "ORBT" || key == "FOLW" || key == "FLSH" || key == "HOVR") return Tier::FrameOutput;
+        // The jigsaw (docs/3d-design.md "Jigsaw"): the table's brightness, a drop's kick, a build's shake, per frame.
+        if (key == "DIM" || key == "KICK" || key == "SHAK") return Tier::FrameOutput;
         // Model solids (docs/model-design.md): the camera and the look, per frame.
         if (key == "DIST" || key == "HITE" || key == "SIDE" || key == "ROLL" || key == "FOV" ||
             key == "CUTB" || key == "CAMX" || key == "CAMY" || key == "CAMZ" || key == "AIMX" || key == "AIMY" ||
             key == "AIMZ" || key == "SPIN" || key == "BANK" || key == "GLOW" || key == "BLOM" ||
             key == "EXPO" || key == "LTX" || key == "LTY" || key == "LTZ")
             return Tier::FrameOutput;
+        // Rain on glass (docs/3d-design.md "Rain on glass"): the rain and the look, per frame (Rain is a literal).
+        if (key == "DENS" || key == "SIZE" || key == "DRZ" || key == "CLUS" || key == "WET" || key == "FOG" ||
+            key == "REFG" || key == "DPTH" || key == "SPEC" || key == "RIM" || key == "SPD" || key == "DCAY" ||
+            key == "PUDL")
+            return Tier::FrameOutput;
+        // Fractal solids (docs/3d-design.md "Fractal zoom"): the zoom position, the camera's sway, the fog.
+        if (key == "ZOOM" || key == "ORBT" || key == "LKX" || key == "LKY" || key == "FOG") return Tier::FrameOutput;
         if (key == "MESH") return Tier::Ignored;  // a literal name (CompiledKey::text), not an expression
         if (isSolidLiteral(key)) return Tier::Ignored;  // model File / Move / Front / Up, camera keyframes
         if (key == "LOOK" || key == "MDUR" || key == "MBAR" || key == "LOOP") return Tier::Pre;
         if (key == "TEXT" || key == "FLAG" || key == "PDUR" || key == "PERS" || key == "OVER" || key == "COLORKEY" || key == "GLAS" ||
-            key == "MOVES")
+            key == "MOVES" || key == "LEN" || key == "HOLD" || key == "EACH" || key == "PCS" || key == "ORDR" ||
+            key == "CYCL" || key == "BRK" || key == "GAP")
             return Tier::Pre;
     } else if (type == SceneType::Organic) {
         if (key == "GROW" || key == "TRPX" || key == "TRPY" || key == "SWAY" || key == "X" || key == "Y" ||

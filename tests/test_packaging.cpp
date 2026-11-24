@@ -91,6 +91,41 @@ TEST_CASE("packaging: window settings") {
     CHECK(s.startFullScreen);
 }
 
+TEST_CASE("packaging: Start Like This round-trips through settings.json, read and not reported as unknown") {
+    namespace fs = std::filesystem;
+    const fs::path p = fs::temp_directory_path() / "reforce_start_like_this.json";
+    fs::remove(p);
+    {
+        std::ofstream out(p);
+        out << "{\n  \"reforce.Object.MaxLive\": 1\n}\n";  // other keys are kept
+    }
+    // What View > Start Like This writes (main.cpp's saveStartSetup).
+    engine::PrefsTable t;
+    t.set("reforce.Window.Screen", "DELL U2720Q", true);
+    t.set("reforce.Window.StartFullScreen", "1", false);
+    t.set("reforce.UI.OpenOnLaunch", "1", false);
+    std::string err;
+    REQUIRE(engine::mergeSettingsFile(p.string(), t, &err));
+    const engine::Settings s = engine::loadSettings(p.string());
+    REQUIRE(s.loaded);
+    CHECK(s.windowScreen == "DELL U2720Q");
+    CHECK(s.startFullScreen);
+    CHECK(s.openPanelOnLaunch);
+    CHECK(s.objectMaxLive == 1);
+    CHECK(s.unknownKeys.empty());
+    // Don't Start Like This: all off again.
+    engine::PrefsTable off;
+    off.set("reforce.Window.Screen", "", true);
+    off.set("reforce.Window.StartFullScreen", "0", false);
+    off.set("reforce.UI.OpenOnLaunch", "0", false);
+    REQUIRE(engine::mergeSettingsFile(p.string(), off, &err));
+    const engine::Settings u = engine::loadSettings(p.string());
+    fs::remove(p);
+    CHECK(u.windowScreen.empty());
+    CHECK_FALSE(u.startFullScreen);
+    CHECK_FALSE(u.openPanelOnLaunch);
+}
+
 TEST_CASE("packaging: single-instance decision") {
     using platform::instanceToActivate;
     using platform::RunningInstance;

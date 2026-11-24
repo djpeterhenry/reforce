@@ -36,6 +36,10 @@ plus Syphon for OBS.
     Duration, Start next / Clear, library and favorites.
     5L.6: start **Rubik Cube** with the beat clock locked: does it land solved on the 8-bar lines, and do the six
     colors read well across ColorMaps? Check it stays solid over the camera backdrop.
+    5L.9: start **Tilt Maze** (11 x 11, a maze per phrase; the 8 x 8 one removed 2026-11-23) with the beat clock
+    locked: do the tilts and clacks feel on the beat, does the drop land on the phrase line? Taste: `Tilt` (drawn tilt, content 2 x the physics), `Floor` (.55
+    see-through), a clack on every beat vs fewer moves with rests, the ball in a ColorMap color vs neutral steel, and
+    keep or drop the decorative trap holes (the ball never goes near them).
 13. **5N organics:** try the Organics card (or the Organics theme) and the seven trees; say which look right and which
     to tune (growth speed, thickness, sway, buds).
 14. **5O rhythm** (built 2026-11-17 while Peter was away; start with docs/prototypes.md): the Rhythm section (phrase
@@ -48,6 +52,38 @@ plus Syphon for OBS.
     Look at: the characters' looks, whether each style feels like itself, the moves on the beat, the disco floor,
     Moves = canon / mirror / together, and "Lit by visuals". Then pick friends whose faces should go on them (next).
 
+18. **5L.14 fractal zoom** (built 2026-11-23): start **Sierpinski Apex**, **Sierpinski Vortex** and **Menger Tunnels**
+    (Objects card, group Fractals) with the beat clock locked. Taste calls: the step length (ZBar 2 / 4 bars), the
+    pulse after each bar line (Puls .5), the beat glow (Glow), Over 1 (opaque over the visuals) vs the keyed copy,
+    Res .5 (sharper at .75 for ~2x the cost), and which of the other paths (dive, menger corner / vortex) deserve
+    scenes of their own.
+19. (5Q.13 racers: dropped 2026-11-23, see 5Q.13.)
+20. **5L.10 knight's tour** (built 2026-11-23): start **Knight's Tour** and **Knight's Web** (group Puzzles). Taste
+    calls: (board settled 2026-11-23: grid lines only, `Brd` 0, for both scenes) symmetric tours for both scenes
+    (`Sym` 1; Knight's Tour now 0), the knight's size and detail, web line / dot sizes, what
+    happens on the phrase line (the web unravels; or a fade / sweep), the drop (a web flash; or a burst of hops),
+    camera framing.
+21. **5L.11 Soma cube** (built 2026-11-23): start **Soma Cube** (group Puzzles; Soma Figures removed 2026-11-23,
+    Peter likes the cube). Taste calls: the pacing (a piece every 2 beats with an 8-beat hold; or one a beat, or one a
+    bar), the exploded halo, the thump strength; a glass variant later.
+22. **5L.13 jigsaw** (built 2026-11-23): start **Jigsaw** and **Jigsaw Mini** (group Puzzles). Taste calls: the empty
+    table (`Gap` 0 frosted / 1 gray / 2 dark / 3 ghost), the break beat (`Brk` 4: whole for a bar after the line; 0
+    on the line), 32 pieces (two a beat at first) vs 27 (exactly one a beat), the completion flash over black, the
+    drop pop (bigger / smaller / pile only).
+23. **5L.12 rain on glass** (built 2026-11-23): start **Rain Downpour**, **Rain Floor** and **Rain Pool** (group Water). Rain Floor vs Rain Pool (2026-11-23, Peter found the floor confusing: glass with beads, yet splashes like water): Rain Floor now shows its puddles (`Pudl`: a bright edge, a dark contact line, deeper inside) and its ripples bounce off the puddle edges; Rain Pool is all water (`Wet` 1). Keep one or both?
+    Taste calls: window or floor as the one to feature (or keep both), the fog (`Fog` .8, `Fros` 16), drop size /
+    density (`Size`, `Dens`), how strongly drops bend (`Dpth`), the floor's ripples and puddles (`Wet` .65), the
+    phrase-line cascade (`Wipe`), highlight / rim (`Spec`, `Rim`), and whether rain joins other slideshow themes.
+24. **5O.9 dragons** (settled 2026-11-23: 8-bar cycles, a fold every 2 beats; Dragon Fold "settle", Dragon Rounded an
+    even level with the band). Still open: the band speeds up on screen within each fold (it covers the whole curve
+    once a bar while the curve doubles): keep, or slow it? `Spin` 0 (the view turns with the curve) vs 1. On
+    ColorMaps that flatten out at the top Dragon Fold's glow looks like its level: if that shows live, pick the level
+    and the glow from the ColorMap's colors (as the pyramid's tops do).
+25. **For Claude, on Peter's say-so:**
+    - Delete the merged agent worktrees in `.claude/worktrees` (~11 GB) and their `worktree-agent-*` branches.
+    - Done 2026-11-23 (Peter saw Knight's Tour end mid-tour): solids' PBar follows the live clock too
+      (engine::BarHold, shared with organics), and the puzzles, the knight's tour, the tilt maze and the fractal zooms
+      have PBar (whole cycles) and SBar instead of a PDur in seconds.
 ---
 
 ## Ground rules
@@ -655,6 +691,80 @@ Peter's decisions:
 - [x] 5L.8 Glass 15 puzzle (Peter, 2026-11-22): `Glas = 1` with `Fros` / `Tint` / `Bend`; clear 3D glass buttons
   (engine::makeGlassButton, MSAA) over the colorized frame, refracting a half-size blur of it, one light tint,
   etched white numbers on a dark halo. Content's Fifteen Glass replaces Fifteen Puzzle. docs/3d-design.md "Glass".
+- [x] 5L.9 Labyrinth solid (Peter, 2026-11-23): `Mesh="labyrinth"` with `Grid` / `Beats` / `Traps` / `Floor` / `Tilt`
+  (`Turn` = beats into the run, `Seed` = the maze); a wooden tilt maze, its steel ball rolling for real (5/7 g sin tilt,
+  rolling resistance, bounces; fixed 1/240-beat steps, swept collisions: no tunneling), tilted by a player that tracks
+  a planned motion, each tilt on a beat, each clack tuned onto its beat (within 2e-6 beats), the drop into the goal on
+  the run's last line (within 1.4e-4 beats); planned lazily, in beats (tempo-proof). Between runs the solved maze sinks,
+  a new one rises, the ball pops up out of the start. Board / walls / ball colors from engine::TrioPicker, black holes,
+  white highlights, a see-through board (colorize mode 2). Content's Tilt Maze (11 x 11, 16 bars; was Tilt Maze Long,
+  the 8 x 8 / 8-bar one removed 2026-11-23, Peter) in Puzzles. Tests: test_engine_labyrinth.cpp, test_render_solids.cpp (labyrinth, in color, cost).
+  docs/3d-design.md "Labyrinth".
+  Realism pass (Peter, 2026-11-23: "the ball moves on rails, the board snaps, collisions are dead"): a human player
+  (one committed tilt per segment played as a planned move, starting .15 beats early; a loose, late, imperfect hand
+  across, seeded), a board with inertia (second order, ~.13 beats, rate-limited; no jolt after clacks), livelier
+  collisions (restitution .42, wall friction .12: glancing hits slide, clacks tick to rest). Locked by a root search on
+  the tilt: drop 4.8e-5 beats off the line, clacks 5e-5, braked stops within .09 cells (was .004). Not changed: Tilt 2,
+  the reflections, the rhythm (a few more two-beat rolls: ~27 segments per 64-beat run, was 30).
+  Stall fix (2026-11-24): every new maze stalled the render thread ~118 ms (the goal choice simulated segment durations
+  thousands of times, twice per run change); durations are now a table, the sinking maze is reused, and one frame plans
+  at most two segments (a mid-phrase start catches up over a few frames). Worst evaluate() ~.9 ms; perf sweep CPU
+  worst 1.24 ms.
+- [x] 5L.10 Knight's tour solid (Peter, 2026-11-23): `Mesh="knight"` with `Sym`, `Brd`, `Orbt`, `Folw`, `Flsh`,
+  `Hovr`; closed tours from g1 (randomized Warnsdorff, or half-turn symmetric by a budgeted half-tour search), one hop
+  per beat landing on the beats, the 64th back home on the phrase line; a knight modeled in code (distance field,
+  surface nets); the web as line art in the solid pass. Content's Knight's Tour and Knight's Web (Puzzles).
+  Tests: test_engine_knight.cpp (tours valid / symmetric / varied over 600 seeds, landings, continuity, junk, the mesh
+  closed and outward, the content scenes on the beat clock), test_render_solids.cpp (board styles, the web growing,
+  the shaded knight, junk, cost ~0.2 ms GPU at 1080p, no render allocations). docs/3d-design.md "Knight's tour".
+- [ ] 5L.10b Peter: look at Knight's Tour / Knight's Web live; pick the board style (Brd), symmetric or not, Pen only or
+  Pen + EPen, and whether the knight's look (piece, mane, size) is right.
+- [x] 5L.11 Soma cube solid (Peter, 2026-11-23: "I'm curious to see what the Soma cube looks like"): `Mesh="soma"`
+  with `Figs`, `Len` / `Hold` / `Each`, `Turn`, `Seed`, `Expl`, `Tens`. engine/Soma: the seven pieces, a Dancing
+  Links solver (the cube's 11,520 / 480 / 240 solutions tested), seven figures, a bottom-up supported assembly order,
+  the round (hold, burst into a halo, one piece flying in and locking every `Each` beats, the last on the line);
+  engine/PieceColors: seven piece colors per ColorMap; soma_fs: flush cubes, rounded piece edges with grooves, faint
+  seams inside a piece. Content's Soma Cube (Objects: Puzzles; Soma Figures removed 2026-11-23, Peter). Tests: test_engine_soma.cpp,
+  test_render_solids.cpp (soma). 0.15 ms GPU at 1080p. docs/3d-design.md "Soma cube".
+- [x] 5L.11c Soma: no two pieces ever meet (Peter 2026-11-24: pieces sometimes passed through each other). An
+  overlap sweep (every 1/32 beat of 48 rounds, oriented-box separating axes) found 7,069 overlapping pairs in every
+  phase; now 0: the ring in figure space outside the figure's cylinder and spaced by bounding spheres, a burst
+  checked when the round is planned (exploded view, then out to the slots), crane flights (turn while rising
+  beside the ring, cross over the top, drop straight in), Expl along the checked burst paths. docs/3d-design.md
+  "No two pieces meet".
+- [ ] 5L.11b Peter: look at Soma Cube live; pick the pacing (Each / Hold), the figures, the halo and the
+  thump strength.
+- [x] 5L.13 Jigsaw of the live frame (Peter, 2026-11-23): `Mesh="jigsaw"` with `Pcs` / `Ordr` / `Cycl` / `Brk` /
+  `Gap` / `Dim` / `Kick` / `Shak`. Classic tabs and blanks from our own generator (engine/JigsawShape.inc, shared by
+  the engine and the shaders), every piece showing the frame from its home place; whole from the 8-bar line, breaks
+  apart on beat 4, pieces fly home corners and border first and snap in on the beats, the last on the next line;
+  the pile hops aside so the assembled part stays clear. Drawn over the colorized frame (render/JigsawPipeline: a
+  cut map once per cycle, the board, the loose pieces with drop shadows). Content's Jigsaw and Jigsaw Mini (Objects:
+  Puzzles). Tests: test_engine_jigsaw.cpp (exact tiling, tabs in blanks, snaps on the beats and the line, solve
+  orders, determinism, junk input, the content scenes), test_render_jigsaw.cpp (GPU cut = CPU cut, the frame back
+  exactly when whole, table and loose pieces, cost). docs/3d-design.md "Jigsaw".
+  - [ ] Peter: look at it live (Objects card: Jigsaw, Jigsaw Mini); pick the empty table (`Gap` 0 frosted / 1 gray /
+    2 dark / 3 ghost), the break beat (`Brk` 4: whole for a bar after the line) and the drop pop.
+- [x] 5L.12 Rain on glass (Peter, 2026-11-23: "simulated raindrops landing on the screen and causing distortion and
+  refraction of what's underneath ... the screen becomes a glass window ... or a glass floor"): `Mesh="rain"`,
+  `Rain = window | floor`, over the colorized frame like the glass puzzle. Window: CPU drops (engine/Rain, fixed
+  1/120 s substeps, seeded) land on the 16th grid, merge conserving volume with a wobble, run down with stick-slip
+  past `Slid`, leave residuals and a wet streak that wipes the condensation fog (GPU, re-fogging over `Refg`); a
+  cascade on phrase lines. Floor: impulses into a GPU wave equation with capillary dispersion and viscosity
+  (render/RainPipeline), crowns of droplets, puddles (`Wet`) with beads on the dry glass. Optics: Snell refraction
+  through the height field to the visuals `Dpth` behind (beads invert), Fresnel, highlight, dark contact line + halo
+  (`Rim`), mipmapped frame copy. Content: Rain Floor, Rain Downpour (Water group; Rain Window, the sparser window, removed 2026-11-23: Peter strictly preferred Rain Downpour). Tests:
+  test_engine_rain.cpp, test_render_rain.cpp, solid_render.cmake (determinism). docs/3d-design.md "Rain on glass".
+  Peter to choose: window or floor as the one to keep / feature (both kept for now).
+- [x] 5L.14 Fractal zoom (Peter, 2026-11-23: "zooming in on one or more 3D fractals ... loop exactly when we've zoomed
+  in so it can go on forever"): `Mesh="fractal"` with `Frac` (sierpinski | menger) and `Path` (apex, dive, vortex |
+  corner, vortex, tunnel). Draws S_inf, the fractal grown outwards about a zoom step's fixed point, which the step maps
+  exactly onto itself: the camera runs along g^u and resets at u = 1 with no seam (GPU frame at the end of a step vs
+  its start: mean |diff| under .01 of 255, every path). Raymarched at half size (1.4–1.9 ms GPU at 1080p), detail
+  relative to the camera, one step per `ZBar` bars landing on the bar lines, surging after each line (`Puls`), beat
+  glow, drops rush `Drop` steps in, builds slow it (`Hovr`). Content's Sierpinski Apex, Sierpinski Vortex, Menger
+  Tunnels (group Fractals). engine/FractalZoom, render/FractalPipeline; tests test_engine_fractals.cpp,
+  test_render_fractals.cpp; docs/3d-design.md "Fractal zoom".
 
 ### 5M. Syphon stream flicker  (Peter, 2026-11-15)  `[-]` dropped (Peter could no longer find a flicker frame)
 Reported: black flicker (or tearing) in an OBS -> YouTube recording of reforce's Syphon output (stream of
@@ -709,7 +819,7 @@ card. Peter away while built: **all of it waits for Peter to try**.
 - [x] Peter (2026-11-18): keep the current defaults (kick zoom off, slideshow changes on the bar, drop switch off);
   no more drop tuning for now.
 - [x] 5O.6 GPU kinds (render/FieldPipeline, Peter 2026-11-18 "build these"): `ripples` (wave equation, a drop on the
-  beat) and `julia` (Julia sets); content Kick Ripples, Rain on a Pond, Ripple Ring, Julia Drift, Julia Pulse, Julia
+  beat) and `julia` (Julia sets); content Ripples Kick, Ripples Pond, Ripples Ring, Julia Drift, Julia Pulse, Julia
   Bands. Drawn into their own texture and composited like solids.
 - [x] Peter (2026-11-22, "a mandelbrot somehow cool ... zooming in"): GPU kind `mandel` (engine/MandelDive): a
   phrase-long dive per target (ten Misiurewicz points), a doubling every 2 beats, a rush back out on the line, bands
@@ -726,6 +836,15 @@ card. Peter away while built: **all of it waits for Peter to try**.
   (not rekordbox memory); faders not moved yet count as down. Toggle "Deck starts" (`reforce.Phrase.DeckStarts`,
   on). Tried live 2026-11-18: hot cues first landed 1-3 beats off the bar (Link re-phasing after the jump); fixed by
   placing a start 0.4 s later, snapped to the nearest Link bar line.
+- [x] 5O.9 Dragon (Peter 2026-11-23: "a 'dragon' fractal ... iterative copies and rotations of 90 degree angles"):
+  Organics kind `dragon` (engine/Dragon): the Heighway paper-folding dragon unfolding one generation per beat, the
+  new copy swinging open 90 degrees about the end point and snapping flat exactly on the beat line; the view keeps
+  the chord fixed and fits the curve to the frame; cycles of 4 bars (unfold 12 folds, hold, refold to one segment
+  by the line); drops burst it open, breakdowns make the flap tremble. Variants: twindragon / four dragons tail to
+  tail (each its own intensity), rounded corners, other fold angles, a band running along it. Content Dragon Fold,
+  Dragon Rounded (Fractals; Dragon Pinwheel, four dragons tail to tail, removed 2026-11-23, Peter). tests/test_engine_dragon.cpp. docs/rhythm-design.md "Dragon".
+  Peter tried it 2026-11-23: all content on 8-bar cycles with a fold every 2 beats; Dragon Fold and Dragon Rounded
+  "look good as is".
 - Later: tempo-scaled time.
 
 ### 5P. Dancers: 3D cartoon characters dancing to the beat  (Peter, 2026-11-18)  `[~]`
@@ -781,6 +900,9 @@ dies. Our own art and names (the repo is public). Design: docs/arcade-design.md.
   the OrganicCanvas (`fillPolygon`, `rect`, `bitmap`, `newPath`), tests/arcade_harness.hpp.
 - [x] 5Q.1 `invaders` (Invaders.cpp, content, tests): Invader March, Invader Swarm (Invader / Rock / Brick Drift removed 2026-11-22, Peter)
 - [x] 5Q.2 `hopper` (Hopper.cpp, content, tests): Pyramid Hop, Pyramid Cascade, Pyramid Mini
+  - [x] Tops on any ColorMap (Peter 2026-11-23: "sometimes the color change of the tiles is hard to see"): dark tops
+    hollow (rim + seam-colored hollow), middle ones a filled center, a step grows the fill; the levels picked per
+    ColorMap near TLo / THi (TAut, engine::TopPicker; organics get the ColorMap's colors). docs/arcade-design.md.
 - [x] 5Q.3 `cycles` (Cycles.cpp, content, tests): Trail Racers, Trail Duel, Trail Swarm
 - [ ] 5Q.4 Arcade group + theme, usage.md, Peter tries it.
 - [x] 5Q.5 `rocks` (Rocks.cpp: Asteroids-inspired; Peter 2026-11-22 "start asteroids-style and breakout-style"): Rock Field, Rock Storm
@@ -807,6 +929,12 @@ dies. Our own art and names (the repo is public). Design: docs/arcade-design.md.
   neuron to neuron, all at once on a drop (Puls, PAll, PlsB, PlsE). docs/organics-design.md "Trees on the beat".
 - [x] 5Q.12 Chase bikes: three designs (Bike = Arc, Blade, Orb), wheels glowing rings rolling at their real speed,
   more glow; Arc for every config (Peter picked it; the comparison configs and a headlight beam were removed).
+- [-] 5Q.13 `racers`: built, then dropped the same day (Peter 2026-11-23: "I don't think I like any of the Drift
+  options"; the kind, Racers.cpp / .hpp, its tests and the three Drift scenes removed). Was (Racers.cpp; Peter 2026-11-23: "a top-down racing game ... a few cars racing around a track ...
+  skidding around corners will be good"): a seeded closed track fitted to the frame (curbs, a checkered finish line),
+  3-6 coupes of our own on a racing line, a slip model for the drift (tire marks and smoke into the feedback); `Sync`
+  1 corners on the beat (default), 2 drift kicks, 3 laps / overtakes on bars; a drop boosts everyone into one big
+  slide. Drift Cup, Drift Duel, Drift Hairpin. docs/arcade-design.md "Racers".
 - [ ] Later: the games stir the warp (a low-res displacement added to the flow pass: explosions push, landings ripple,
   cycles leave a wake).
 

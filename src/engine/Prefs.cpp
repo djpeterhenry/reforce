@@ -326,6 +326,8 @@ void Settings::apply(const PrefsTable& t) {
     blendFlowField = t.string("reforce.Blend.FlowField", blendFlowField);
     scenesDir = t.string("reforce.ScenesDir", scenesDir);
     startFullScreen = t.flag("reforce.Window.StartFullScreen", startFullScreen);
+    windowScreen = t.string("reforce.Window.Screen", windowScreen);
+    openPanelOnLaunch = t.flag("reforce.UI.OpenOnLaunch", openPanelOnLaunch);
     externalSpritesDir = t.string("reforce.ExternalSpritesDir", externalSpritesDir);
     videoDir = t.string("reforce.VideoDir", videoDir);
     videoStartupSource = t.string("reforce.Video.Layer.Source", videoStartupSource);

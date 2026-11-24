@@ -46,11 +46,16 @@
 #include "engine/Dancers.hpp"
 #include "engine/Organics.hpp"
 #include "engine/Solids.hpp"
+#include "engine/Knight.hpp"
+#include "engine/PieceColors.hpp"
 #include "engine/StickerColors.hpp"
 #include "render/DancerPipeline.hpp"
 #include "render/FieldPipeline.hpp"
 #include "render/SolidPipeline.hpp"
+#include "render/JigsawPipeline.hpp"
 #include "render/ModelPipeline.hpp"
+#include "render/RainPipeline.hpp"
+#include "render/FractalPipeline.hpp"
 #include "app/ModelLoader.hpp"
 #include "render/VideoMips.hpp"
 #include "scene/Evaluate.hpp"
@@ -413,8 +418,22 @@ private:
     // destroyed first) and the worker that loads models (declared after the pass it uploads with).
     std::unique_ptr<render::ModelPipeline> models_;
     std::unique_ptr<ModelLoader> modelLoader_;
+    // Rain on glass (Mesh="rain", docs/3d-design.md "Rain on glass"): stepped with the solids, laid over the
+    // colorized frame after the glass (encodeComposite). One rain at a time (a newer one replaces an older).
+    std::unique_ptr<render::RainPipeline> rain_;
+    struct RainDraw {
+        std::shared_ptr<const engine::rain::Sim> sim;
+        render::RainLook look;
+    };
+    std::vector<RainDraw> rainDraws_;
     std::vector<render::ModelDraw> modelColorDraws_;  // this step's look-B models (encodeColor after colorize)
+    // The jigsaw (docs/3d-design.md "Jigsaw"): its pass over the colorized frame and this step's draws.
+    std::unique_ptr<render::JigsawPipeline> jigsaws_;
+    std::vector<render::JigsawDraw> jigsawDraws_;
     void preloadModels();
+    // Fractal zooms (PLAN 5L.14, docs/3d-design.md "Fractal zoom"): the raymarching pass (shares solids_' slots;
+    // declared after it, so destroyed first). Null when unavailable.
+    std::unique_ptr<render::FractalPipeline> fractals_;
     std::filesystem::path contentDir_;  // reforce.ContentDir: camera presets (content/Camera)
 public:
     void setContentDir(const std::filesystem::path& dir) { contentDir_ = dir; }
@@ -438,16 +457,29 @@ private:
         bool waiting = false;
         std::shared_ptr<const scene::CompiledConfig> cfg;
         FadeSpec fade;
+        std::unique_ptr<engine::jigsaw::Solver> jigsaw;  // Mesh="jigsaw": its plans (made at start)
     };
     std::vector<LiveSolid> liveSolids_;
     void stepModel(MTL::CommandBuffer* cmd, LiveSolid& s, double t, const engine::SpriteAudio& a);
+    void stepFractal(MTL::CommandBuffer* cmd, LiveSolid& s, double t, const engine::SpriteAudio& a);
     std::vector<render::SpriteQuad> opaqueSolids_;  // this step's ColorKey = 0 solids (encodeColorize)
     std::vector<render::SpriteQuad> colorSolids_;  // this step's rubik solids, drawn in color (encodeColorize)
     std::vector<render::GlassDraw> glassDraws_;     // this step's glass puzzles (encodeGlass after colorize)
     engine::StickerPicker stickerPicker_;           // rubik sticker intensities for the current ColorMap
     int stickerLogged_ = -1;
     engine::TilePicker tilePicker_;                 // the 15 puzzle's row colors and numbers for the current ColorMap
+    engine::knight::TourCache knightTours_;         // the knight solids' tours (searched once per Seed)
+    // The ColorMap's colors for the organics (engine::OrganicColors), recomputed when the palette or MapFunction LUT
+    // changes (the copies say what they were made from).
+    engine::OrganicColors organicColors_{};
+    engine::Palette organicPal_{};
+    engine::MapLut organicLut_{};
+    bool organicColorsHave_ = false;
     int tileLogged_ = -1;
+    engine::TrioPicker trioPicker_;                 // the labyrinth's board, walls and ball colors
+    int trioLogged_ = -1;
+    engine::PiecePicker piecePicker_;               // the soma's seven piece colors for the current ColorMap
+    int pieceLogged_ = -1;
     std::vector<std::unique_ptr<engine::OrganicRun>> organics_;  // start order
     void stepOrganics(double t, const audio::AudioFrame* audio);
     // Dancers (PLAN 5P).

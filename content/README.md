@@ -19,4 +19,12 @@ reforce's own scene content, laid out like a G-Force scene root (`Packages/`, `T
 - `Categories/Object/`: the object groups (Trees, Pendulums, Curves, Cells, Water, Fractals, Arcade, Solids,
   Puzzles), which the Objects card browses and the group themes select.
 
+## Naming scenes
+
+When an object has more than one scene, every scene's name starts with the object's common type name, then what makes
+that one different, so they sort together in the lists (Peter 2026-11-23): Dragon Fold / Dragon Rounded, Rain Downpour
+/ Rain Floor / Rain Pool, Ripples Kick / Ripples Pond / Ripples Ring, Julia Drift / Julia Pulse / Julia Bands. A name
+that describes the scene but starts elsewhere ("Four Dragons", "Downpour", "Hairpin Alley") hides it from its
+siblings. A one-scene object just uses its type name (Tilt Maze).
+
 reforce reads this folder from the source tree by default (an app built elsewhere uses the copy bundled in it); `reforce.ContentDir` or `--content DIR|none` changes it.

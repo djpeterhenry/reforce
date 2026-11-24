@@ -698,12 +698,12 @@ folder `reforce.Solid.Dir`). Solids are Objects, a spawn layer like Particles: `
 
 | Key | Tier | Meaning |
 |---|---|---|
-| `Mesh` | literal | `tetrahedron`, `cube`, `octahedron`, `dodecahedron`, `icosahedron` (default), `sphere`, `torus`, `prism`, `rubik` (a Rubik's cube: see below), `fifteen` (a 15 puzzle: see below). A name, not an expression; unknown names refuse to start. |
+| `Mesh` | literal | `tetrahedron`, `cube`, `octahedron`, `dodecahedron`, `icosahedron` (default), `sphere`, `torus`, `prism`, `rubik` (a Rubik's cube: see below), `fifteen` (a 15 puzzle: see below), `labyrinth` (a tilt maze: see below), `knight` (a knight's tour: see below), `soma` (the Soma cube: see below), `jigsaw` (a jigsaw of the live frame: see below), `rain` (rain on glass: see below), `model` (your own 3D model: see below), `fractal` (an endless zoom into a 3D fractal: see below). A name, not an expression; unknown names refuse to start. |
 | `Text` | Pre | Face texture: `0` the current WaveShape (default), `1` the previous frame (Droste), `2` flat. |
 | `Pers` | Pre | `1` perspective (default; 40° vertical field of view, camera at z ≈ 2.75), `0` orthographic. |
 | `Flag` | Pre | Sprite blend flags (§5.6); absent = 0, a keyed copy. |
 | `PDur` | Pre | Seconds at full strength (else `Object.Duration`, 40). |
-| `PBar` | Pre | Bars at full strength instead (wins over `PDur`). With the beat clock the fade-out starts on the bar line nearest to that many bars after the fade-in, or on the nearest phrase line when it is a whole number of phrases (never under half of it); without it, bars at 120 BPM. The tempo at the start counts. |
+| `PBar` | Pre | Bars at full strength instead (wins over `PDur`). With the beat clock the fade-out starts on the bar line nearest to that many bars after the fade-in, or on the nearest phrase line when it is a whole number of phrases (never under half of it); without it, bars at 120 BPM. The tempo at the start counts. The end then keeps following the live clock (Peter 2026-11-23, engine::BarHold, as for organics): the bars left are counted as the clock runs, so a tempo change moves the end with it, and every frame the end snaps to the nearest such line of the clock as it is now (a deck start or a phrase re-alignment moves it). Use a whole number of the object's cycles (the puzzles: 32 bars, 4 solves; the knight's tour and the tilt maze: 64, 4 phrases) and `SBar` to start on a cycle line. |
 | `A#` | Load | Once at start. |
 | `B#` | Frame | Per frame, persisting (like sprites). `C#`/`D#` are not evaluated. |
 | `X`, `Y`, `Z` | FrameOutput | Center. Sprite convention: ±1 = the frame edges at z = 0; +z comes towards the viewer (stay below ~2). Default 0. |
@@ -716,11 +716,60 @@ folder `reforce.Solid.Dir`). Solids are Objects, a spawn layer like Particles: `
 | `Over` | Pre | `1`: Pen / EPen draw the solid opaque over the frame with its coverage as alpha (exact intensities, dark parts covering what is behind), instead of the sprite blend `Flag` picks; `0` (default): by `Flag`. |
 | `ColorKey` | Pre | `1` (default) keyed like the visuals in the Syphon alpha / camera backdrop; `0` the whole solid stays opaque there, dark parts included (docs/syphon-alpha.md). |
 | `Moves` | Pre | `rubik`: scramble length, 1..32 (30); `fifteen`: 1..64 (30). |
-| `Turn` | FrameOutput | `rubik`: position in the cycle, in turns: `0` solved, `Moves` fully scrambled (the scramble's moves done one after another), `2 * Moves` solved again (the same moves undone in reverse order); the fraction is how far the current turn has gone. Absent: solved. |
-| `Seed` | FrameOutput | `rubik`, `fifteen`: picks the scramble (its whole part; 0). Change it once per cycle for a new scramble. |
+| `Turn` | FrameOutput | `soma`: beats into the round, 0..`Len` (absent: the figure complete). `rubik`: position in the cycle, in turns: `0` solved, `Moves` fully scrambled (the scramble's moves done one after another), `2 * Moves` solved again (the same moves undone in reverse order); the fraction is how far the current turn has gone. Absent: solved. `labyrinth`: beats into the run, `0` .. `Beats` (the ball drops into the goal at `Beats`); absent: the end of the run. `jigsaw`: beats into the cycle, `0` (the line, complete) .. `Cycl`; absent: whole. |
+| `Seed` | FrameOutput | `rubik`, `fifteen`, `jigsaw`: picks the scramble (and the jigsaw's cut) (its whole part; 0). Change it once per cycle for a new scramble. `labyrinth`: picks the maze (the run number: the next seed's maze rises as the last one sinks). `soma`: the round (its whole part): round r builds the r-th figure of `Figs` (wrapping) with a solution picked from r. |
+| `Figs` | literal | `soma`: the figures, in round order: `all` or names separated by spaces (`cube`, `pyramid`, `steps`, `bathtub`, `sofa`, `wall`, `tower`); default `cube`. Unknown names are skipped (and logged). |
+| `Len`, `Hold`, `Each` | Pre | `soma`: beats per round (32), beats the finished figure stands before it bursts (8), beats between locks (2): piece k of 7 locks on `Len - (6 - k) * Each`, so the last lands on `Len`. Clamped so the build fits (the hold gives way first). |
+| `Expl`, `Tens` | FrameOutput | `soma`: open the figure up along its pieces' burst paths (0..1, about a cell at 1; content: `SYNC_DROP`, so a drop opens it and it closes again; pieces never meet); make the hovering pieces tremble and pull in (0..1; content: `SYNC_BUILD`). |
 | `Glas` | Pre | `fifteen`: `1` = liquid glass (drawn over the colorized frame, not into the visuals; the gaps and what is under the panes keep moving). |
 | `Fros`, `Tint`, `Bend` | FrameOutput | `fifteen` glass: blur in pixels at 1080p of the frosted half (12; content 8), how much the glass's light tint shows 0..1 (.35; content .15), how strongly the button's shape bends the view 0..4 (1). |
 | `Shuf` | FrameOutput | `fifteen`: the leap into the scramble, 0 = tiles on their solved places .. 1 = scrambled (default 1). |
+| `Sym` | Pre | `knight`: `1` = tours with half-turn symmetry (a symmetric web; default), `0` = any closed tour. |
+| `Brd` | Pre | `knight`: the board, `0` = grid lines only (the visuals show through every square), `1` = the light squares filled faintly too (default), `2` = both colors (a checkerboard). |
+| `Orbt`, `Folw` | FrameOutput | `knight`: the board turned about its own normal in radians, before `RotX/Y/Z` (an orbiting camera: `Orbt=".04 * B0"`); the share 0..1 of the knight's offset the board slides back towards the center (.15). |
+| `Flsh`, `Hovr` | FrameOutput | `knight`: 0..1 the whole web lit up and thicker (`SYNC_DROP`); 0..1 the knight floats between hops (`SYNC_BUILD`). Default 0. |
+| `Grid` | Pre | `labyrinth`: cells per side, 4..12 (8). |
+| `Beats` | Pre | `labyrinth`: one run's length in beats, 8..128 (32 = 8 bars); `Turn` counts through it. |
+| `Traps` | Pre | `labyrinth`: trap holes, 0..6 (3; decoration in dead ends off the route: the ball never falls in). |
+| `Floor` | FrameOutput | `labyrinth`: the board's opacity, 0..1 (.55): the visuals show through it. |
+| `Tilt` | FrameOutput | `labyrinth`: the board's drawn tilt times this, 0..4 (1 = as the physics tilts it; content 2). The ball rolls the same. |
+| `Pcs` | Pre | `jigsaw`: about how many pieces, 2..160 (32), in a grid fitted to the frame's aspect (32 = 8 x 4 at 16:9). |
+| `Ordr` | Pre | `jigsaw`: solve order: `0` like a person (corners, border, then inwards; default), `1` growing from a corner, `2` row by row, `3` random. |
+| `Cycl`, `Brk` | Pre | `jigsaw`: beats per cycle (32: 8 bars), and the beat it breaks apart (4; 0 = on the line itself). |
+| `Gap` | Pre | `jigsaw`: the empty table under missing pieces: `0` frosted (default), `1` gray, `2` dark, `3` ghost. |
+| `Dim` | FrameOutput | `jigsaw`: the table's brightness 0..1 (absent: the Gap preset's). `Fros` is its blur (10). |
+| `Kick`, `Shak` | FrameOutput | `jigsaw`: 0..1: the picture pops apart (a drop); the pile trembles (a build). Default 0. |
+
+**Rain** (`Mesh="rain"`, docs/3d-design.md "Rain on glass"): rain on glass over the colorized frame (not into the
+visuals). `X Y Z Scal Rot* Text Fill Shad Edge Pen EPen Flag Over` don't apply; `PDur`, `PBar`, `ColorKey` (0: the
+water stays opaque in the Syphon alpha) and `Seed` (load: the rain's seed; default the object's own) do. One rain
+at a time: a newer one replaces an older one at once.
+
+| Key | Tier | Meaning |
+|---|---|---|
+| `Rain` | literal | `window` (default): the frame is a vertical pane, drops bead, merge and run down. `floor`: a horizontal glass floor seen from above, puddles with rings. |
+| `Dens` | FrameOutput | Drops per beat line (4). A drop (`SYNC_DROP`) multiplies it up to 6x; a build (`SYNC_BUILD`) thins it. |
+| `Size` | FrameOutput | Mean drop radius in pixels at 1080p (11; lognormal spread). |
+| `Drz` | FrameOutput | Small drizzle drops per 16th line between the beats (1); a build thickens it. |
+| `Clus` | FrameOutput | Clusters (a big drop and a ring of satellites) per bar line (1); a cluster on every beat during a drop. |
+| `Slid` | Pre | Window: radius (px at 1080p) past which a drop runs down (17; each drop ±18 %). |
+| `Bead` | Pre | Contact angle in degrees, 20..85 (window 62, floor 55): flatter or rounder beads, stronger lenses. |
+| `Wipe` | Pre | Window: `1` (default) the big drops let go together on every phrase line; `0` off. |
+| `Max` | Pre | Drops alive at most (700; the smallest evaporate first). |
+| `Fog` | FrameOutput | Window: condensation, 0..1 (.8): the frosted visuals where no water is; running drops wipe it clear. |
+| `Refg` | FrameOutput | Window: seconds for a wiped streak to fog up again (25). |
+| `Fros` | FrameOutput | Blur of the fog in pixels at 1080p (16). |
+| `Dpth` | FrameOutput | The visuals' distance behind the glass in frame heights (window .5, floor .25): how strongly drops bend and invert them. |
+| `Wet` | FrameOutput | Floor: the share of the glass under puddles, 0 dry (beads only) .. 1 one sheet of water (.65; Rain Pool 1). The dry glass holds the water at rest, so ripples bounce off a puddle's edge. |
+| `Pudl` | FrameOutput | Floor: how visible the puddles are (0..3; 1): a bright meniscus on the water's edge, a dark contact line just outside, a little deeper and cooler inside, a stronger lens at the edge; 0 = the edges only bend the visuals faintly. |
+| `Spd`, `Dcay` | FrameOutput | Floor: ripple speed in frame heights per second (.3) and decay in seconds (1.6). |
+| `Spec`, `Rim` | FrameOutput | Highlight strength (1); the dark contact line and halo that make drops read on any visuals (1). |
+
+```
+Mesh="rain"  Rain="window"  PBar="32"
+Dens="4"  Size="11"  Drz="1"  Clus="1"  Slid="17"
+Fog=".8"  Refg="25"  Fros="18"  Dpth=".5"
+```
 
 **Rubik** (`Mesh="rubik"`): 26 cubies, their state a pure function of `Seed`, `Moves` and `Turn`
 (engine/Rubik.hpp), so any jump of the clock simply shows the right cube. `Text`, `Fill` and `Edge` are not used;
@@ -738,6 +787,20 @@ Turn="(B2 < 2) * 30 * B4 * B4 + (B2 >= 2) * (30 + floor(B5) + clamp((wrap(B5) - 
 Seed="SYNC_ON * floor(SYNC_BAR / 8) + (1 - SYNC_ON) * floor(B1 / 32)"
 ```
 
+**Knight** (`Mesh="knight"`, docs/3d-design.md "Knight's tour"): a chess knight on an 8 x 8 board (board units:
+`Scal` is the board's corner) makes a closed knight's tour. `Turn` is hops into the tour, `0..64`: hop k lands exactly on
+the whole number k, so with one hop per beat a tour fills a 16-bar phrase and the 64th hop lands back on the first square
+on the phrase line; absent = 64 (the whole web). `Seed` picks the tour (every tour starts on g1, so one follows another
+without a jump); during the first hop the previous tour's web (Seed - 1) unravels. The web's newest lines are the
+brightest. Intensities: the knight .92 before shading (`Shad`), the web 1 fading to .68, grid lines .34, fills .16 / .07.
+Content's Knight's Tour / Knight's Web:
+
+```
+B1="1 + (SYNC_BPM > 0) * (SYNC_BPM < 90)"                     // tours per phrase: 2 at slow tempos
+B2="SYNC_ON * B1 * SYNC_PHRASE + (1 - SYNC_ON) * B0 / 32"    // tours so far (120 BPM without the clock)
+Turn="64 * wrap(B2)"  Seed="floor(B2)"  Flsh="SYNC_DROP"  Hovr="SYNC_BUILD"
+```
+
 **Fifteen** (`Mesh="fifteen"`): a 15 puzzle on a tray (engine/Fifteen.hpp). `Turn` runs from `0` (scrambled) to
 `Moves` (solved), one tile slide per whole turn; the scramble is a walk of the blank from `Seed`. Each row of the
 solved board takes its own color, picked for the current ColorMap: the tiles are colored cuboids down to the
@@ -747,6 +810,37 @@ shade on four dark ones: one choice for the whole board). Use
 `Over="1"` and `ColorKey="0"` as for the rubik. Content's Fifteen Glass (with `Glas="1"` instead of `Over`): `Shuf="clamp(B2 / .75)"`,
 `Turn="floor(B4) + clamp((wrap(B4) - .55) / .45) ^ 2"` with `B4="max(0, B2 - 1)"` (B2 = beats into the 8-bar cycle).
 
+**Jigsaw** (`Mesh="jigsaw"`, docs/3d-design.md "Jigsaw"): the live frame cut into `Pcs` jigsaw pieces, drawn over
+the colorized frame (not into the visuals). Each piece always shows the frame from its home place. `Turn` is the beat
+in a cycle of `Cycl` beats and `Seed` the cycle's number (a new cut and scramble): whole from the line, it breaks apart
+on beat `Brk`, then the pieces fly home in `Ordr` order, snapping in on whole beats, the last on beat `Cycl` (the next
+line). `X Y Z Scal Rot*`, `Text`, `Fill`, `Shad`, `Edge`, `Pen`, `EPen`, `Flag` and `Over` don't apply. Content's
+Jigsaw (`SBar="8"`, so the slideshow starts it on an 8-bar line):
+
+```
+Mesh="jigsaw"  Pcs="32"  Ordr="0"  Cycl="32"  Brk="4"  Gap="0"  SBar="8"
+B2="SYNC_ON * 32 * wrap(SYNC_BAR / 8) + (1 - SYNC_ON) * 32 * wrap(B1 / 32)"   // beats into the 8-bar cycle
+B3="SYNC_ON * floor(SYNC_BAR / 8) + (1 - SYNC_ON) * floor(B1 / 32)"           // the cycle
+Turn="B2"  Seed="B3"
+Kick="clamp((SYNC_DROP - .4) / .6) ^ 2"  Shak="SYNC_BUILD * (1 - SYNC_DROP)"
+```
+
+**Labyrinth** (`Mesh="labyrinth"`): a tilt maze with a rolling steel ball (engine/Labyrinth.hpp; docs/3d-design.md
+"Labyrinth"). `Turn` runs from `0` to `Beats` through one run: the first two beats (one for runs under 16 beats) the
+last maze sinks, the new one (`Seed`) rises and the ball pops up out of the start; then the board tilts on whole
+beats, the ball clacks into the walls on whole beats and drops into the goal exactly at `Turn = Beats`. The ball's
+motion is planned and simulated in beats, so any jump of `Turn` shows the right frame and the tempo never matters. The
+board, walls and ball take three colors picked for the current ColorMap; the holes are black; `Shad` shades them in
+color. Use `Over="1"` with `Pen="0"` (drawn in color over the visuals only, nothing into the feedback) and
+`ColorKey="0"`. Content's Tilt Maze, one run per 16-bar phrase:
+
+```
+Grid="11"  Beats="64"  Traps="5"  Floor=".5"  Tilt="2"
+B2="SYNC_ON * 64 * wrap(SYNC_BAR / 16) + (1 - SYNC_ON) * 64 * wrap(B1 / 64)"   // beats into the 16-bar run
+Turn="B2"
+Seed="SYNC_ON * floor(SYNC_BAR / 16) + (1 - SYNC_ON) * floor(B1 / 64)"
+```
+
 Variables: `t`, `START_TIME`, `END_TIME`, `DT` (age / lifetime, 0..1, as for sprites), `FADER`, the audio scalars,
 `LINK_*` and `SYNC_*`. `t - START_TIME` is the solid's age, handy for motion that starts the same every time:
 
@@ -755,6 +849,22 @@ Mesh="icosahedron"  Text="0"
 B0="t - START_TIME"
 X=".45 * sin(.31 * B0)"  Y=".22 * sin(.47 * B0)"  Z=".7 * sin(.19 * B0)"
 RotX=".35"  RotY=".5 * B0"
+```
+
+**Soma** (`Mesh="soma"`, docs/3d-design.md "Soma cube"): the seven Soma pieces (engine/Soma.hpp) build a figure
+on the beat. A round of `Len` beats: the previous figure stands for `Hold` beats, bursts apart in one beat into a ring of
+hovering, tumbling pieces around and a little below it, and the pieces fly in one every `Each` beats in a supported,
+bottom-up order (dropped in from above, or slid in from the side), each locking on its beat with a small thump; the
+last locks on `Len`. Each piece takes its own color, picked for the current ColorMap (seven colors, light enough to
+shade, clear of the background); `Shad` shades them in color (content: .8). Here `RotY` turns the figure about its
+own vertical first, then `RotX` tilts it (so the figure orbits upright, unlike the other meshes), and `Scal` is the
+3 x 3 x 3 cube's circumradius. Use `Over="1"` and `ColorKey="0"` as for the rubik. Content's Soma Cube (Soma Figures, with `Figs="all"`, removed 2026-11-23):
+
+```
+Figs="cube"  Len="32"  Hold="8"  Each="2"
+Turn="SYNC_ON * 32 * wrap(SYNC_BAR / 8) + (1 - SYNC_ON) * 32 * wrap(B1 / 32)"   // beats into the 8-bar round
+Seed="SYNC_ON * floor(SYNC_BAR / 8) + (1 - SYNC_ON) * floor(B1 / 32)"
+Expl="SYNC_DROP"  Tens="SYNC_BUILD"
 ```
 
 **Model** (`Mesh="model"`, PLAN 5R, docs/model-design.md): your own textured 3D model (a `.glb`) seen from a moving
@@ -788,6 +898,39 @@ Move="orbit"  MBar="16"  Hite=".2"
 Glow="1 + .4 * BEAT"
 ```
 
+**Fractal** (`Mesh="fractal"`, PLAN 5L.14, docs/3d-design.md "Fractal zoom"): an endless zoom into a 3D fractal that
+loops seamlessly by self-similarity (each step the camera has come exactly as close as the fractal repeats itself, so
+the frame at the end of a step is the frame at its start). Raymarched into the solid's slot and composited like any
+solid: `Pen`, `EPen`, `Flag`, `Over`, `ColorKey`, `PDur`, `PBar`, `Fill` (a lit surface's floor, .06 here) and `Shad`
+(the key light, .85 here) apply; `X Y Z Scal Rot*`, `Text`, `Edge` don't. Unknown `Frac` / `Path` names refuse to
+start. Starts the zoom from the path's base pose; steps land on `ZBar` bar lines of the beat clock (no clock: 120 BPM
+from the start).
+
+| Key | Tier | Meaning |
+|---|---|---|
+| `Frac` | literal | `sierpinski` (default; the Sierpinski tetrahedron) or `menger` (the Menger sponge). |
+| `Path` | literal | The zoom path (default: the fractal's first). sierpinski: `apex` (the tip of an endless pyramid from outside, x2 and a third of a turn per step), `dive` (inside it down its axis through the windows, x2, rolling a third), `vortex` (spiralling in on a point deep in the gaps, x4 and a third of a turn). menger: `corner` (the corner of an endless sponge from outside, x3 and a third of a turn), `vortex` (through the tunnels, x3 and a quarter turn), `tunnel` (straight down the tunnels, x9). |
+| `ZBar` | Pre | Bars per zoom step (2; .25..64). The steps land on every ZBar-th bar line. |
+| `Puls` | Pre | 0..1 (.5): how much of each bar's motion surges right after its bar line (0 = steady). |
+| `Drop` | Pre | Extra steps rushed through at a drop (SYNC_DROP), 0..16 (2). |
+| `DrpB` | Pre | Beats the drop's rush takes (4). |
+| `Hovr` | FrameOutput | 0..1 (.75): how far a build (SYNC_BUILD) slows the zoom; afterwards it catches up to the next whole step. |
+| `Stpb` | Pre | 0..1 (.6): how much the default sway moves in a step on each beat (0 = smoothly). |
+| `Res` | Pre | Render scale .25..1 (.5 = half the frame's width and height, upscaled). |
+| `Detl` | Pre | The smallest pieces' size in pixels, .25..16 (2.5; under ~2 the hole grids alias into moire rings). |
+| `Stps` | Pre | Raymarching steps per pixel, 8..400 (120). |
+| `Zoom` | FrameOutput | The zoom position in steps (its fraction counts); absent: from the beat clock as above. |
+| `Orbt` | FrameOutput | Radians: the camera turned about the path's orbit axis through the zoom's center (default: a slow sway over 32 beats). |
+| `LkX`, `LkY` | FrameOutput | Radians: the view turned right / up (default: a slow look-around). |
+| `Roll`, `Fov` | FrameOutput | Extra roll (radians); a fixed vertical field of view in degrees (0 = the path's: 45 outside, 65–70 inside). |
+| `Fog` | FrameOutput | Fog distance in units of the camera's distance to the zoom's center (the path's: 3–4). |
+| `Glow` | FrameOutput | The beat glow on the rims and along near misses (.6), times a pulse on each beat line. |
+
+```
+Mesh="fractal"  Frac="sierpinski"  Path="apex"
+ZBar="2"  Puls=".5"  Over="1"  Glow=".7"
+```
+
 ### 5.8 Organic (reforce extension, PLAN 5N)
 
 *Since 2026-11-22 solids and organics are one layer, Objects (`switch:object:NAME`, `Object.*` settings and theme
@@ -808,7 +951,7 @@ grows from each root until it reaches the points.
 |---|---|---|
 | `Kind` | literal | `tree` (default), or one of the other kinds below. A name, not an expression; unknown kinds refuse to start. |
 | `PDur` | Pre | Seconds at full strength (else `Object.Duration`, 40). |
-| `PBar` | Pre | Bars at full strength instead (wins over `PDur`), ending on a bar or phrase line as for Solids (§5.7). |
+| `PBar` | Pre | Bars at full strength instead (wins over `PDur`), ending on a bar or phrase line as for Solids (§5.7). The end keeps following the live clock, as for solids (Peter 2026-11-23): the bars left are counted as the clock runs, so a tempo change moves the end with it, and every frame the end snaps to the nearest such line of the clock as it is now (a deck start or a phrase re-alignment moves it; a jump is not counted as time). Without the clock: 120 BPM from the start, like the bodies. |
 | `Pts`, `Rts` | Pre | Attraction points (300; 10..4000) and roots (1; 1..64). |
 | `C#` | per point / root | Before each point's and each root's keys, ascending (with `s` = k / (count - 1) and `rnd`). |
 | `PX`, `PY` | per point | A point's position. Default: an ellipse .9 x .55 at (0, .3). |
@@ -851,6 +994,7 @@ the beat clock when it is locked (`SYNC_BEAT`, and `SYNC_BAR` aligned to the phr
 | `life` | `Cols` (64), `Rows` (36), `Rate` generations per beat (1), `Dens` start density (.3), `Rsd` reseed every N bars (16; 0 = only when it dies or stops), `Cell` (.8) | |
 | `lsystem` | literal `Axm` (X) and rules `R1`..`R4` ("F=FF"; default: a fern), `Gens` (5), `Rate` bars per generation (2; each new one traced over its first bar), `Wdth` (1.5). Turtle: F G draw, f move, + - turn, \| about-face, [ ] push / pop; fitted to the frame, root at the bottom | `Ang` degrees (25) |
 | `attractor` | `Num` points per frame (6000, at most 30000), `DotW` (1.5), `Sprd` scale (.42) | `PA`, `PB`, `PC`, `PD` (-1.4, 1.6, 1, .7): a Clifford attractor x' = sin(a y) + c cos(a x), y' = sin(b x) + d cos(b y) |
+| `dragon` | The paper-folding dragon (docs/rhythm-design.md "Dragon"). `Gens` generations at full growth (12; 0..14, Num x 2^Gens <= 16384), `Fold` beats per fold (1), `Cyc` bars per cycle (4: unfold, hold, refold, on the phrase-aligned bars), `Back` beats of refold at the cycle's end (2; 0 = cut), `Swng` share of a fold interval the copy swings over, ending on the line (.5), `Angl` fold angle in degrees (90), `Num` dragons tail to tail (1; 2 = twindragon, 4), `Stag` folds between successive dragons (0), `Sprd` their intensity spread (.45), `Rnd` corner radius as a share of a segment (0; at most .45), `Wdth` line width (3), `Thin` LWdt per pixel of segment length (.12), `Shd` intensity spread by birth generation (.6), `Flsh` the newest copy's flash (.5), `Run` a band running along it once per bar, in at the start after the bar line and out at the end before the next, moving without jumps as the curve unfolds (0), `Spin` 0 = the view turns with the curve, 1 = the full-grown curve's view (0), `Brst` beats a drop's burst takes (1), `Fill` share of the frame (.9), `Vary` a seeded mirror / half turn per cycle (1) | `Rise` 0..1 (0): the newest copy swings out at 1 - Rise of its brightness and brightens smoothly to full just as the next fold starts to swing (Dragon Fold .75, with `Flsh` 0). `Setl` 0..2 (0): the rise goes on to a glow of 1 + Setl times the level and settles back over the next fold interval; the level is 1 / (1 + Setl) (Dragon Fold .25, with `Shd` 0). Fading out from a cycle line it stays one still segment. |
 | `ripples` | GPU (render/FieldPipeline). `Rate` drops per beat (1; 0 = none), `Rad` drop radius in frame heights (.03), `Spd` wave speed in frame heights per second (.4), `Decy` seconds to 1/e (2.5), `Edge` 0 = the frame's edges absorb, 1 = they reflect, `Flag` sprite blend flags (0) | `DX`, `DY` where the next drop lands (tree units; default random), `Amp` drop height (1), `Rain` extra small drops per second (0), `Gain` brightness of the crests (3), `Pen` |
 | `julia` | GPU. `Iter` iterations (120; 8..1000), `Flag` (0) | `CRe`, `CIm` the constant c (-.8, .156), `X`, `Y`, `Scal`, `Rot` (the set's ±1.6 fills the frame height at Scal 1), `Gain` (1), `Band` bands per Iter of escape count (0 = none), `Phas` band phase in radians, `Pen` |
 | `mandel` | GPU. A Mandelbrot dive on the clock (engine/MandelDive). `Dive` bars per dive (16: one per phrase), `Dbl` beats per doubling of the magnification (2; 0 = paced to reach `Deep` just before the rush out), `Deep` deepest log2 magnification (34; at most 44), `Out` beats of the rush back out to the whole set at the end of a dive (4; 0 = a cut), `Algn` dives count from the phrase line (every Algn bars) at or before the start (16; 0 = from bar 0), `Ent` doublings a beat while catching up from the whole set after a start mid-dive (6; 0 = jump straight in), `Kick` doublings surging in on each beat line (.3), `Drop` doublings a drop pulls out (6), `Iter` least iterations (200), `Itk` x the iterations the target needs at the depth (1.5), `MaxI` cap (4000), `Prec` 0 auto (float32, perturbation past 2^12), 1 float32, 2 double-float, 3 perturbation, `Res` render scale (1; .5 = a quarter of the pixels, upscaled), `Mini` which endings: 0 all four kinds (spirals, lace, mini-Mandelbrots, the decorations around a mini; taking turns), 1 minis and decorations only, 2 no minis, `Aff` 0 turns off the mini interior shortcut (1), `Flag` (0) | `Tgt` target index (-1 = the shared seeded order, one per dive; 0-4 spirals, 5-6 lace, 7-10 minis, 11-13 decorations), `X`, `Y`, `Scal`, `Rot` (the whole set fills the frame height at Scal 1 and depth 0), `Gain` (1), `Band` escape-count iterations per band (0 = none), `Phas` band phase (default: the bands flow inward one per beat), `Glow` pixels from the edge fully lit (1; 0 = none), `Pen` |

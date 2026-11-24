@@ -307,7 +307,8 @@ private:
 // reforce extension (PLAN 5L.4, docs/3d-design.md). Load-time keys: Mesh (a literal name), Text, Flag, PDur, Pers,
 // ColorKey, Over, Moves. Per frame: B vars (persist across frames), then X, Y, Z, Scal, RotX, RotY, RotZ, Fill, Shad, Edge,
 // Pen, EPen, Turn, Seed, Shuf (Turn / Seed / Moves: the rubik and fifteen meshes, engine/Rubik.hpp,
-// engine/Fifteen.hpp; Shuf: fifteen).
+// engine/Fifteen.hpp; Shuf: fifteen; Turn / Seed for labyrinth too, whose own keys Grid, Beats, Traps, Floor, Tilt
+// SolidRun reads through loaded / frameKey).
 
 struct SolidFrame {
     double x = 0, y = 0, z = 0;           // sprite convention: +-1 = the frame edges at z = 0

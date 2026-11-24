@@ -1,0 +1,20 @@
+Vers=100
+Meta="reforce solid: the jigsaw of the live frame with 12 big pieces (4 x 3 at 16:9), solved on every 8-bar line, growing from a corner. On beat 8 of the phrase the finished picture breaks apart over the empty table (the frame grayed and dimmed); the pieces fly home one at a time with pauses between, each snapping in on a beat, the last exactly on the next 8-bar line. A drop pops the picture apart for a moment; a build makes the pile tremble."
+Mesh="jigsaw"
+Pcs="12"
+Ordr="1"
+Cycl="32"
+Brk="8"
+Gap="1"
+SBar="8"
+// 4 puzzles (one per 8 bars), ending on a phrase line of the live clock; started on a 8-bar line (Peter 2026-11-23:
+// a fixed PDur ended mid-tour)
+PBar="32"
+B0="t - START_TIME"
+B1="SYNC_ON * SYNC_BEAT + (1 - SYNC_ON) * 2 * B0"
+B2="SYNC_ON * 32 * wrap(SYNC_BAR / 8) + (1 - SYNC_ON) * 32 * wrap(B1 / 32)"
+B3="SYNC_ON * floor(SYNC_BAR / 8) + (1 - SYNC_ON) * floor(B1 / 32)"
+Turn="B2"
+Seed="B3"
+Kick="clamp((SYNC_DROP - .4) / .6) ^ 2"
+Shak="SYNC_BUILD * (1 - SYNC_DROP)"

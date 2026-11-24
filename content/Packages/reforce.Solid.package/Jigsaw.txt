@@ -1,0 +1,25 @@
+Vers=100
+Meta="reforce solid: a jigsaw cut from the live frame, solved on every 8-bar line. Each piece always shows the visuals from its home place, so a scattered piece is a moving patch of picture out of place. On beat 4 of the phrase the finished picture breaks apart: the 32 pieces lift and scatter, turned, over the empty table (the frame frosted and dimmed); then they fly home in the order a person would solve it (the corners, the border, then inwards), each snapping in on a beat with a flash on its seams, two per beat at first, the last exactly on the next 8-bar line. The seams fade so the picture is whole for a bar. A drop pops the picture apart for a moment; a build makes the pile tremble. Bar lines from the phrase clock while the beat clock is locked, else 120 BPM from the start."
+Mesh="jigsaw"
+// 32 pieces (8 x 4 at 16:9), solved corners and border first; a cycle of 32 beats, breaking apart on beat 4
+Pcs="32"
+Ordr="0"
+Cycl="32"
+Brk="4"
+// the empty table: 0 frosted (blurred, half saturation, dimmed), 1 gray, 2 dark, 3 ghost; Dim overrides its brightness
+Gap="0"
+Fros="10"
+SBar="8"
+// 4 puzzles (one per 8 bars), ending on a phrase line of the live clock; started on a 8-bar line (Peter 2026-11-23:
+// a fixed PDur ended mid-tour)
+PBar="32"
+B0="t - START_TIME"
+// beats: the beat clock when locked, else 2 per second
+B1="SYNC_ON * SYNC_BEAT + (1 - SYNC_ON) * 2 * B0"
+// beats into the 8-bar cycle (0..32) and the cycle number (the cut and the scramble)
+B2="SYNC_ON * 32 * wrap(SYNC_BAR / 8) + (1 - SYNC_ON) * 32 * wrap(B1 / 32)"
+B3="SYNC_ON * floor(SYNC_BAR / 8) + (1 - SYNC_ON) * floor(B1 / 32)"
+Turn="B2"
+Seed="B3"
+Kick="clamp((SYNC_DROP - .4) / .6) ^ 2"
+Shak="SYNC_BUILD * (1 - SYNC_DROP)"

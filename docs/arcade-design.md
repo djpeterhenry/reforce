@@ -27,6 +27,12 @@ Coordinates as for every organic: tree units, y = ±1 at the bottom / top of the
 square or ultra-wide output works too; at 16:9 nothing changes.
 
 
+## Racers (5Q.13): dropped
+
+A top-down race (`Kind="racers"`: a seeded track, coupes drifting through the corners on the beat) was built on
+2026-11-23 and dropped the same day (Peter: none of the Drift scenes appealed); the kind, its code, tests and content
+were removed (git history: Racers.cpp).
+
 ## Chase (`Kind="chase"`, 5Q.8)
 
 Peter (2026-11-22): "something more inspired by the [light-cycle] movies. A 3D view following a motorcycle
@@ -363,6 +369,23 @@ dark again for the next cycle. Nobody loses: balls bounce down past the player, 
   have stepped a top). With no route either way the next hop is a high spinning jump instead. One per 4 beats.
 - **A breakdown** (`SYNC_BUILD`): hops lift up to 2.6 x and a glint runs over the tops (only ever brighter, so a top
   never looks unturned).
+- **Tops on any ColorMap** (Peter 2026-11-23: a top's change was hard to see on some maps). The board is drawn as
+  intensity like every organic, and many maps give .6 and 1 nearly the same color (a map that saturates to white, a
+  hue cycle at one lightness). Two fixes:
+  - *The state is in the shape too.* A dark top is a rim around a hollow in the seam color, a middle one (`Levels` 3)
+    has a filled diamond in its center, a bright one is filled; a step grows the fill out from the center to the rim
+    over the first fifth of a beat (the hollows and fills are their own paths over the faces). This reads whenever
+    the seams and the tops differ, which the board needs anyway.
+  - *The levels are picked per ColorMap* (`TAut` 1, engine::TopPicker in engine/StickerColors, the stickers' method):
+    organics get the ColorMap's colors (`OrganicStep::colors`, the colors colorize gives each intensity in CIELAB,
+    recomputed by the Visualizer when the palette or the MapFunction LUT changes). The states are picked as far
+    apart as possible (net of how steeply the map changes there), clear of the seams and, with less weight, of the
+    sides, the bright one not looking darker than the dark one; any distance of 30 or more counts as enough, so
+    `TLo` / `THi` are kept wherever they already read and the pick moves only as far as the map needs. Hysteresis
+    and a 0.5 s ease, as for the stickers. Over the 212 PNG maps (2 states, `TLo` .6): dark and bright under 10
+    CIELAB units apart on 52 maps with the fixed levels, 2 picked (one is all black); under 20: 101 fixed, 5 picked;
+    the fixed levels kept as they are on 76 maps. With the content's `TLo` .45: 78 and 2 under 10. Three states are
+    harder (under 20: 160 fixed, 35 picked).
 - **Determinism.** Routes and balls are seeded per cycle by the organic's seed; the board is a pure function of the
   plan and the position in the cycle, so a jump of any size plans once (from where the player stood) and draws.
 - **Cost** (1080p, the 7-row default board): at most ~5000 segments (the dark silhouette ~450 strokes, faces ~4400, creature and
@@ -377,7 +400,8 @@ dark again for the next cycle. Nobody loses: balls bounce down past the player, 
 | `Offb` | load | 1: balls bounce on the off-beat (0). |
 | `Size` | load | Cube width in tree units (0 = fit the frame). |
 | `Hop` | frame | Hop height in cube widths (.55); balls hop .75 of it. |
-| `TLo`, `THi` | frame | Top intensity of the dark and the bright state (.6, 1), relative to Pen. |
+| `TLo`, `THi` | frame | Top intensity of the dark and the bright state (.6, 1), relative to Pen; with `TAut` the preferred levels. |
+| `TAut` | frame | 1: pick the tops' levels for the current ColorMap (see "Tops on any ColorMap"); 0: exactly `TLo` / `THi` (1). |
 | `SidL`, `SidR` | frame | Left and right side intensities (.22, .4). |
 | `Edge` | frame | The seams, outlines and shadows (.04). |
 | `CPen`, `BPen` | frame | Creature body (.9) and ball (.72) intensity. |

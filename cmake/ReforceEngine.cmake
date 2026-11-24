@@ -11,6 +11,7 @@ add_library(reforce_engine STATIC
     src/engine/Look.cpp
     src/engine/MediaOptions.cpp
     src/engine/CameraMoves.cpp
+    src/engine/FractalZoom.cpp
     src/engine/Meshes.cpp
     src/engine/ModelFile.cpp
     src/engine/ModelScenes.cpp
@@ -27,11 +28,18 @@ add_library(reforce_engine STATIC
     src/engine/Solids.cpp
     src/engine/Rubik.cpp
     src/engine/Fifteen.cpp
+    src/engine/Rain.cpp
+    src/engine/Knight.cpp
+    src/engine/Labyrinth.cpp
+    src/engine/Soma.cpp
+    src/engine/PieceColors.cpp
+    src/engine/Jigsaw.cpp
     src/engine/StickerColors.cpp
     src/engine/TreeGrowth.cpp
     src/engine/MandelDive.cpp
     src/engine/Organics.cpp
     src/engine/OrganicKinds.cpp
+    src/engine/Dragon.cpp
     src/engine/arcade/Invaders.cpp
     src/engine/arcade/Hopper.cpp
     src/engine/arcade/Cycles.cpp
@@ -59,7 +67,10 @@ target_link_libraries(reforce_engine PUBLIC reforce_scene)
 target_sources(reforce_render PRIVATE
     src/render/ScenePipeline.cpp
     src/render/SolidPipeline.cpp
+    src/render/JigsawPipeline.cpp
     src/render/ModelPipeline.cpp
+    src/render/RainPipeline.cpp
+    src/render/FractalPipeline.cpp
     src/render/Downsample.cpp
     src/render/DancerPipeline.cpp
     src/render/FieldPipeline.cpp
@@ -81,6 +92,7 @@ target_sources(reforce PRIVATE
     src/app/VisualizerRhythm.cpp
     src/app/VisualizerSolids.cpp
     src/app/ModelLoader.cpp
+    src/app/VisualizerFractals.cpp
     src/app/VisualizerSprites.cpp
     src/app/VisualizerVideo.cpp
 )
@@ -101,12 +113,19 @@ if(REFORCE_BUILD_TESTS)
         tests/test_engine_beatsync.cpp
         tests/test_engine_meshes.cpp
         tests/test_engine_models.cpp
+        tests/test_engine_fractals.cpp
         tests/test_engine_solids.cpp
         tests/test_engine_rubik.cpp
         tests/test_engine_fifteen.cpp
+        tests/test_engine_rain.cpp
+        tests/test_engine_knight.cpp
+        tests/test_engine_labyrinth.cpp
+        tests/test_engine_soma.cpp
+        tests/test_engine_jigsaw.cpp
         tests/test_engine_organics.cpp
         tests/test_engine_mandel.cpp
         tests/test_engine_arcade.cpp
+        tests/test_engine_dragon.cpp
         tests/test_engine_arcade_invaders.cpp
         tests/test_engine_arcade_hopper.cpp
         tests/test_engine_arcade_cycles.cpp
@@ -229,7 +248,7 @@ target_compile_options(reforce-line-lab PRIVATE ${REFORCE_WARNINGS})
 target_link_libraries(reforce-line-lab PRIVATE reforce_render)
 if(REFORCE_BUILD_TESTS)
     add_executable(reforce_render_tests tests/test_main_render.cpp tests/test_render_lines.cpp tests/test_render_look.cpp
-        tests/test_render_solids.cpp tests/test_render_models.cpp tests/test_render_edges.cpp tests/test_render_fields.cpp tests/test_render_dancers.cpp tests/test_render_text.cpp)
+        tests/test_render_solids.cpp tests/test_render_jigsaw.cpp tests/test_render_rain.cpp tests/test_render_models.cpp tests/test_render_fractals.cpp tests/test_render_edges.cpp tests/test_render_fields.cpp tests/test_render_dancers.cpp tests/test_render_text.cpp)
     target_compile_options(reforce_render_tests PRIVATE ${REFORCE_WARNINGS})
     target_link_libraries(reforce_render_tests PRIVATE reforce_render doctest::doctest)
     target_compile_definitions(reforce_render_tests PRIVATE REFORCE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")

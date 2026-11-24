@@ -1,0 +1,14 @@
+Vers=100
+Meta="reforce solid: an endless flight into the gaps of a Sierpinski tetrahedron, spiralling in on a point deep inside it. Every four bars the camera has come four times as close and turned a third of a turn, which is exactly where it started (the tetrahedron is the same at every size), so the spiral loops on the bar line with no seam, for ever. The zoom surges after each bar line, the camera sways on the beats, the edges glow on them, a drop rushes it two steps in, a build slows it down."
+Mesh="fractal"
+Frac="sierpinski"
+Path="vortex"
+// one step (four times as close, a third of a turn) every 4 bars
+ZBar="4"
+Puls=".5"
+Over="1"
+// 12 zoom steps (one per 4 bars), ending on a phrase line of the live clock; started on a 4-bar line (Peter 2026-11-23:
+// a fixed PDur ended mid-tour)
+PBar="48"
+SBar="4"
+Glow=".6"

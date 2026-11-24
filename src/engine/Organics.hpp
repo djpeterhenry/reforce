@@ -11,7 +11,7 @@
 //
 // Scene keys (docs/organics-design.md "Keys"):
 //   Kind   literal: tree (default) | pendulums | phyllotaxis | harmonograph | automaton | life | lsystem | attractor |
-//          ripples | julia | mandel
+//          dragon | ripples | julia | mandel
 //   PDur   seconds at full strength (else Object.Duration)
 //   Pts, PX, PY (per point, with s), Rts, RtX, RtY, RtA (per root), Seg, Infl, Kill, Jitr, Wdth, Tip, BudW, Wthr,
 //   Strk, SGap, SAln, SwyB, VibF, PlsB, PlsE, PlsL, PlsP, Rwir, RwrB, LeafW, LeafD, LeafA, LeafU
@@ -119,6 +119,14 @@ public:
     void setHold(double seconds) {
         if (std::isfinite(seconds) && seconds >= 0) env_.hold = std::min(seconds, 24.0 * 3600.0);
     }
+    // After setHold(holdForBars(...)): full strength keeps ending on a line of the live clock (Peter 2026-11-23, the
+    // dragons "always phrase aligned"). The time left is counted in bars as the clock runs (so tempo changes move the
+    // end with it), a jump of the clock is not counted, and every step the end snaps to the nearest line, `unitBars`
+    // apart (1: bar lines; the phrase length when PBar is whole phrases), of the clock as it is now. Without the beat
+    // clock, the bodies' fallback: 2 beats a second of age, 4 beats a bar.
+    void followBars(double unitBars) {
+        barHold_.unit = std::isfinite(unitBars) && unitBars > 0 ? std::min(unitBars, 4096.0) : 0.0;
+    }
     const TreeGrowth& tree() const { return *tree_; }  // trees only
     int strike() const { return strike_; }
     bool rewiring() const { return dying_; }  // trees with Rwir: branches withering back              // trees: current growth (Strk), -1 before the first
@@ -138,8 +146,9 @@ public:
 
     // Evaluates the frame at `t`, grows the tree by the time since the last step, and appends its segments
     // (one path) to `out`.
+    // `colors`: the current ColorMap's colors (optional; see OrganicColors).
     void step(double t, const SpriteAudio& audio, const FrameMapping& map, const LineStyle& style,
-              std::vector<LineSegment>& out);
+              std::vector<LineSegment>& out, const OrganicColors* colors = nullptr);
 
 private:
     std::shared_ptr<const scene::CompiledConfig> cfg_;
@@ -148,6 +157,7 @@ private:
     OrganicKind kind_ = OrganicKind::Tree;
     std::string kindName_ = "tree";
     std::unique_ptr<OrganicBody> body_;  // Body (after inst_: it holds a reference to it)
+    BarHold barHold_;  // followBars
     // Pendulums
     int pendulums_ = 15;
     double osc_ = 16, cycleBars_ = 16, spread_ = 3.0, length_ = 1.4, bobWidth_ = 10, stringWidth_ = 1.5;

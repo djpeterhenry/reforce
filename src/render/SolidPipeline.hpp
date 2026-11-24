@@ -46,6 +46,17 @@
 // tile, b = the share outside its number's seven-segment strokes (analytic, anti-aliased). The color pass draws the
 // strokes in a contrasting shade of the tile's color (dark on light tiles, light on dark ones).
 //
+// labyrinth_vs / labyrinth_fs (MeshKind::Labyrinth; docs/3d-design.md "Labyrinth"): the board slab, one box per run of
+// walls, flat discs / rings for the holes and the start and goal rings, the sphere for the ball, all tilted with the
+// board. r = intensity x share, g = coverage, b = share (0: black, the holes), a = coverage x shading / 2 (shading
+// 0..2, the ball's highlight above 1); the board's top writes its opacity (Floor) as coverage, premultiplied.
+// soma_fs (MeshKind::Soma, drawn once per unit cube of each piece: the figure's model x the piece's place x the cube's
+// cell): r = the piece's intensity, b = 1 (all color), a = the shading. The cubes meet flush; the shader draws each
+// face's borders by engine::soma::edgeCodes: the piece's outer edges rounded (the normal tilts towards the edge) with
+// a clear groove, so pieces read apart, and a faint line between the cubes of one piece. The figure's model turns
+// RotY about its own vertical first, then RotX, then RotZ (so the figure orbits upright); Scal = the 3 x 3 x 3 cube's
+// circumradius.
+//
 // Solids come from scene files (engine/Solids.hpp SolidRun, reforce.Solid.package; app/Visualizer startSolid), or
 // from the test hook `--solid-test SPEC` (app/main.cpp), parsed by parseSolidTest below.
 
@@ -57,10 +68,14 @@
 #include "engine/LineGeometry.hpp"
 #include "engine/Meshes.hpp"
 #include "engine/Fifteen.hpp"
+#include "engine/Knight.hpp"
+#include "engine/Labyrinth.hpp"
 #include "engine/Rubik.hpp"
+#include "engine/Soma.hpp"
 
 namespace MTL {
 class Device; class Texture; class CommandBuffer; class RenderPipelineState; class DepthStencilState; class Buffer;
+class RenderCommandEncoder;
 
 }
 
@@ -86,6 +101,19 @@ struct SolidShading {
     std::array<float, 3> light{0.4f, 0.6f, 1.0f};  // direction towards the light (normalized when used)
 };
 
+// The knight's-tour solid's look (scene keys Brd, Orbt, Folw, Flsh; intensities fixed here).
+struct KnightLook {
+    int board = 1;        // Brd: 0 = grid lines only, 1 = light squares filled faintly, 2 = both (a checkerboard)
+    float orbit = 0;      // Orbt: the board turned about its own normal (radians), before RotX / RotY / RotZ
+    float follow = 0.15f; // Folw: the board slides this share of the knight's offset towards the center
+    float flash = 0;      // Flsh: 0..1 the whole web lit up and thicker (a drop)
+    float piece = 0.92f;  // the knight's intensity before shading
+    float web = 0.68f;    // older segments; the newest are 1, fading down over the last hops
+    float line = 0.34f;   // the board's grid lines
+    float lightFill = 0.16f, darkFill = 0.07f;
+    float width = 0.075f; // web line width in squares
+};
+
 // One solid for one step.
 struct SolidDraw {
     engine::MeshKind mesh = engine::MeshKind::Cube;
@@ -103,6 +131,21 @@ struct SolidDraw {
     // mesh == Fifteen (engine/Fifteen.hpp): the tiles' places; row r of the solved board (tiles 4r+1..4r+4) takes
     // stickers[kFifteenRowColor[r]]; the numbers get a contrasting shade of it in the color pass.
     engine::fifteen::Frame fifteen = engine::fifteen::frameAt(0, 0, 0);
+    // mesh == Knight (engine/Knight.hpp, docs/3d-design.md "Knight's tour"): the board, the web of the tour so far
+    // (and what is left of the previous tour's while it unravels in the first hop), the knight. Board units: 1 per
+    // square; the board's corner is the circumradius (Scal).
+    // (Tours that are not closed tours draw no web.)
+    engine::knight::Tour tour{}, prevTour{};
+    engine::knight::Frame knight;
+    KnightLook knightLook;
+    // mesh == Labyrinth (engine/Labyrinth.hpp): the board tilted under the ball; the floor, walls and ball take
+    // stickers[kLabyrinthFloor / kLabyrinthWalls / kLabyrinthBall]; holes are black. `floor`: the board's opacity.
+    engine::labyrinth::Frame labyrinth;
+    float floor = 0.55f;
+    float tiltGain = 1.0f;  // the drawn tilt x this (scene key Tilt)
+    // mesh == Soma (engine/Soma.hpp): the pieces this frame and each piece's intensity (engine::PiecePicker).
+    engine::soma::Frame soma;
+    std::array<float, engine::soma::kPieces> pieces{0.25f, 0.37f, 0.49f, 0.61f, 0.73f, 0.85f, 0.97f};
 };
 // The 15 puzzle as glass (scene key Glas = 1; docs/3d-design.md "Glass"): drawn over the colorized frame
 // (encodeGlass), not into the visuals, so the WaveShape and flow keep running under it. Each tile is a 3D glass
@@ -126,6 +169,8 @@ struct GlassDraw {
 
 // The sticker colors the 15 puzzle's rows use: one of each opposite-face pair first (those are the farthest apart).
 inline constexpr int kFifteenRowColor[4] = {0, 2, 4, 1};
+// The sticker colors the labyrinth uses: the board, the walls, the ball (one of each opposite pair).
+inline constexpr int kLabyrinthFloor = 0, kLabyrinthWalls = 2, kLabyrinthBall = 4;
 
 // Where a drawn solid landed: the sprite quad (render pixels, origin top-left) and the target sub-rectangle.
 struct SolidQuad {
@@ -162,6 +207,11 @@ SolidReference solidReference(const engine::Mesh& mesh, const SolidDraw& d, int 
 //   turn seed moves                        rubik / fifteen: position in the cycle, scramble seed, scramble length (30)
 //   shuf                                   fifteen: the leap into the scramble, 0..1 (1)
 //   glass                                  fifteen: 1 = as glass over the frame (encodeGlass; Fros 12, Tint .35)
+//   grid beats traps floor                 labyrinth: cells per side (8), beats per run (32), trap holes (3), board opacity
+//                                          (.55); turn = beats into the run (default: the end), seed = the run
+//   sym board orbit follow flash hover     knight: tour (turn 0..64, seed), look (KnightLook)
+//   figure                                 soma: the figure (engine::soma::figure index; 0 the cube), with turn
+//                                          (beats into the round of 32: 8 hold, a lock every 2 from 20) and seed
 struct SolidTestSpec {
     SolidDraw draw;
     double spin[3] = {0, 0, 0};
@@ -172,7 +222,10 @@ struct SolidTestSpec {
     double turn = -1, seed = 0;  // rubik / fifteen (turn < 0: solved)
     double shuffle = 1;          // fifteen
     bool glass = false;          // fifteen: drawn as glass (encodeGlass)
+    int grid = 8, beats = 32, traps = 3;  // labyrinth
     int moves = 30;
+    double sym = 1, hover = 0;   // knight: symmetric tour, hover (the look keys go to draw.knightLook)
+    int figure = 0;              // soma
 };
 bool parseSolidTest(const std::string& spec, SolidTestSpec& out, std::string* error = nullptr);
 
@@ -212,8 +265,17 @@ public:
     // half size, draws the buttons into g.slot's target, then over the frame. `trackAlpha`: the Syphon alpha is
     // tracked (opaque glass raises it by its coverage).
     void encodeGlass(MTL::CommandBuffer* cmd, MTL::Texture* output, const GlassDraw& g, bool trackAlpha);
+    // The glass's first step, shared with render/RainPipeline: `output` (BGRA8, readable) at half size into
+    // halfSharp(), and that blurred (sigma `frost` px at 1080p, separable 13-tap Gaussian) into halfBlur().
+    void encodeFrost(MTL::CommandBuffer* cmd, MTL::Texture* output, float frost);
+    MTL::Texture* halfSharp() const { return halfSharp_; }
+    MTL::Texture* halfBlur() const { return halfBlur_; }
 
 private:
+    // The knight's board, web and piece into the open solid pass (`board`: the board's model matrix).
+    void encodeKnight(MTL::RenderCommandEncoder* enc, const SolidDraw& d, const engine::Mat4& board,
+                      const engine::Mat4& viewProj, const std::array<float, 3>& light);
+
     ScenePipeline& scene_;
     MTL::Device* device_;
     uint32_t width_, height_;
@@ -225,6 +287,11 @@ private:
     MTL::RenderPipelineState* pso_ = nullptr;
     MTL::RenderPipelineState* rubikPso_ = nullptr;  // rubik_fs: the cubies
     MTL::RenderPipelineState* fifteenPso_ = nullptr;  // fifteen_fs: the tray and tiles
+    MTL::RenderPipelineState* knightPso_ = nullptr;   // knight_fs: the board, web and piece
+    Range knightBoard_, knightSegment_, knightDisc_, knightRing_;  // extra ranges in vertices_
+    MTL::RenderPipelineState* labyrinthPso_ = nullptr;  // labyrinth_vs / labyrinth_fs: board, walls, holes, ball
+    Range discRange_, ringRange_;  // engine::makeFlatRing: the holes, the goal and start rings
+    MTL::RenderPipelineState* somaPso_ = nullptr;     // soma_fs: the pieces' cubes
     // Glass (encodeGlass): half-size copies of the frame (sharp, then blurred through a scratch) and the pipelines.
     MTL::Texture* halfSharp_ = nullptr;
     MTL::Texture* halfBlur_ = nullptr;

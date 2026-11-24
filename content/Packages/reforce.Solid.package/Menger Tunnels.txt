@@ -1,0 +1,18 @@
+Vers=100
+Meta="reforce solid: an endless flight down the tunnels of a Menger sponge, toward a point deep inside it. Every four bars the camera has come nine times as close, which is exactly where it started (the sponge is the same at every size), so the flight loops on the bar line with no seam, for ever. The zoom surges after each bar line, the camera sways on the beats, the edges glow on them, a drop rushes it two steps in, a build slows it down."
+Mesh="fractal"
+Frac="menger"
+Path="tunnel"
+// one step (nine times as close) every 4 bars
+ZBar="4"
+Puls=".5"
+Over="1"
+// 12 zoom steps (one per 4 bars), ending on a phrase line of the live clock; started on a 4-bar line (Peter 2026-11-23:
+// a fixed PDur ended mid-tour)
+PBar="48"
+SBar="4"
+Glow=".6"
+// fog twice as deep as the path default (3), so the tunnels reach further into the distance (Peter 2026-11-23); the
+// longer rays need more steps
+Fog="6"
+Stps="200"

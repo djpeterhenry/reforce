@@ -32,6 +32,7 @@ struct Run {
     std::shared_ptr<const reforce::scene::CompiledConfig> cfg;
     std::unique_ptr<OrganicRun> run;
     FrameMapping map = organicMapping(1920, 1080);
+    const OrganicColors* colors = nullptr;  // the ColorMap's colors handed to the body (none by default)
     double t = 0;
     explicit Run(const std::string& text, double life = 600.0) : cfg(compile(text)) {
         run = std::make_unique<OrganicRun>(cfg, env, "arcade", 0.0, 0.0, life, nullptr);
@@ -49,7 +50,7 @@ struct Run {
         a.sync.build = build;
         t += dt;
         std::vector<LineSegment> segs;
-        run->step(t, a, map, LineStyle{}, segs);
+        run->step(t, a, map, LineStyle{}, segs, colors);
         return segs;
     }
     // Steps at 60 fps from beat b0 to b1 (at `bpm`), returning the last frame.

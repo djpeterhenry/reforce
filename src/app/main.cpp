@@ -634,6 +634,17 @@ int main(int argc, char** argv) {
                 }
                 platform::WindowConfig window;
                 window.startFullScreen = prefs.startFullScreen && !background;
+                window.screen = background ? std::string() : prefs.windowScreen;
+                window.openPanelOnLaunch = prefs.openPanelOnLaunch && !background;
+                if (!noPrefs && !background)
+                    window.saveStartSetup = [settingsPath](const platform::WindowConfig::StartSetup& s,
+                                                           std::string* err) {
+                        engine::PrefsTable t;
+                        t.set("reforce.Window.Screen", s.screen, true);
+                        t.set("reforce.Window.StartFullScreen", s.fullScreen ? "1" : "0", false);
+                        t.set("reforce.UI.OpenOnLaunch", s.openPanel ? "1" : "0", false);
+                        return engine::mergeSettingsFile(settingsPath, t, err);
+                    };
                 window.background = background;
                 window.targetFrameRate = deterministic ? 0.0 : fps;
                 // Web control UI: its threads only read snapshots and push commands.

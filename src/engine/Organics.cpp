@@ -557,10 +557,11 @@ void OrganicRun::stepField(double t, double dtSim, const scene::OrganicFrame& f,
 }
 
 void OrganicRun::step(double t, const SpriteAudio& audio, const FrameMapping& map, const LineStyle& style,
-                      std::vector<LineSegment>& out) {
+                      std::vector<LineSegment>& out, const OrganicColors* colors) {
     const double dtSim = lastT_ < 0 ? 0.0 : std::clamp(t - lastT_, 0.0, 0.25);
     lastT_ = t;
     const double age = t - start_;
+    barHold_.follow(env_, age, audio.sync);
     scene::OrganicFrameInput in;
     in.t = t;
     in.startTime = start_;
@@ -635,6 +636,8 @@ void OrganicRun::step(double t, const SpriteAudio& audio, const FrameMapping& ma
         st.pen = std::clamp(finiteOr(f.pen, 0.0) * in.fader, 0.0, 1.0);
         st.frame = &f;
         st.audio = &audio;
+        st.colors = colors;
+        st.ending = env_.fadingOut(age);
         OrganicCanvas canvas(map, style, out, f.x, f.y, f.scale, f.rot);
         if (st.pen > 0) body_->step(st, canvas);
         return;

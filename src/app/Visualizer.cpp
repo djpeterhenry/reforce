@@ -99,12 +99,31 @@ Visualizer::Visualizer(MTL::Device* device, const VisualizerOptions& opts)
         }
         if (solids_) {
             try {
+                jigsaws_ = std::make_unique<render::JigsawPipeline>(pipeline_->device(), pipeline_->width(),
+                                                                    pipeline_->height());
+                jigsawDraws_.reserve(4);
+            } catch (const std::exception& e) {
+                rlog("[reforce] jigsaw unavailable: %s\n", e.what());
+            }
+            try {
                 models_ = std::make_unique<render::ModelPipeline>(*solids_);
                 modelLoader_ = std::make_unique<ModelLoader>(*models_, opts.prefs.modelMaxTexture, opts.prefs.modelCache);
                 preloadModels();
             } catch (const std::exception& e) {
                 rlog("[reforce] 3D models unavailable: %s\n", e.what());
                 models_.reset();
+            }
+            try {
+                rain_ = std::make_unique<render::RainPipeline>(*solids_);
+            } catch (const std::exception& e) {
+                rlog("[reforce] rain unavailable: %s\n", e.what());
+                rain_.reset();
+            }
+            try {
+                fractals_ = std::make_unique<render::FractalPipeline>(*solids_);
+            } catch (const std::exception& e) {
+                rlog("[reforce] fractal zooms unavailable: %s\n", e.what());
+                fractals_.reset();
             }
         }
         try {
@@ -573,9 +592,15 @@ void Visualizer::colorize(MTL::CommandBuffer* cmd, MTL::Texture* output, double 
     pipeline_->encodeColorize(cmd, palette_, lut_, output, layer, colorQuads_.data(), colorQuads_.size(),
                               trackAlpha || backdrop, opaqueSolids_.data(), opaqueSolids_.size(),
                               colorSolids_.data(), colorSolids_.size());
+    // The jigsaw of the frame (docs/3d-design.md "Jigsaw"), cut from the colorized frame.
+    if (jigsaws_)
+        for (const auto& d : jigsawDraws_) jigsaws_->encode(cmd, output, d, trackAlpha || backdrop);
     // Glass puzzles (Glas = 1) over the colorized frame, before anything else goes on top.
     if (solids_)
         for (const auto& g : glassDraws_) solids_->encodeGlass(cmd, output, g, trackAlpha || backdrop);
+    // Rain on glass over the colorized frame (and the glass puzzle), likewise.
+    if (rain_)
+        for (const auto& r : rainDraws_) rain_->encodeComposite(cmd, output, *r.sim, r.look, trackAlpha || backdrop);
     // 3D models in color (look B) over the colorized frame, likewise.
     if (models_)
         for (const auto& d : modelColorDraws_) models_->encodeColor(cmd, output, d, trackAlpha || backdrop);

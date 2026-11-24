@@ -1,4 +1,4 @@
 ThemeName = "Objects: Fractals"
-About = "reforce: everything as in (Standard), plus a Julia set morphing with the bars every 30 seconds or so."
+About = "reforce: everything as in (Standard), plus a fractal every 30 seconds or so: a Julia set morphing with the bars, the Mandelbrot dive, a dragon curve folding, or an endless 3D zoom into a Sierpinski tetrahedron or a Menger sponge that loops on the bar lines."
 Object.CategoryExpr = "+Fractals"
 Object.Slideshow.Interval.Duration = 30

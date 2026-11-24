@@ -1,0 +1,14 @@
+Vers=100
+Meta="reforce solid: rain on a sheet of water over a glass floor seen from above, the visuals below it (Rain floor, all wet). Every drop strikes the water on the beat (Dens per beat, a cluster on every bar line, a drizzle on the 16ths): it pushes the surface down and throws a crown of droplets, and the rings spread, cross and interfere over the whole frame (a damped wave equation with capillary dispersion, Spd, Dcay), bending the visuals beneath. A build thins the beats and thickens the drizzle, a drop is a downpour. Drawn over the visuals, which keep running underneath."
+Mesh="rain"
+Rain="floor"
+PBar="32"
+Dens="3"
+Size="9"
+Drz=".6"
+Clus="1"
+// the whole floor one sheet of water: no dry glass, no beads
+Wet="1"
+Spd=".3"
+Dcay="1.6"
+Dpth=".25"

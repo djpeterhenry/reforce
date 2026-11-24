@@ -42,7 +42,7 @@ int runOffline(MTL::Device* device, unsigned width, unsigned height, const Offli
     double cpuSum = 0, gpuSum = 0, gpuMax = 0, cpuMax = 0;
     double waveSum = 0, geomSum = 0, colorSum = 0;
     std::size_t segMax = 0;
-    std::vector<double> cpuFrames, waveFrames;  // per measured frame (percentiles)
+    std::vector<double> cpuFrames, waveFrames, gpuFrames;  // per measured frame (percentiles)
     double waveMax = 0;
     int slowFrames = 0;
     int written = 0;
@@ -91,6 +91,7 @@ int runOffline(MTL::Device* device, unsigned width, unsigned height, const Offli
             waveSum += tm.waveEvalMs;
             waveMax = std::max(waveMax, tm.waveEvalMs + tm.geometryMs);
             cpuFrames.push_back(cpuMs);
+            gpuFrames.push_back(gpuMs);
             waveFrames.push_back(tm.waveEvalMs + tm.geometryMs);
             // Frames over 1.5 x the 60 Hz budget (Phase 5D): which part was slow.
             if (cpuMs > 25.0 && ++slowFrames <= 20)
@@ -127,6 +128,7 @@ int runOffline(MTL::Device* device, unsigned width, unsigned height, const Offli
         };
         std::fprintf(stderr, "[reforce] cpu p99 %.2f ms; WaveShape eval+geometry p99 %.2f ms, max %.2f ms\n",
                      p99(cpuFrames), p99(waveFrames), waveMax);
+        std::fprintf(stderr, "[reforce] gpu p99 %.2f ms\n", p99(gpuFrames));  // (scripts/perf-sweep.py reads it)
     }
     target->release();
     queue->release();

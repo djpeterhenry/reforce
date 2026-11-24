@@ -1,0 +1,28 @@
+Vers=100
+Meta="reforce solid: a knight's tour with half-turn symmetry. The knight hops once per beat over a board drawn as grid lines only (the visuals show through every square), and the web it leaves is symmetric about the board's center, completing on the 16-bar phrase line when the 64th hop returns it to its first square. Seen from higher up than Knight's Tour, so the web reads as a whole. A drop lights up the whole web; a build makes the knight float. Below 90 BPM it hops twice per beat. Bar lines from the phrase clock while the beat clock is locked, else 120 BPM from the start."
+Mesh="knight"
+Text="2"
+// half-turn symmetric tours (Sym 1), the board as grid lines (Brd 0)
+Sym="1"
+Brd="0"
+// 4 tours (a tour per phrase), ending on a phrase line of the live clock; started on a 16-bar line (Peter 2026-11-23:
+// a fixed PDur ended mid-tour)
+PBar="64"
+SBar="16"
+B0="t - START_TIME"
+B1="1 + (SYNC_BPM > 0) * (SYNC_BPM < 90)"
+B2="SYNC_ON * B1 * SYNC_PHRASE + (1 - SYNC_ON) * B0 / 32"
+Turn="64 * wrap(B2)"
+Seed="floor(B2)"
+Flsh="SYNC_DROP"
+Hovr="SYNC_BUILD"
+X="0"
+Y="0"
+Z="0"
+Scal="1.15"
+RotX="-.62 + .05 * sin(.11 * B0)"
+Orbt=".03 * B0"
+Folw=".08"
+Shad=".75"
+Pen="1"
+EPen="1"

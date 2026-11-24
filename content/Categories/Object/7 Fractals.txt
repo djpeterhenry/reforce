@@ -4,4 +4,9 @@ Julia Drift
 Julia Pulse
 Julia Bands
 Mandelbrot Dive
+Dragon Fold
+Dragon Rounded
+Sierpinski Apex
+Sierpinski Vortex
+Menger Tunnels
 "

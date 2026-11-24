@@ -39,6 +39,23 @@ using reforce::platform::MenuItem;
 
 // Platform messages go to stderr like the rest of the app (the log file tees
 // stderr; NSLog would only reach the unified log when not on a terminal).
+// The display named `name` as macOS shows it (case-insensitive), or "external": the first display that is not built
+// in. nil when no such display is connected.
+static NSScreen* RFScreenNamed(const std::string& name) {
+    if (name.empty()) return nil;
+    NSString* want = [NSString stringWithUTF8String:name.c_str()];
+    const BOOL external = [want caseInsensitiveCompare:@"external"] == NSOrderedSame;
+    for (NSScreen* s in NSScreen.screens) {
+        if (external) {
+            NSNumber* n = s.deviceDescription[@"NSScreenNumber"];
+            if (n && !CGDisplayIsBuiltin(n.unsignedIntValue)) return s;
+        } else if (s.localizedName && [s.localizedName caseInsensitiveCompare:want] == NSOrderedSame) {
+            return s;
+        }
+    }
+    return nil;
+}
+
 static void RFLog(NSString* format, ...) NS_FORMAT_FUNCTION(1, 2);
 static void RFLog(NSString* format, ...) {
     va_list args;
@@ -198,6 +215,7 @@ static KeyEvent keyEventFrom(NSEvent* event) {
     std::atomic<bool> _visible;         // updated on main from window notifications
     std::atomic<double> _screenMaxFps;  // updated on main
     BOOL _shuttingDown;
+    BOOL _panelOpened;  // the control panel was opened this session (Cmd+K or at launch): Start Like This keeps it
     NSMenu* _audioMenu;
     NSMenu* _videoMenu;
 }
@@ -249,6 +267,9 @@ static NSMenuItem* RFAddItem(NSMenu* menu, NSString* title, SEL action, NSString
     RFAddItem(viewMenu, @"Toggle Full Screen", @selector(toggleFullScreen:), @"f",
               cmd | NSEventModifierFlagControl, nil);
     RFAddItem(viewMenu, @"Open Control Panel\u2026", @selector(openControlPanel:), @"k", cmd, self);
+    [viewMenu addItem:[NSMenuItem separatorItem]];
+    RFAddItem(viewMenu, @"Start Like This", @selector(startLikeThis:), @"", 0, self);
+    RFAddItem(viewMenu, @"Don\u2019t Start Like This", @selector(dontStartLikeThis:), @"", 0, self);
     [viewMenu addItem:[NSMenuItem separatorItem]];
     RFAddItem(viewMenu, @"Window Shows Visuals Only (for Lights)", @selector(toggleWindowVisualsOnly:), @"", 0, self);
     RFAddItem(viewMenu, @"Room Lights (Nanoleaf)", @selector(toggleLights:), @"", 0, self);
@@ -322,6 +343,7 @@ static NSMenuItem* RFAddItem(NSMenu* menu, NSString* title, SEL action, NSString
 
 - (void)openControlPanel:(id)sender {
     if (_config.controlPanelUrl.empty()) return;
+    _panelOpened = YES;
     NSURL* url = [NSURL URLWithString:[NSString stringWithUTF8String:_config.controlPanelUrl.c_str()]];
     if (url) [NSWorkspace.sharedWorkspace openURL:url];
 }
@@ -332,8 +354,58 @@ static NSMenuItem* RFAddItem(NSMenu* menu, NSString* title, SEL action, NSString
     if (_handler) _handler->onKey(key);
 }
 
+// View > Start Like This (Peter 2026-11-23): remember the display the window is on, full screen or not, and whether
+// the control panel was opened, so a launch from the Dock comes up the same way (settings.json).
+- (void)startLikeThis:(id)sender {
+    if (!_config.saveStartSetup || !_window) return;
+    WindowConfig::StartSetup s;
+    NSScreen* screen = _window.screen;
+    s.screen = screen.localizedName ? std::string(screen.localizedName.UTF8String) : std::string();
+    s.fullScreen = (_window.styleMask & NSWindowStyleMaskFullScreen) != 0;
+    s.openPanel = _panelOpened;
+    // The windowed frame too (on that display), for a launch that is not full screen.
+    if (!s.fullScreen && _window.frameAutosaveName.length) [_window saveFrameUsingName:_window.frameAutosaveName];
+    NSString* where = screen.localizedName ?: @"this display";
+    NSString* how = [NSString stringWithFormat:@"On \u201c%@\u201d, %@, %@.", where,
+                                               s.fullScreen ? @"full screen" : @"in a window",
+                                               s.openPanel ? @"with the control panel open" : @"without the control panel"];
+    [self saveStartSetup:s title:@"reforce will start like this"
+                    info:[how stringByAppendingString:@" (View \u203a Don\u2019t Start Like This undoes it. If that display "
+                                                      @"is not connected, reforce opens in a window where it was.)"]];
+}
+
+- (void)dontStartLikeThis:(id)sender {
+    if (!_config.saveStartSetup) return;
+    [self saveStartSetup:WindowConfig::StartSetup{} title:@"reforce will start as before"
+                    info:@"In a window where it was last, without the control panel."];
+}
+
+- (void)saveStartSetup:(const WindowConfig::StartSetup&)s title:(NSString*)title info:(NSString*)info {
+    std::string err;
+    NSAlert* alert = [[NSAlert alloc] init];
+    if (_config.saveStartSetup(s, &err)) {
+        _config.screen = s.screen;
+        _config.startFullScreen = s.fullScreen;
+        _config.openPanelOnLaunch = s.openPanel;
+        RFLog(@"[reforce] start setup saved: screen \"%s\", full screen %d, control panel %d", s.screen.c_str(),
+              int(s.fullScreen), int(s.openPanel));
+        alert.messageText = title;
+        alert.informativeText = info;
+    } else {
+        alert.alertStyle = NSAlertStyleWarning;
+        alert.messageText = @"Could not save the start setup";
+        alert.informativeText = [NSString stringWithUTF8String:err.c_str()];
+    }
+    if (_window) [alert beginSheetModalForWindow:_window completionHandler:nil];
+    else [alert runModal];
+}
+
 - (BOOL)validateMenuItem:(NSMenuItem*)item {
     if (item.action == @selector(openControlPanel:)) return !_config.controlPanelUrl.empty();
+    if (item.action == @selector(startLikeThis:)) return _config.saveStartSetup != nullptr && _window != nil;
+    if (item.action == @selector(dontStartLikeThis:))
+        return _config.saveStartSetup != nullptr &&
+               (!_config.screen.empty() || _config.startFullScreen || _config.openPanelOnLaunch);
     if (item.action == @selector(toggleLights:)) {
         const int st = _handler ? _handler->lightsMenuState() : -1;
         item.state = st == 1 ? NSControlStateValueOn : NSControlStateValueOff;
@@ -480,7 +552,26 @@ static NSMenuItem* RFAddItem(NSMenu* menu, NSString* title, SEL action, NSString
         }
     }
     if (!restored) [_window center];
+    // (Before the move below: naming the autosave applies the remembered frame, which would undo it.)
     if (autosave.length) [_window setFrameAutosaveName:autosave];
+    // Start Like This: onto the named display (centered in it, at most its size), if it is connected.
+    BOOL onScreen = YES;
+    if (!_config.background && !_config.screen.empty()) {
+        NSScreen* target = RFScreenNamed(_config.screen);
+        onScreen = target != nil;
+        if (!target) {
+            RFLog(@"[reforce] window: display \"%s\" (reforce.Window.Screen) is not connected: opening in a window "
+                  @"where it was", _config.screen.c_str());
+        } else if (_window.screen != target) {
+            const NSRect vis = target.visibleFrame;
+            NSRect f = _window.frame;
+            f.size.width = MIN(f.size.width, vis.size.width);
+            f.size.height = MIN(f.size.height, vis.size.height);
+            f.origin = NSMakePoint(NSMidX(vis) - 0.5 * f.size.width, NSMidY(vis) - 0.5 * f.size.height);
+            [_window setFrame:f display:NO];
+            RFLog(@"[reforce] window: on \"%@\" (reforce.Window.Screen)", target.localizedName);
+        }
+    }
     if (_config.background) {
         [_window orderBack:nil];  // behind everything; never key, never brought forward
     } else {
@@ -490,11 +581,31 @@ static NSMenuItem* RFAddItem(NSMenu* menu, NSString* title, SEL action, NSString
         // with the explicit reforce.Window.StartFullScreen = 1.
         [NSUserDefaults.standardUserDefaults removeObjectForKey:kRFFullScreenKey];
     }
-    if (_config.startFullScreen && !_config.background) {
+    if (_config.startFullScreen && !_config.background && onScreen) {
         RFLog(@"[reforce] window: entering full screen (reforce.Window.StartFullScreen)");
+        const std::string want = _config.screen;
         dispatch_async(dispatch_get_main_queue(), ^{
-            if (self->_window && !(self->_window.styleMask & NSWindowStyleMaskFullScreen))
-                [self->_window toggleFullScreen:nil];
+            NSWindow* w = self->_window;
+            if (!w || (w.styleMask & NSWindowStyleMaskFullScreen)) return;
+            // Full screen comes up on the window's display: put it on the chosen one first, if anything moved it.
+            NSScreen* target = RFScreenNamed(want);
+            if (target && w.screen != target) {
+                const NSRect vis = target.visibleFrame;
+                NSRect f = w.frame;
+                f.size.width = MIN(f.size.width, vis.size.width);
+                f.size.height = MIN(f.size.height, vis.size.height);
+                f.origin = NSMakePoint(NSMidX(vis) - 0.5 * f.size.width, NSMidY(vis) - 0.5 * f.size.height);
+                [w setFrame:f display:YES];
+            }
+            RFLog(@"[reforce] window: full screen on \"%@\"", w.screen.localizedName ?: @"?");
+            [w toggleFullScreen:nil];
+        });
+    }
+    if (_config.openPanelOnLaunch && !_config.background && !_config.controlPanelUrl.empty()) {
+        RFLog(@"[reforce] opening the control panel (reforce.UI.OpenOnLaunch)");
+        // After the window is up (and on its way to full screen), so the browser comes up beside it.
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+            [self openControlPanel:nil];
         });
     }
 

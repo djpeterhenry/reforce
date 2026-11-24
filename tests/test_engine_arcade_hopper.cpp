@@ -335,3 +335,45 @@ TEST_CASE("arcade hopper: junk keys and big beat jumps stay finite and bounded")
     CHECK(g.plan().pos[0] == start);
     checkPlan(g);
 }
+
+TEST_CASE("arcade hopper: tops read on any ColorMap: picked levels, hollow dark tops") {
+    using namespace reforce::engine;
+    // A map whose upper half is all white: the default tops (.6 and 1) would look the same.
+    Palette pal{};
+    MapLut lut{};
+    for (int k = 0; k < kPaletteSize; ++k) {
+        const float v = std::min(1.0f, float(k) / 127.0f);
+        pal[std::size_t(k)] = {v, v, v, 1.0f};
+        lut[std::size_t(k)] = float(k) / 255.0f;
+    }
+    OrganicColors colors;
+    effectiveColors(pal, lut, colors.lab);
+    colors.version = 1;
+    const TopPick pick = pickTops(colors.lab, TopSpec{});
+    const double lo = pick.level[0] / 255.0;
+    REQUIRE(lo < 0.5);  // the picked dark top is below the white half
+
+    auto near = [](const std::vector<LineSegment>& segs, double v) {
+        int n = 0;
+        for (const auto& s : segs) n += std::abs(s.penA - v) < 0.004;
+        return n;
+    };
+    const char* text = "Kind=\"hopper\"\n";
+    arcade_test::Run plain(text), picked(text), off("Kind=\"hopper\"\nTAut=\"0\"\n");
+    picked.colors = &colors;
+    off.colors = &colors;
+    std::vector<LineSegment> sp, sc, so;
+    for (double beat = 0; beat <= 8.5; beat += 0.25) sp = plain.at(beat), sc = picked.at(beat), so = off.at(beat);
+    CHECK(near(sp, 0.6) > 20);  // the fixed dark tops' rims
+    CHECK(near(sc, lo) > 20);   // the picked ones
+    CHECK(near(sc, 0.6) < near(sp, 0.6) / 4);
+    // TAut 0: the fixed levels, exactly as without colors.
+    REQUIRE(so.size() == sp.size());
+    for (std::size_t i = 0; i < so.size(); ++i) CHECK(so[i].penA == sp[i].penA);
+
+    // Dark tops are hollow: many more seam-colored strokes on a dark board than on the finished one.
+    arcade_test::Run h(text);
+    const auto dark = h.play(0, 2.5);
+    const auto done = h.play(2.5, 31.9);
+    CHECK(near(dark, 0.04) > near(done, 0.04) + 100);
+}

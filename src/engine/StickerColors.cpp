@@ -398,4 +398,251 @@ std::array<float, 6> StickerPicker::levels(double t) const {
     return out;
 }
 
+// ------------------------------------------------------------------ the pyramid hopper's top states
+
+namespace {
+
+constexpr int kTopMin = 40;        // lowest top level (~.16): clear of the seams' near-black
+constexpr float kEnough = 30.0f;   // a distance that reads well: more counts the same, so `prefer` wins
+constexpr float kPull = 10.0f;     // score lost per full range (255 levels) moved away from `prefer`, summed
+constexpr float kSideWeight = 2.5f;  // a top close to a side face matters less than two states or a seam (212 PNG maps)
+
+TopSpec clampSpec(TopSpec s) {
+    s.n = std::clamp(s.n, 2, 3);
+    for (int& v : s.prefer) v = std::clamp(v, 0, 255);
+    s.edge = std::clamp(s.edge, 0, 255);
+    s.sideL = std::clamp(s.sideL, 0, 255);
+    s.sideR = std::clamp(s.sideR, 0, 255);
+    return s;
+}
+
+float rawTops(const Ctx& c, const TopSpec& s, const int* lv) {
+    float m = 1e9f;
+    for (int i = 0; i < s.n; ++i) {
+        m = std::min(m, c.near(lv[i], lv, i));  // every pair once, and each state against the seams (the body)
+        m = std::min(m, kSideWeight * c.pair(lv[i], s.sideL));
+        m = std::min(m, kSideWeight * c.pair(lv[i], s.sideR));
+        // A brighter state should not look darker: count lightness going the wrong way against it.
+        if (i > 0) {
+            const float dl = c.lab[std::size_t(lv[i - 1])].l - c.lab[std::size_t(lv[i])].l;
+            if (dl > 0) m -= 0.5f * dl;
+        }
+    }
+    return m;
+}
+
+float effectiveTops(const Ctx& c, const TopSpec& s, const int* lv) {
+    float away = 0;
+    for (int i = 0; i < s.n; ++i) {
+        const int want = s.n == 2 && i == 1 ? s.prefer[2] : s.prefer[std::size_t(i)];  // 2 states: dark, bright
+        away += float(std::abs(lv[i] - want)) / 255.0f;
+    }
+    return std::min(rawTops(c, s, lv), kEnough) - kPull * away;
+}
+
+}  // namespace
+
+float topScore(const LabTable& lab, const TopSpec& spec, const std::array<int, 3>& level) {
+    const TopSpec s = clampSpec(spec);
+    const Ctx c(lab, s.edge);
+    int lv[3];
+    for (int i = 0; i < 3; ++i) lv[i] = std::clamp(level[std::size_t(i)], 0, 255);
+    return rawTops(c, s, lv);
+}
+
+TopPick pickTops(const LabTable& lab, const TopSpec& spec) {
+    const TopSpec s = clampSpec(spec);
+    const Ctx c(lab, s.edge);
+    TopPick best;
+    best.n = s.n;
+    float bestEff = -1e30f;
+    auto consider = [&](const int* lv) {
+        const float e = effectiveTops(c, s, lv);
+        if (e > bestEff) {
+            bestEff = e;
+            for (int i = 0; i < 3; ++i) best.level[std::size_t(i)] = i < s.n ? lv[i] : lv[s.n - 1];
+        }
+    };
+    // The preferred levels first (ties keep them), then a grid (2 states: every other level; 3: every fourth),
+    // then a few rounds of moving one level at a time.
+    int pref[3] = {s.prefer[0], s.prefer[1], s.prefer[2]};
+    if (s.n == 2) pref[1] = s.prefer[2];
+    std::sort(pref, pref + s.n);
+    consider(pref);
+    const int step = s.n == 2 ? 2 : 4;
+    if (s.n == 2) {
+        for (int a = kTopMin; a <= 255; a += step)
+            for (int b = a + step; b <= 255; b += step) {
+                const int lv[2] = {a, b};
+                consider(lv);
+            }
+    } else {
+        for (int a = kTopMin; a <= 255; a += step)
+            for (int b = a + step; b <= 255; b += step)
+                for (int d = b + step; d <= 255; d += step) {
+                    const int lv[3] = {a, b, d};
+                    consider(lv);
+                }
+    }
+    for (int round = 0; round < 4; ++round) {
+        bool moved = false;
+        for (int i = 0; i < s.n; ++i)
+            for (int d : {-1, 1, -2, 2, -3, 3}) {
+                int lv[3] = {best.level[0], best.level[1], best.level[2]};
+                lv[i] += d;
+                if (lv[i] < kTopMin || lv[i] > 255 || (i > 0 && lv[i] <= lv[i - 1]) || (i + 1 < s.n && lv[i] >= lv[i + 1]))
+                    continue;
+                const float before = bestEff;
+                consider(lv);
+                moved = moved || bestEff > before;
+            }
+        if (!moved) break;
+    }
+    int lv[3] = {best.level[0], best.level[1], best.level[2]};
+    best.score = rawTops(c, s, lv);
+    return best;
+}
+
+void TopPicker::update(const LabTable& lab, std::uint64_t version, const TopSpec& spec, double t, double minInterval) {
+    if (have_ && version == version_ && spec == spec_) return;
+    if (have_ && t - lastT_ < minInterval && t >= lastT_) return;  // caught up on a later call (version_ unchanged)
+    lastT_ = t;
+    version_ = version;
+    spec_ = spec;
+    const TopPick p = pickTops(lab, spec);
+    std::array<int, 3> now{};
+    const std::array<float, 3> cur = levels(t);
+    for (int i = 0; i < 3; ++i) now[std::size_t(i)] = std::clamp(int(std::lround(cur[std::size_t(i)] * 255.0f)), 0, 255);
+    if (!have_) {
+        from_ = to_ = p.level;
+        score_ = p.score;
+        have_ = true;
+        switchT_ = -1e30;
+        return;
+    }
+    // Hysteresis on the score the pick optimizes (contrast up to "enough", minus the pull towards `prefer`).
+    const TopSpec s = clampSpec(spec);
+    const Ctx c(lab, s.edge);
+    const int curLv[3] = {to_[0], to_[1], to_[2]}, newLv[3] = {p.level[0], p.level[1], p.level[2]};
+    const float curEff = effectiveTops(c, s, curLv), newEff = effectiveTops(c, s, newLv);
+    if (p.level != to_ && newEff > curEff + std::max(2.0f, 0.1f * std::abs(curEff))) {
+        from_ = now;
+        to_ = p.level;
+        switchT_ = t;
+        score_ = p.score;
+        ++switches_;
+    } else {
+        score_ = rawTops(c, s, curLv);
+    }
+}
+
+std::array<float, 3> TopPicker::levels(double t) const {
+    std::array<float, 3> out{0.6f, 0.8f, 1.0f};
+    if (!have_) return out;
+    double w = ease_ > 0 ? (t - switchT_) / ease_ : 1.0;
+    w = std::clamp(w, 0.0, 1.0);
+    w = w * w * (3 - 2 * w);
+    for (int i = 0; i < 3; ++i)
+        out[std::size_t(i)] = float((from_[std::size_t(i)] + (to_[std::size_t(i)] - from_[std::size_t(i)]) * w) / 255.0);
+    return out;
+}
+
+// ---------------------------------------------------------------- the labyrinth's three colors
+
+namespace {
+constexpr int kTrioStep = 3;
+float toBlack(const Ctx& c, int a) {
+    return deltaE(c.lab[std::size_t(a)], Lab{}) - 0.5f * c.wob[std::size_t(a)];
+}
+float trioScoreOf(const Ctx& c, int a, int b, int d) {
+    if (a == b || a == d || b == d) return -1e9f;
+    return std::min({c.pair(a, b), c.pair(a, d), c.pair(b, d), toBlack(c, a), toBlack(c, b), toBlack(c, d)});
+}
+// Roles by lightness: board darkest, walls lightest, ball the third.
+std::array<int, 3> byRole(const LabTable& lab, int a, int b, int d) {
+    std::array<int, 3> s{a, b, d};
+    std::sort(s.begin(), s.end(), [&](int x, int y) { return lab[std::size_t(x)].l < lab[std::size_t(y)].l; });
+    return {s[0], s[2], s[1]};
+}
+}  // namespace
+
+float trioScore(const LabTable& lab, const std::array<int, 3>& level) {
+    const Ctx c(lab, -1);
+    const int a = std::clamp(level[0], 0, kPaletteSize - 1), b = std::clamp(level[1], 0, kPaletteSize - 1),
+              d = std::clamp(level[2], 0, kPaletteSize - 1);
+    return trioScoreOf(c, a, b, d);
+}
+
+TrioPick pickTrio(const LabTable& lab) {
+    const Ctx c(lab, -1);
+    TrioPick best;
+    best.score = -1e9f;
+    best.level = {kFirst, 128, 255};
+    for (int a = kFirst; a < kPaletteSize; a += kTrioStep) {
+        if (toBlack(c, a) <= best.score) continue;
+        for (int b = a + kTrioStep; b < kPaletteSize; b += kTrioStep) {
+            if (std::min(c.pair(a, b), toBlack(c, b)) <= best.score) continue;
+            for (int d = b + kTrioStep; d < kPaletteSize; d += kTrioStep) {
+                const float s = trioScoreOf(c, a, b, d);
+                if (s > best.score) {
+                    best.score = s;
+                    best.level = {a, b, d};
+                }
+            }
+        }
+    }
+    best.level = byRole(lab, best.level[0], best.level[1], best.level[2]);
+    return best;
+}
+
+void TrioPicker::update(const Palette& palette, const MapLut& lut, double t, double minInterval) {
+    if (have_ && t - lastT_ < minInterval && t >= lastT_) return;
+    if (have_ && std::memcmp(&palette, &lastPal_, sizeof(Palette)) == 0 &&
+        std::memcmp(&lut, &lastLut_, sizeof(MapLut)) == 0)
+        return;
+    lastT_ = t;
+    lastPal_ = palette;
+    lastLut_ = lut;
+    effectiveColors(palette, lut, lab_);
+    std::array<int, 3> now{};
+    const std::array<float, 3> cur = levels(t);
+    for (int i = 0; i < 3; ++i) now[std::size_t(i)] = std::clamp(int(std::lround(cur[std::size_t(i)] * 255.0f)), 0, 255);
+    const TrioPick p = pickTrio(lab_);
+    if (!have_) {
+        from_ = to_ = p.level;
+        score_ = p.score;
+        have_ = true;
+        switchT_ = -1e30;
+        return;
+    }
+    // The current set, its roles re-sorted by lightness on the new map.
+    const std::array<int, 3> kept = byRole(lab_, to_[0], to_[1], to_[2]);
+    const float curScore = trioScore(lab_, kept);
+    if (p.score > curScore * 1.1f + 1.5f && p.level != to_) {
+        from_ = curScore < 2.0f ? p.level : now;  // nothing worth easing from: switch at once
+        to_ = p.level;
+        switchT_ = t;
+        score_ = p.score;
+        ++switches_;
+    } else {
+        if (kept != to_) {  // the same three colors, their roles changed with the map: ease into them
+            from_ = now;
+            to_ = kept;
+            switchT_ = t;
+        }
+        score_ = curScore;
+    }
+}
+
+std::array<float, 3> TrioPicker::levels(double t) const {
+    std::array<float, 3> out{};
+    if (!have_) return {0.3f, 0.8f, 0.55f};
+    double w = ease_ > 0 ? (t - switchT_) / ease_ : 1.0;
+    w = std::clamp(w, 0.0, 1.0);
+    w = w * w * (3 - 2 * w);
+    for (int i = 0; i < 3; ++i)
+        out[std::size_t(i)] = float((from_[std::size_t(i)] + (to_[std::size_t(i)] - from_[std::size_t(i)]) * w) / 255.0);
+    return out;
+}
+
 }  // namespace reforce::engine

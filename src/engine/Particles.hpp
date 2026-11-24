@@ -64,6 +64,19 @@ struct FadeEnvelope {
 // below half of `bars`. Without the clock: `bars` at 120 BPM. A bar is `beatsPerBar` beats (Link's quantum). The tempo is the one at the start (a later tempo change
 // does not stretch it). NaN for bars that are not finite and > 0.
 double holdForBars(double bars, double fade, const scene::SyncInput& sync, int phraseBars, double beatsPerBar = 4.0);
+// The lines holdForBars ends on, in bars: the phrase length when `bars` is a whole number of phrases, else 1.
+double holdLineBars(double bars, int phraseBars);
+
+// After holdForBars: full strength keeps ending on a line of the live clock (Peter 2026-11-23: the dragons, then the
+// solids, "always phrase aligned"). The time left is counted in bars as the clock runs (so a tempo change moves the
+// end with it), a jump of the clock is not counted, and every step the end snaps to the nearest line, `unit` bars
+// apart, of the clock as it is now (a deck start, a phrase re-alignment, the lock arriving). Without the beat clock the
+// bodies' fallback: 2 beats a second of age, 4 beats a bar. Organics (OrganicRun) and solids (SolidRun) use it.
+struct BarHold {
+    double unit = 0;  // line spacing in bars (holdLineBars); 0 = off
+    double left = std::nan(""), last = std::nan("");
+    void follow(FadeEnvelope& env, double age, const scene::SyncInput& sync);
+};
 
 // Slideshow spawn timer: the interval counts from one spawn to the next
 // (particles overlap; GUESS for G-Force, whose docs say "when G-Force rolls
