@@ -10,7 +10,8 @@
 #   asan    build-asan/: AddressSanitizer + UndefinedBehaviorSanitizer (out of bounds, use after free, overflow,
 #           bad shifts, misaligned access, ...), uninitialized stack variables filled with a pattern, all new heap
 #           memory filled with 0xBE, plus GPU poison mode
-#   tsan    build-tsan/: ThreadSanitizer (data races between the render, audio, web and lights threads); slow
+#   tsan    build-tsan/: ThreadSanitizer (data races between the render, audio, web and lights threads); slow.
+#           Known false positives and third-party races: tests/tsan.supp
 #
 # Time budgets are reported, not enforced (REFORCE_NO_PERF_BUDGETS): every mode here runs slower than normal.
 # Examples: scripts/check.sh asan -R render     scripts/check.sh poison --output-on-failure
@@ -46,7 +47,7 @@ asan() {
 tsan() {
     echo "== tsan: ThreadSanitizer (build-tsan/)"
     build build-tsan -DREFORCE_SANITIZE=thread
-    TSAN_OPTIONS=halt_on_error=1:second_deadlock_stack=1 \
+    TSAN_OPTIONS=halt_on_error=1:second_deadlock_stack=1:suppressions="$repo/tests/tsan.supp" \
     REFORCE_NO_PERF_BUDGETS=1 ctest --test-dir "$repo/build-tsan" -j 3 "$@"
 }
 

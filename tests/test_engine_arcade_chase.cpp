@@ -6,6 +6,7 @@
 #include <cmath>
 #include <vector>
 
+#include "PerfBudget.hpp"
 #include "arcade_harness.hpp"
 #include "engine/arcade/Chase.hpp"
 
@@ -319,7 +320,7 @@ TEST_CASE("arcade chase: segments and step cost stay bounded") {
         MESSAGE("chase " << std::string(k.name) << ": most " << most << " segments; step " << total / frames << " ms avg, "
                          << worst << " max");
         CHECK(most < 8000);
-        CHECK(total / frames < 1.0);
+        PERF_BUDGET(total / frames < 1.0);
     }
 }
 

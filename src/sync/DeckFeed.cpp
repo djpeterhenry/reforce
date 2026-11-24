@@ -7,6 +7,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -97,7 +98,8 @@ struct DeckFeed::Midi {
     // One per MIDI source ever connected (its map and 14-bit state); handed to CoreMIDI as the source's refCon, so it
     // lives as long as the client, even after the source goes away.
     struct Source {
-        const ControllerMap* map = nullptr;
+        // Published with release: the MIDI thread's acquire load then also sees owner and the maps written before.
+        std::atomic<const ControllerMap*> map{nullptr};
         MidiHiRes hr;  // MIDI thread only
     };
     DeckFeed* owner = nullptr;
@@ -128,7 +130,7 @@ struct DeckFeed::Midi {
                 for (auto& s : sources)
                     if (s.first == id) ctx = s.second.get();
                 if (!ctx) ctx = sources.emplace_back(id, std::make_unique<Source>()).second.get();
-                ctx->map = map;
+                ctx->map.store(map, std::memory_order_release);
                 if (MIDIPortConnectSource(port, src, ctx) != noErr) continue;
                 std::fprintf(stderr, "[reforce] deck starts: MIDI from \"%s\" (%s)\n", name.c_str(), map->name.c_str());
             }
@@ -180,7 +182,8 @@ DeckFeed::DeckFeed(int port, std::string midiDevice, std::vector<ControllerMap> 
                 m->client, CFSTR("reforce deck starts"), kMIDIProtocol_1_0, &m->port,
                 ^(const MIDIEventList* list, void* refCon) {
                     auto* source = static_cast<Midi::Source*>(refCon);
-                    if (!source || !source->map) return;
+                    const ControllerMap* map = source ? source->map.load(std::memory_order_acquire) : nullptr;
+                    if (!map) return;
                     const double t = DeckFeed::now();
                     const MIDIEventPacket* p = &list->packet[0];
                     for (UInt32 k = 0; k < list->numPackets; ++k) {
@@ -188,7 +191,7 @@ DeckFeed::DeckFeed(int port, std::string midiDevice, std::vector<ControllerMap> 
                             const UInt32 word = p->words[w];
                             if ((word >> 28) != 0x2) continue;  // MIDI 1.0 channel voice (one word)
                             DeckFeedEvent e;
-                            if (parseControllerMidi(*source->map, (word >> 16) & 0xFF, (word >> 8) & 0xFF, word & 0xFF, t,
+                            if (parseControllerMidi(*map, (word >> 16) & 0xFF, (word >> 8) & 0xFF, word & 0xFF, t,
                                                     source->hr, e))
                                 m->owner->push(e);
                         }

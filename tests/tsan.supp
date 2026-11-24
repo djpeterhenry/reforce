@@ -1,0 +1,9 @@
+# ThreadSanitizer suppressions (scripts/check.sh tsan). Each one says why it is not ours or not real.
+
+# metal-cpp's addCompletedHandler(std::function) copies the block on the encoding thread; Metal runs it on a GCD
+# thread after the GPU finishes, ordered by Metal internals TSan cannot see. A false positive.
+race:MTL::CommandBuffer::addCompletedHandler
+
+# Syphon (third party): two command buffers' completion handlers can run -[SyphonServerBase publish] at once and race
+# on its _pushPending flag; at worst the surface ID is sent to clients twice.
+race:SyphonServerBase
