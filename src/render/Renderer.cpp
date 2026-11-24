@@ -9,6 +9,7 @@
 
 #include <stdexcept>
 
+#include "render/GpuPoison.hpp"
 #include "render/Layout.hpp"
 #include "render/ShaderCompiler.hpp"
 
@@ -124,7 +125,7 @@ Renderer::Renderer(MTL::Device* device, uint32_t width, uint32_t height)
         MTL::PixelFormatBGRA8Unorm, width, height, false);
     td->setUsage(MTL::TextureUsageRenderTarget | MTL::TextureUsageShaderRead);
     td->setStorageMode(device->hasUnifiedMemory() ? MTL::StorageModeShared : MTL::StorageModeManaged);
-    frame_ = device->newTexture(td, surface_, 0);
+    frame_ = makeTexture(device, td, surface_, 0);
     if (!frame_) throw std::runtime_error("newTexture(iosurface) failed");
     frame_->setLabel(NS::String::string("reforce frame", NS::UTF8StringEncoding));
 
@@ -150,7 +151,7 @@ void Renderer::encodeTestPattern(MTL::CommandBuffer* cmd, float timeSeconds) {
     att->setStoreAction(MTL::StoreActionStore);
 
     PatternParams params{timeSeconds, 0.f, {float(width_), float(height_)}};
-    MTL::RenderCommandEncoder* enc = cmd->renderCommandEncoder(pass);
+    MTL::RenderCommandEncoder* enc = makeRenderEncoder(cmd, pass);
     enc->setLabel(NS::String::string("test pattern", NS::UTF8StringEncoding));
     enc->setRenderPipelineState(patternPipeline_);
     enc->setFragmentBytes(&params, sizeof(params), 0);
@@ -169,7 +170,7 @@ void Renderer::encodePresent(MTL::CommandBuffer* cmd, CA::MetalDrawable* drawabl
     att->setClearColor(MTL::ClearColor(0, 0, 0, 1));
     att->setStoreAction(MTL::StoreActionStore);
 
-    MTL::RenderCommandEncoder* enc = cmd->renderCommandEncoder(pass);
+    MTL::RenderCommandEncoder* enc = makeRenderEncoder(cmd, pass);
     enc->setLabel(NS::String::string("present", NS::UTF8StringEncoding));
     enc->setViewport(MTL::Viewport{r.x, r.y, r.width, r.height, 0.0, 1.0});
     enc->setRenderPipelineState(presentPipeline_);

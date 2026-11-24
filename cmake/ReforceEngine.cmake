@@ -128,6 +128,11 @@ if(REFORCE_BUILD_TESTS)
     target_compile_definitions(reforce_engine_tests PRIVATE REFORCE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
     add_test(NAME reforce_engine_tests COMMAND reforce_engine_tests)
 
+    # GPU allocations and render passes go through render/GpuPoison.hpp (REFORCE_GPU_POISON).
+    add_test(NAME reforce_gpu_poison_lint
+        COMMAND ${CMAKE_COMMAND} -DSRC_DIR=${CMAKE_CURRENT_SOURCE_DIR}/src
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/gpu_poison_lint.cmake)
+
     # Smoke test: deterministic offscreen render of a synthetic scene written
     # by the test itself (our own config text), checks the PNG is not blank.
     add_executable(reforce_png_check tests/png_check.cpp)
@@ -223,7 +228,7 @@ add_executable(reforce-line-lab tools/line_lab/line_lab.cpp)
 target_compile_options(reforce-line-lab PRIVATE ${REFORCE_WARNINGS})
 target_link_libraries(reforce-line-lab PRIVATE reforce_render)
 if(REFORCE_BUILD_TESTS)
-    add_executable(reforce_render_tests tests/test_main.cpp tests/test_render_lines.cpp tests/test_render_look.cpp
+    add_executable(reforce_render_tests tests/test_main_render.cpp tests/test_render_lines.cpp tests/test_render_look.cpp
         tests/test_render_solids.cpp tests/test_render_models.cpp tests/test_render_edges.cpp tests/test_render_fields.cpp tests/test_render_dancers.cpp tests/test_render_text.cpp)
     target_compile_options(reforce_render_tests PRIVATE ${REFORCE_WARNINGS})
     target_link_libraries(reforce_render_tests PRIVATE reforce_render doctest::doctest)

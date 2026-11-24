@@ -7,6 +7,7 @@
 #include <stdexcept>
 
 #include "engine/Perf.hpp"
+#include "render/GpuPoison.hpp"
 #include "render/ShaderCompiler.hpp"
 
 namespace reforce::render {
@@ -82,7 +83,7 @@ MTL::Texture* VideoMips::acquire(int w, int h) {
     td->setUsage(MTL::TextureUsageRenderTarget | MTL::TextureUsageShaderRead);
     td->setStorageMode(MTL::StorageModePrivate);
     perf::countRenderAlloc();  // once per new size (a new video)
-    MTL::Texture* t = device_->newTexture(td);
+    MTL::Texture* t = makeTexture(device_, td);
     if (t) t->setLabel(NS::String::string("video mips", NS::UTF8StringEncoding));
     return t;
 }
@@ -124,7 +125,7 @@ MTL::Texture* VideoMips::prepare(MTL::CommandBuffer* cmd, const void* slotKey, M
     att->setLevel(0);
     att->setLoadAction(MTL::LoadActionDontCare);
     att->setStoreAction(MTL::StoreActionStore);
-    MTL::RenderCommandEncoder* enc = cmd->renderCommandEncoder(pass);
+    MTL::RenderCommandEncoder* enc = makeRenderEncoder(cmd, pass);
     enc->setLabel(NS::String::string("video downscale", NS::UTF8StringEncoding));
     enc->setRenderPipelineState(pso_);
     enc->setFragmentTexture(frame, 0);

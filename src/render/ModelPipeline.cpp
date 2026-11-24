@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <stdexcept>
 
+#include "render/GpuPoison.hpp"
 #include "render/ImageFiles.hpp"
 #include "render/ShaderCompiler.hpp"
 
@@ -276,7 +277,7 @@ MTL::Texture* solidTexture(MTL::Device* dev, MTL::PixelFormat fmt, const std::ui
     MTL::TextureDescriptor* td = MTL::TextureDescriptor::texture2DDescriptor(fmt, 1, 1, false);
     td->setUsage(MTL::TextureUsageShaderRead);
     td->setStorageMode(MTL::StorageModeShared);
-    MTL::Texture* t = dev->newTexture(td);
+    MTL::Texture* t = makeTexture(dev, td);
     if (!t) throw std::runtime_error("model default texture allocation failed");
     t->replaceRegion(MTL::Region(0, 0, 1, 1), 0, rgba, 4);
     return t;
@@ -367,7 +368,7 @@ ModelPipeline::ModelPipeline(SolidPipeline& solids)
             td->setTextureType(MTL::TextureType2DMultisample);
             td->setSampleCount(NS::UInteger(msaa_));
         }
-        MTL::Texture* t = device_->newTexture(td);
+        MTL::Texture* t = makeTexture(device_, td);
         if (!t) throw std::runtime_error(std::string(label) + " allocation failed");
         t->setLabel(NS::String::string(label, NS::UTF8StringEncoding));
         return t;
@@ -433,7 +434,7 @@ std::shared_ptr<const ModelGpu> ModelPipeline::upload(const engine::Model& model
         td->setMipmapLevelCount(NS::UInteger(levels));
         td->setUsage(MTL::TextureUsageShaderRead);
         td->setStorageMode(MTL::StorageModeShared);
-        MTL::Texture* t = device_->newTexture(td);
+        MTL::Texture* t = makeTexture(device_, td);
         if (!t) {
             g->warnings_.push_back("texture allocation failed: " + mt.name);
             g->textures_.push_back(nullptr);
@@ -507,7 +508,7 @@ void ModelPipeline::drawModel(MTL::CommandBuffer* cmd, const ModelDraw& d, bool 
     da->setStoreAction(MTL::StoreActionDontCare);
     pass->setRenderTargetWidth(NS::UInteger(bw));
     pass->setRenderTargetHeight(NS::UInteger(bh));
-    MTL::RenderCommandEncoder* enc = cmd->renderCommandEncoder(pass);
+    MTL::RenderCommandEncoder* enc = makeRenderEncoder(cmd, pass);
     enc->setLabel(NS::String::string(label, NS::UTF8StringEncoding));
     const int W = int(width_), H = int(height_);
     enc->setViewport(MTL::Viewport{0.0, 0.0, double(W), double(H), 0.0, 1.0});
@@ -658,7 +659,7 @@ void ModelPipeline::encodeColor(MTL::CommandBuffer* cmd, MTL::Texture* output, c
         a->setTexture(target);
         a->setLoadAction(load);
         a->setStoreAction(MTL::StoreActionStore);
-        MTL::RenderCommandEncoder* enc = cmd->renderCommandEncoder(rp);
+        MTL::RenderCommandEncoder* enc = makeRenderEncoder(cmd, rp);
         enc->setLabel(NS::String::string(label, NS::UTF8StringEncoding));
         return enc;
     };

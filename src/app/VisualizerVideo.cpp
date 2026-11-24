@@ -28,6 +28,7 @@
 #include "scene/SceneFile.hpp"
 
 #include "app/VisualizerInternal.hpp"
+#include "render/GpuPoison.hpp"
 
 namespace reforce::app {
 using engine::Layer;
@@ -237,7 +238,7 @@ void Visualizer::uploadBodyMask(const std::vector<std::uint8_t>& mask, int w, in
         td->setStorageMode(MTL::StorageModeShared);
         for (auto& tex : maskTex_) {
             perf::countRenderAlloc();  // once per mask size
-            tex = pipeline_->device()->newTexture(td);
+            tex = render::makeTexture(pipeline_->device(), td);
             if (!tex) {
                 releaseBodyMasks();
                 return;

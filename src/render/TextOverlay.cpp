@@ -11,6 +11,7 @@
 #include <stdexcept>
 
 #include "engine/Perf.hpp"
+#include "render/GpuPoison.hpp"
 #include "render/ShaderCompiler.hpp"
 
 namespace reforce::render {
@@ -389,7 +390,7 @@ void TextOverlay::worker() {
                 MTL::PixelFormatBGRA8Unorm, NS::UInteger(img.width), NS::UInteger(img.height), false);
             td->setUsage(MTL::TextureUsageShaderRead);
             td->setStorageMode(MTL::StorageModeShared);
-            done.tex = device_->newTexture(td);
+            done.tex = makeTexture(device_, td);
             if (done.tex)
                 done.tex->replaceRegion(MTL::Region(0, 0, NS::UInteger(img.width), NS::UInteger(img.height)), 0,
                                         img.bgra.data(), NS::UInteger(img.width) * 4);
@@ -441,7 +442,8 @@ void TextOverlay::encode(MTL::CommandBuffer* cmd, MTL::Texture* output, const Dr
             MTL::TextureDescriptor* td = MTL::TextureDescriptor::texture2DDescriptor(MTL::PixelFormatR16Float, lw, lh, false);
             td->setUsage(MTL::TextureUsageRenderTarget | MTL::TextureUsageShaderRead);
             td->setStorageMode(MTL::StorageModePrivate);
-            lum_ = device_->newTexture(td);
+            lum_ = makeTexture(device_, td);
+            if (lum_) lum_->setLabel(NS::String::string("text shadow luminance average", NS::UTF8StringEncoding));
             perf::countRenderAlloc();  // once (and on an output size change)
             lumFresh_ = true;
         }
@@ -454,7 +456,7 @@ void TextOverlay::encode(MTL::CommandBuffer* cmd, MTL::Texture* output, const Dr
             la->setLoadAction(lumFresh_ ? MTL::LoadActionClear : MTL::LoadActionLoad);
             la->setClearColor(MTL::ClearColor(0, 0, 0, 1));
             la->setStoreAction(MTL::StoreActionStore);
-            MTL::RenderCommandEncoder* le = cmd->renderCommandEncoder(lp);
+            MTL::RenderCommandEncoder* le = makeRenderEncoder(cmd, lp);
             le->setLabel(NS::String::string("text shadow luminance", NS::UTF8StringEncoding));
             le->setRenderPipelineState(lumPso_);
             const float c = lumFresh_ ? 1.0f : float(1.0 - std::exp(-std::max(0.0, dt) / 0.25));
@@ -470,7 +472,7 @@ void TextOverlay::encode(MTL::CommandBuffer* cmd, MTL::Texture* output, const Dr
     att->setTexture(output);
     att->setLoadAction(MTL::LoadActionLoad);
     att->setStoreAction(MTL::StoreActionStore);
-    MTL::RenderCommandEncoder* enc = cmd->renderCommandEncoder(pass);
+    MTL::RenderCommandEncoder* enc = makeRenderEncoder(cmd, pass);
     enc->setLabel(NS::String::string("text overlay", NS::UTF8StringEncoding));
     enc->setRenderPipelineState(pso_);
     for (int i = 0; i < count; ++i) {

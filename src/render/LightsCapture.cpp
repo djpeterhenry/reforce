@@ -1,4 +1,5 @@
 #include "render/LightsCapture.hpp"
+#include "render/GpuPoison.hpp"
 
 #include <Metal/Metal.hpp>
 
@@ -36,9 +37,9 @@ LightsCapture::LightsCapture(MTL::Device* device, std::uint32_t width, std::uint
         MTL::TextureDescriptor::texture2DDescriptor(MTL::PixelFormatBGRA8Unorm, width, height, true);
     td->setUsage(MTL::TextureUsageShaderRead);
     td->setStorageMode(MTL::StorageModePrivate);
-    s_->tex = device->newTexture(td);
+    s_->tex = makeTexture(device, td);
     for (auto& b : s_->buffers)
-        b = device->newBuffer(NS::UInteger(s_->rowBytes) * NS::UInteger(s_->gh), MTL::ResourceStorageModeShared);
+        b = makeBuffer(device, NS::UInteger(s_->rowBytes) * NS::UInteger(s_->gh), MTL::ResourceStorageModeShared);
     for (auto& b : s_->busy) b.store(false);
 }
 

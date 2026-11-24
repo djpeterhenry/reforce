@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <string>
 
+#include "render/GpuPoison.hpp"
 #include "render/ShaderCompiler.hpp"
 
 namespace reforce::render {
@@ -70,7 +71,7 @@ Downsampler::Downsampler(MTL::Device* device, std::uint32_t outW, std::uint32_t 
         MTL::TextureDescriptor* td = MTL::TextureDescriptor::texture2DDescriptor(MTL::PixelFormatBGRA8Unorm, outW, outH, false);
         td->setUsage(MTL::TextureUsageRenderTarget | MTL::TextureUsageShaderRead);
         td->setStorageMode(MTL::StorageModePrivate);
-        out_[i] = device->newTexture(td);
+        out_[i] = makeTexture(device, td);
         if (!out_[i]) throw std::runtime_error("supersample output allocation failed");
         out_[i]->setLabel(NS::String::string("supersampled frame", NS::UTF8StringEncoding));
     }
@@ -89,7 +90,7 @@ MTL::Texture* Downsampler::encode(MTL::CommandBuffer* cmd, MTL::Texture* src, in
     a->setTexture(out);
     a->setLoadAction(MTL::LoadActionDontCare);
     a->setStoreAction(MTL::StoreActionStore);
-    MTL::RenderCommandEncoder* enc = cmd->renderCommandEncoder(pass);
+    MTL::RenderCommandEncoder* enc = makeRenderEncoder(cmd, pass);
     enc->setLabel(NS::String::string("supersample downsample", NS::UTF8StringEncoding));
     enc->setRenderPipelineState(pso_);
     enc->setFragmentTexture(src, 0);

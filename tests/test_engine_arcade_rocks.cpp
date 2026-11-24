@@ -45,7 +45,8 @@ struct Driver {
         st.dt = dt;
         st.audio = &a;
         std::vector<LineSegment> out;
-        OrganicCanvas c(map, LineStyle{}, out, 0, 0, 1, 0);
+        const LineStyle style;
+        OrganicCanvas c(map, style, out, 0, 0, 1, 0);
         body->step(st, c);
         return out;
     }

@@ -10,6 +10,7 @@
 #include <chrono>
 #include <cstdio>
 
+#include "render/GpuPoison.hpp"
 #include "render/Renderer.hpp"
 
 namespace reforce::render {
@@ -35,7 +36,7 @@ Presenter::Presenter(MTL::Device* device, const Renderer& renderer)
         MTL::PixelFormatBGRA8Unorm, renderer.width(), renderer.height(), false);
     td->setUsage(MTL::TextureUsageShaderRead);
     td->setStorageMode(MTL::StorageModePrivate);
-    for (auto& s : slots_) s = device->newTexture(td);
+    for (auto& s : slots_) s = makeTexture(device, td);
 }
 
 Presenter::~Presenter() {

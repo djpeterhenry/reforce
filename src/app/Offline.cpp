@@ -12,6 +12,7 @@
 #include "app/AudioDriver.hpp"
 #include "app/Director.hpp"
 #include "app/Visualizer.hpp"
+#include "render/GpuPoison.hpp"
 #include "render/ImageFiles.hpp"
 
 namespace reforce::app {
@@ -32,9 +33,10 @@ int runOffline(MTL::Device* device, unsigned width, unsigned height, const Offli
                                                                              height, false);
     td->setUsage(MTL::TextureUsageRenderTarget | MTL::TextureUsageShaderRead);
     td->setStorageMode(device->hasUnifiedMemory() ? MTL::StorageModeShared : MTL::StorageModeManaged);
-    MTL::Texture* target = device->newTexture(td);
+    MTL::Texture* target = render::makeTexture(device, td);
 
     vis.waitForField();  // deterministic: frame 0 already flows
+    render::poison::startChecks();  // REFORCE_GPU_POISON: NaN check after every frame
 
     std::vector<std::uint8_t> pixels(std::size_t(width) * height * 4);
     double cpuSum = 0, gpuSum = 0, gpuMax = 0, cpuMax = 0;
@@ -71,6 +73,11 @@ int runOffline(MTL::Device* device, unsigned width, unsigned height, const Offli
         if (cmd->status() == MTL::CommandBufferStatusError) {
             std::fprintf(stderr, "[reforce] GPU error at frame %d: %s\n", f,
                          cmd->error() ? cmd->error()->localizedDescription()->utf8String() : "?");
+            pool->release();
+            return 1;
+        }
+        if (const auto nan = render::poison::check(); !nan.empty()) {
+            for (const auto& line : nan) std::fprintf(stderr, "[reforce] GPU poison, frame %d: %s\n", f, line.c_str());
             pool->release();
             return 1;
         }

@@ -29,6 +29,8 @@ class OrganicCanvas {
 public:
     OrganicCanvas(const FrameMapping& map, const LineStyle& style, std::vector<LineSegment>& out, double x, double y,
                   double scale, double rot);
+    // Keeps references to map, style and out: a temporary style would dangle (ASan found one in a test).
+    OrganicCanvas(const FrameMapping&, LineStyle&&, std::vector<LineSegment>&, double, double, double, double) = delete;
     // Widths in LWdt units (scaled with Scal); pens 0..1. Off-frame or non-finite points are skipped.
     void line(double x0, double y0, double x1, double y1, double width, double pen0, double pen1);
     void line(double x0, double y0, double x1, double y1, double width, double pen) {

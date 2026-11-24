@@ -26,6 +26,18 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 option(REFORCE_BUILD_TESTS "Build unit tests (doctest)" ON)
 option(REFORCE_BUILD_PROBE "Build the reforce-syphon-probe helper" ON)
 
+# Sanitizer builds (scripts/check.sh): e.g. address,undefined or thread. Uninitialized stack variables are filled
+# with a pattern (0xAA...) so code reading them misbehaves the same way every run (clang has no MemorySanitizer on
+# macOS); UBSan findings abort instead of only printing.
+set(REFORCE_SANITIZE "" CACHE STRING "Clang sanitizers to build with (-fsanitize=...), empty for none")
+if(REFORCE_SANITIZE)
+    add_compile_options(-fsanitize=${REFORCE_SANITIZE} -fno-omit-frame-pointer -ftrivial-auto-var-init=pattern)
+    add_link_options(-fsanitize=${REFORCE_SANITIZE})
+    if(REFORCE_SANITIZE MATCHES "undefined")
+        add_compile_options(-fno-sanitize-recover=undefined)
+    endif()
+endif()
+
 include(cmake/Dependencies.cmake)   # metal-cpp, Syphon, doctest (FetchContent, pinned)
 
 set(REFORCE_WARNINGS -Wall -Wextra -Wno-unused-parameter)
@@ -51,6 +63,7 @@ add_library(reforce_render STATIC
     src/render/MetalCppImpl.cpp
     src/render/Presenter.cpp
     src/render/Renderer.cpp
+    src/render/GpuPoison.cpp
     src/render/ShaderCompiler.cpp
 )
 target_include_directories(reforce_render PUBLIC src)

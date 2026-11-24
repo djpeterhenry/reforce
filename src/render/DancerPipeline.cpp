@@ -12,6 +12,7 @@
 #include <string>
 
 #include "engine/Perf.hpp"
+#include "render/GpuPoison.hpp"
 #include "render/ShaderCompiler.hpp"
 
 namespace reforce::render {
@@ -804,7 +805,7 @@ DancerPipeline::DancerPipeline(MTL::Device* device, uint32_t width, uint32_t hei
                                   MTL::ResourceStorageModeShared);
     if (!mesh_ || !meshIdx_) throw std::runtime_error("dancer mesh allocation failed");
     for (int i = 0; i < 8; ++i) {
-        MTL::Buffer* b = device_->newBuffer(NS::UInteger(maxParts_) * sizeof(Inst), MTL::ResourceStorageModeShared);
+        MTL::Buffer* b = makeBuffer(device_, NS::UInteger(maxParts_) * sizeof(Inst), MTL::ResourceStorageModeShared);
         if (!b) throw std::runtime_error("dancer instance buffer allocation failed");
         b->setLabel(NS::String::string("dancer instances", NS::UTF8StringEncoding));
         ring_.push_back(b);
@@ -845,7 +846,7 @@ DancerPipeline::DancerPipeline(MTL::Device* device, uint32_t width, uint32_t hei
             td->setUsage(MTL::TextureUsageRenderTarget | MTL::TextureUsageShaderRead);
             td->setStorageMode(MTL::StorageModePrivate);
         }
-        MTL::Texture* t = device_->newTexture(td);
+        MTL::Texture* t = makeTexture(device_, td);
         if (!t) throw std::runtime_error(std::string(label) + " allocation failed");
         t->setLabel(NS::String::string(label, NS::UTF8StringEncoding));
         return t;
@@ -865,7 +866,7 @@ DancerPipeline::DancerPipeline(MTL::Device* device, uint32_t width, uint32_t hei
                                                                                  false);
         td->setUsage(MTL::TextureUsageRenderTarget);
         td->setStorageMode(memoryless ? MTL::StorageModeMemoryless : MTL::StorageModePrivate);
-        reflectDepth_ = device_->newTexture(td);
+        reflectDepth_ = makeTexture(device_, td);
         if (!reflectDepth_) throw std::runtime_error("dancer reflection depth allocation failed");
     }
 }
@@ -939,7 +940,7 @@ bool DancerPipeline::encode(MTL::CommandBuffer* cmd, MTL::Texture* output, const
         att->setTexture(light_);
         att->setLoadAction(MTL::LoadActionDontCare);
         att->setStoreAction(MTL::StoreActionStore);
-        MTL::RenderCommandEncoder* enc = cmd->renderCommandEncoder(pass);
+        MTL::RenderCommandEncoder* enc = makeRenderEncoder(cmd, pass);
         enc->setLabel(NS::String::string("dancer light", NS::UTF8StringEncoding));
         enc->setRenderPipelineState(lightPso_);
         enc->setFragmentTexture(output, 0);
@@ -965,7 +966,7 @@ bool DancerPipeline::encode(MTL::CommandBuffer* cmd, MTL::Texture* output, const
         da->setLoadAction(MTL::LoadActionClear);
         da->setClearDepth(1.0);
         da->setStoreAction(MTL::StoreActionDontCare);
-        MTL::RenderCommandEncoder* enc = cmd->renderCommandEncoder(pass);
+        MTL::RenderCommandEncoder* enc = makeRenderEncoder(cmd, pass);
         enc->setLabel(NS::String::string("dancer reflection", NS::UTF8StringEncoding));
         enc->setFrontFacingWinding(MTL::WindingCounterClockwise);
         enc->setRenderPipelineState(reflectPso_);
@@ -1014,7 +1015,7 @@ bool DancerPipeline::encode(MTL::CommandBuffer* cmd, MTL::Texture* output, const
         da->setLoadAction(MTL::LoadActionClear);
         da->setClearDepth(1.0);
         da->setStoreAction(MTL::StoreActionDontCare);
-        MTL::RenderCommandEncoder* enc = cmd->renderCommandEncoder(pass);
+        MTL::RenderCommandEncoder* enc = makeRenderEncoder(cmd, pass);
         enc->setLabel(NS::String::string("dancers", NS::UTF8StringEncoding));
         enc->setFrontFacingWinding(MTL::WindingCounterClockwise);
         // Floor and shadows (no depth: everything else stands on it).
@@ -1059,7 +1060,7 @@ bool DancerPipeline::encode(MTL::CommandBuffer* cmd, MTL::Texture* output, const
         att->setTexture(output);
         att->setLoadAction(MTL::LoadActionLoad);
         att->setStoreAction(MTL::StoreActionStore);
-        MTL::RenderCommandEncoder* enc = cmd->renderCommandEncoder(pass);
+        MTL::RenderCommandEncoder* enc = makeRenderEncoder(cmd, pass);
         enc->setLabel(NS::String::string("dancer composite", NS::UTF8StringEncoding));
         const float opacity = std::clamp(st.opacity, 0.0f, 1.0f);
         enc->setRenderPipelineState(compositePso_);

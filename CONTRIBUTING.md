@@ -30,6 +30,14 @@ ctest --test-dir build
 GitHub Actions runs the same build and tests on every pull request (`.github/workflows/ci.yml`). Its GPU is virtual,
 so time budgets in the tests (`tests/PerfBudget.hpp`) are reported there but not enforced.
 
+`scripts/check.sh` runs the tests again with checks for undefined behavior and uninitialized memory: `poison`
+(new GPU textures, buffers and `DontCare` loads filled with NaN / magenta, and float textures checked for NaN
+afterward, so reading undefined GPU memory fails on every Mac rather than only on some GPUs; plus heap scribbling and
+Metal API and shader validation), `asan` (AddressSanitizer + UndefinedBehaviorSanitizer in `build-asan/`) and `tsan`
+(ThreadSanitizer in `build-tsan/`). New GPU textures, buffers and render passes go through
+`src/render/GpuPoison.hpp` (`makeTexture`, `makeBuffer`, `makeRenderEncoder`); a test fails on direct calls.
+`REFORCE_GPU_POISON=1` also works on the app itself, to look for magenta on screen.
+
 A development build reads `content/` straight from your checkout, so a scene file edit shows on the next start
 without a rebuild. To try a scene, start it from the control panel (`Cmd+K`), or render it offline to PNGs:
 

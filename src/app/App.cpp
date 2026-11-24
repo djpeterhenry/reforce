@@ -14,15 +14,16 @@
 #include "app/Director.hpp"
 #include "app/Hotkeys.hpp"
 #include "app/Visualizer.hpp"
+#include "audio/Analyzer.hpp"
+#include "audio/CoreAudioInput.hpp"
 #include "engine/Blend.hpp"
 #include "engine/Commands.hpp"
 #include "engine/Log.hpp"
-#include "audio/Analyzer.hpp"
-#include "audio/CoreAudioInput.hpp"
 #include "platform/SyphonPublisher.hpp"
+#include "render/Downsample.hpp"
+#include "render/GpuPoison.hpp"
 #include "render/Presenter.hpp"
 #include "render/Renderer.hpp"
-#include "render/Downsample.hpp"
 #include "sync/DeckFeed.hpp"
 #include "sync/LinkClock.hpp"
 #include "video/VideoSource.hpp"
@@ -178,7 +179,7 @@ void App::onFrame(const platform::FrameInfo& frame) {
             td->setUsage(MTL::TextureUsageRenderTarget | MTL::TextureUsageShaderRead);
             td->setStorageMode(MTL::StorageModePrivate);
             perf::countRenderAlloc();  // once, when the option is first used
-            windowFrame_ = device_->newTexture(td);
+            windowFrame_ = render::makeTexture(device_, td);
         }
         return windowFrame_;
     };
@@ -235,7 +236,7 @@ void App::onFrame(const platform::FrameInfo& frame) {
             td->setUsage(MTL::TextureUsageRenderTarget | MTL::TextureUsageShaderRead);
             td->setStorageMode(MTL::StorageModePrivate);
             perf::countRenderAlloc();  // once, when the option is first used
-            syphonFrame_ = device_->newTexture(td);
+            syphonFrame_ = render::makeTexture(device_, td);
         }
         if (syphonFrame_) {
             director_->visualizer().encodeSyphonAlpha(cmd, published, syphonFrame_);

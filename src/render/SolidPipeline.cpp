@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <stdexcept>
 
+#include "render/GpuPoison.hpp"
 #include "render/ScenePipeline.hpp"
 #include "render/ShaderCompiler.hpp"
 
@@ -714,7 +715,7 @@ SolidPipeline::SolidPipeline(ScenePipeline& scene, const SolidPipelineOptions& o
                 MTL::TextureDescriptor::texture2DDescriptor(MTL::PixelFormatBGRA8Unorm, hw, hh, false);
             td->setUsage(MTL::TextureUsageRenderTarget | MTL::TextureUsageShaderRead);
             td->setStorageMode(MTL::StorageModePrivate);
-            MTL::Texture* t = device_->newTexture(td);
+            MTL::Texture* t = makeTexture(device_, td);
             if (!t) throw std::runtime_error(std::string(label) + " allocation failed");
             t->setLabel(NS::String::string(label, NS::UTF8StringEncoding));
             return t;
@@ -749,7 +750,7 @@ SolidPipeline::SolidPipeline(ScenePipeline& scene, const SolidPipelineOptions& o
             MTL::PixelFormatR8Unorm, NS::UInteger(tileSize_), NS::UInteger(tileSize_), true);
         td->setUsage(MTL::TextureUsageRenderTarget | MTL::TextureUsageShaderRead);
         td->setStorageMode(MTL::StorageModePrivate);
-        MTL::Texture* t = device_->newTexture(td);
+        MTL::Texture* t = makeTexture(device_, td);
         if (!t) throw std::runtime_error(std::string(label) + " allocation failed");
         t->setLabel(NS::String::string(label, NS::UTF8StringEncoding));
         return t;
@@ -772,7 +773,7 @@ SolidPipeline::SolidPipeline(ScenePipeline& scene, const SolidPipelineOptions& o
             td->setTextureType(MTL::TextureType2DMultisample);
             td->setSampleCount(NS::UInteger(msaa_));
         }
-        MTL::Texture* t = device_->newTexture(td);
+        MTL::Texture* t = makeTexture(device_, td);
         if (!t) throw std::runtime_error(std::string("solid ") + label + " allocation failed");
         t->setLabel(NS::String::string(label, NS::UTF8StringEncoding));
         return t;
@@ -787,7 +788,7 @@ SolidPipeline::SolidPipeline(ScenePipeline& scene, const SolidPipelineOptions& o
         td->setUsage(MTL::TextureUsageRenderTarget | MTL::TextureUsageShaderRead);
         td->setStorageMode(MTL::StorageModePrivate);
         Slot s;
-        s.tex = device_->newTexture(td);
+        s.tex = makeTexture(device_, td);
         if (!s.tex) throw std::runtime_error("solid target allocation failed");
         s.tex->setLabel(NS::String::string("solid target", NS::UTF8StringEncoding));
         s.handle = scene_.addSolidTexture(s.tex);
@@ -837,7 +838,7 @@ void SolidPipeline::encodeFrameTile(MTL::CommandBuffer* cmd) {
     att->setTexture(frameTile_);
     att->setLoadAction(MTL::LoadActionDontCare);
     att->setStoreAction(MTL::StoreActionStore);
-    MTL::RenderCommandEncoder* enc = cmd->renderCommandEncoder(pass);
+    MTL::RenderCommandEncoder* enc = makeRenderEncoder(cmd, pass);
     enc->setLabel(NS::String::string("solid frame tile", NS::UTF8StringEncoding));
     enc->setRenderPipelineState(framePso_);
     enc->setFragmentTexture(src, 0);
@@ -973,7 +974,7 @@ SolidQuad SolidPipeline::encode(MTL::CommandBuffer* cmd, int slot, const SolidDr
     da->setStoreAction(MTL::StoreActionDontCare);
     pass->setRenderTargetWidth(NS::UInteger(bw));
     pass->setRenderTargetHeight(NS::UInteger(bh));
-    MTL::RenderCommandEncoder* enc = cmd->renderCommandEncoder(pass);
+    MTL::RenderCommandEncoder* enc = makeRenderEncoder(cmd, pass);
     enc->setLabel(NS::String::string("solid", NS::UTF8StringEncoding));
     enc->setViewport(MTL::Viewport{0.0, 0.0, double(W), double(H), 0.0, 1.0});
     enc->setScissorRect(MTL::ScissorRect{0, 0, NS::UInteger(bw), NS::UInteger(bh)});
@@ -1073,7 +1074,7 @@ void SolidPipeline::encodeGlass(MTL::CommandBuffer* cmd, MTL::Texture* output, c
         a->setTexture(target);
         a->setLoadAction(load);
         a->setStoreAction(MTL::StoreActionStore);
-        MTL::RenderCommandEncoder* enc = cmd->renderCommandEncoder(rp);
+        MTL::RenderCommandEncoder* enc = makeRenderEncoder(cmd, rp);
         enc->setLabel(NS::String::string(label, NS::UTF8StringEncoding));
         return enc;
     };
@@ -1132,7 +1133,7 @@ void SolidPipeline::encodeGlass(MTL::CommandBuffer* cmd, MTL::Texture* output, c
         da->setLoadAction(MTL::LoadActionClear);
         da->setClearDepth(1.0);
         da->setStoreAction(MTL::StoreActionDontCare);
-        MTL::RenderCommandEncoder* enc = cmd->renderCommandEncoder(rp);
+        MTL::RenderCommandEncoder* enc = makeRenderEncoder(cmd, rp);
         enc->setLabel(NS::String::string("glass buttons", NS::UTF8StringEncoding));
         enc->setRenderPipelineState(glassPso_);
         enc->setDepthStencilState(depth_);

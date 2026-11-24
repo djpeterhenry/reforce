@@ -34,7 +34,7 @@ target_link_options(reforce-gen-videos PRIVATE -ObjC)
 
 if(REFORCE_BUILD_TESTS)
     enable_testing()
-    add_executable(reforce_video_tests tests/test_main.cpp tests/test_video.cpp)
+    add_executable(reforce_video_tests tests/test_main_render.cpp tests/test_video.cpp)
     target_compile_options(reforce_video_tests PRIVATE ${REFORCE_WARNINGS})
     target_link_libraries(reforce_video_tests PRIVATE reforce_video reforce_render reforce_platform doctest::doctest)
     target_link_options(reforce_video_tests PRIVATE -ObjC)

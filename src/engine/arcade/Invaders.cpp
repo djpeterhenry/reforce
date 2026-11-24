@@ -116,7 +116,8 @@ public:
     void step(const OrganicStep& s, OrganicCanvas& c) override {
         if (const double hw = std::clamp(c.halfWidth(), 0.25, 8.0); hw != fitW_) fit(hw);  // the frame's aspect
         const double beat = std::clamp(finiteOr(s.beat, 0), -1e12, 1e12);
-        const double bar = finiteOr(s.bar, beat / 4);
+        // Clamped like beat: barAt() turns bars into int64 wave / phrase numbers (UBSan: 1e298 does not fit).
+        const double bar = std::clamp(finiteOr(s.bar, beat / 4), -1e12, 1e12);
         barOff_ = bar - beat / 4;
         const std::int64_t now = std::int64_t(std::floor(beat * kTicksPerBeat));
         const double build = buildOf(s), drop = dropOf(s);

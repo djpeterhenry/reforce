@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <string>
 
+#include "render/GpuPoison.hpp"
 #include "render/ScenePipeline.hpp"
 #include "render/ShaderCompiler.hpp"
 
@@ -286,7 +287,7 @@ MTL::Texture* newTarget(MTL::Device* dev, MTL::PixelFormat fmt, uint32_t w, uint
     MTL::TextureDescriptor* td = MTL::TextureDescriptor::texture2DDescriptor(fmt, w, h, false);
     td->setUsage(MTL::TextureUsageRenderTarget | MTL::TextureUsageShaderRead);
     td->setStorageMode(MTL::StorageModePrivate);
-    MTL::Texture* t = dev->newTexture(td);
+    MTL::Texture* t = makeTexture(dev, td);
     if (!t) throw std::runtime_error(std::string(label) + " allocation failed");
     t->setLabel(NS::String::string(label, NS::UTF8StringEncoding));
     return t;
@@ -300,7 +301,7 @@ void fullScreen(MTL::CommandBuffer* cmd, MTL::Texture* target, MTL::RenderPipeli
     att->setTexture(target);
     att->setLoadAction(MTL::LoadActionDontCare);
     att->setStoreAction(MTL::StoreActionStore);
-    MTL::RenderCommandEncoder* enc = cmd->renderCommandEncoder(pass);
+    MTL::RenderCommandEncoder* enc = makeRenderEncoder(cmd, pass);
     enc->setLabel(NS::String::string(label, NS::UTF8StringEncoding));
     enc->setRenderPipelineState(pso);
     if (scale < 1.0) {
@@ -347,7 +348,7 @@ FieldPipeline::FieldPipeline(ScenePipeline& scene, const FieldPipelineOptions& o
         s.undo.reserve(kMaxDrops);
         s.tex = newTarget(device_, MTL::PixelFormatRG8Unorm, width_, height_, "organic field target");
         for (auto& b : s.ref) {
-            b = device_->newBuffer(NS::UInteger((kMaxRef + 1) * 2 * sizeof(float)), MTL::ResourceStorageModeShared);
+            b = makeBuffer(device_, NS::UInteger((kMaxRef + 1) * 2 * sizeof(float)), MTL::ResourceStorageModeShared);
             if (!b) throw std::runtime_error("mandel reference buffer allocation failed");
         }
         for (auto& h : s.h)
@@ -390,7 +391,7 @@ void FieldPipeline::clearFields(MTL::CommandBuffer* cmd, int slot) {
         att->setLoadAction(MTL::LoadActionClear);
         att->setClearColor(MTL::ClearColor(0, 0, 0, 0));
         att->setStoreAction(MTL::StoreActionStore);
-        MTL::RenderCommandEncoder* enc = cmd->renderCommandEncoder(pass);
+        MTL::RenderCommandEncoder* enc = makeRenderEncoder(cmd, pass);
         enc->setLabel(NS::String::string("ripple clear", NS::UTF8StringEncoding));
         enc->endEncoding();
     }

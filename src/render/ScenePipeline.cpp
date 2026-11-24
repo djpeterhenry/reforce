@@ -10,6 +10,7 @@
 
 #include "engine/Perf.hpp"
 #include "engine/Sprites.hpp"
+#include "render/GpuPoison.hpp"
 #include "render/ShaderCompiler.hpp"
 
 namespace reforce::render {
@@ -892,7 +893,7 @@ MTL::RenderCommandEncoder* beginPass(MTL::CommandBuffer* cmd, MTL::Texture* targ
     att->setLoadAction(load);
     att->setClearColor(MTL::ClearColor(0, 0, 0, 1));
     att->setStoreAction(MTL::StoreActionStore);
-    MTL::RenderCommandEncoder* enc = cmd->renderCommandEncoder(pass);
+    MTL::RenderCommandEncoder* enc = makeRenderEncoder(cmd, pass);
     enc->setLabel(NS::String::string(label, NS::UTF8StringEncoding));
     return enc;
 }
@@ -926,7 +927,7 @@ MTL::Texture* TexturePool::make() {
         MTL::TextureDescriptor::texture2DDescriptor(MTL::PixelFormat(format_), width_, height_, false);
     td->setUsage(MTL::TextureUsageShaderRead | (renderTarget_ ? MTL::TextureUsageRenderTarget : 0));
     td->setStorageMode(device_->hasUnifiedMemory() ? MTL::StorageModeShared : MTL::StorageModeManaged);
-    MTL::Texture* tex = device_->newTexture(td);
+    MTL::Texture* tex = makeTexture(device_, td);
     if (!tex) throw std::runtime_error(std::string(label_) + " texture allocation failed");
     tex->setLabel(NS::String::string(label_, NS::UTF8StringEncoding));
     created_.fetch_add(1);
@@ -1019,7 +1020,7 @@ ScenePipeline::ScenePipeline(MTL::Device* device, uint32_t width, uint32_t heigh
         MTL::TextureDescriptor* sd = MTL::TextureDescriptor::texture2DDescriptor(kScratchFormat, width, height, false);
         sd->setUsage(MTL::TextureUsageRenderTarget);
         sd->setStorageMode(MTL::StorageModeMemoryless);
-        scratch_ = device->newTexture(sd);
+        scratch_ = makeTexture(device, sd);
         if (!scratch_) throw std::runtime_error("line AA scratch texture allocation failed");
     } else if (opts_.lineAa == LineAa::Msaa4) {
         MTL::SamplePosition pos[4];
@@ -1057,7 +1058,7 @@ ScenePipeline::ScenePipeline(MTL::Device* device, uint32_t width, uint32_t heigh
         MTL::TextureDescriptor* md = MTL::TextureDescriptor::texture2DDescriptor(MTL::PixelFormatR32Float, 1, 1, false);
         md->setUsage(MTL::TextureUsageShaderRead);
         md->setStorageMode(device->hasUnifiedMemory() ? MTL::StorageModeShared : MTL::StorageModeManaged);
-        dummyMask_ = device->newTexture(md);
+        dummyMask_ = makeTexture(device, md);
         const float zero = 0.f;
         dummyMask_->replaceRegion(MTL::Region(0, 0, 1, 1), 0, &zero, 4);
     }
@@ -1074,7 +1075,7 @@ ScenePipeline::ScenePipeline(MTL::Device* device, uint32_t width, uint32_t heigh
     (void)fmt;
     // Line buffers: 2 frames in flight x up to 4 catch-up steps.
     for (int i = 0; i < 8; ++i) {
-        LineBuffer lb{device->newBuffer(NS::UInteger(1u << 20),
+        LineBuffer lb{makeBuffer(device, NS::UInteger(1u << 20),
                                         MTL::ResourceStorageModeShared | MTL::ResourceCPUCacheModeWriteCombined),
                       std::make_shared<std::atomic<bool>>(false)};
         if (!lb.buf) throw std::runtime_error("line buffer allocation failed");
@@ -1192,7 +1193,7 @@ ScenePipeline::FormatSet ScenePipeline::makeFormatSet(IntensityFormat f) const {
         sd->setStorageMode(MTL::StorageModeMemoryless);
         sd->setTextureType(MTL::TextureType2DMultisample);
         sd->setSampleCount(4);
-        s.msaa = device->newTexture(sd);
+        s.msaa = makeTexture(device, sd);
         if (!s.msaa) throw std::runtime_error("line AA MSAA texture allocation failed");
         PsoLayout ms{MTL::PixelFormatInvalid, false, 4};
         s.flowMsaa = makePso(device, lib, "scene_fullscreen_vs", "flow_fs", fmt, BlendNone, "flow (MSAA)", ms);
@@ -1228,7 +1229,7 @@ MTL::Texture* ScenePipeline::newIntensityTexture(IntensityFormat f, const char* 
     MTL::TextureDescriptor* td = MTL::TextureDescriptor::texture2DDescriptor(intensityFormat(f), width_, height_, false);
     td->setUsage(MTL::TextureUsageRenderTarget | MTL::TextureUsageShaderRead);
     td->setStorageMode(MTL::StorageModePrivate);
-    MTL::Texture* t = device_->newTexture(td);
+    MTL::Texture* t = makeTexture(device_, td);
     if (!t) throw std::runtime_error("intensity texture allocation failed");
     t->setLabel(NS::String::string(label, NS::UTF8StringEncoding));
     return t;
@@ -1314,7 +1315,7 @@ MTL::Texture* ScenePipeline::createSpriteTexture(MTL::Device* device, const std:
         MTL::PixelFormatRG8Unorm, NS::UInteger(width), NS::UInteger(height), levels > 1);
     td->setUsage(MTL::TextureUsageShaderRead);
     td->setStorageMode(device->hasUnifiedMemory() ? MTL::StorageModeShared : MTL::StorageModeManaged);
-    MTL::Texture* tex = device->newTexture(td);
+    MTL::Texture* tex = makeTexture(device, td);
     if (!tex) return nullptr;
     tex->setLabel(NS::String::string("sprite", NS::UTF8StringEncoding));
     tex->replaceRegion(MTL::Region(0, 0, NS::UInteger(width), NS::UInteger(height)), 0, la,
@@ -1411,7 +1412,7 @@ void ScenePipeline::enableTileLines(int extraLineBuffers) {
     if (tileLinePso_) return;
     tileLinePso_ = makePso(device_, lib_, "line_vs", "line_fs", MTL::PixelFormatR8Unorm, BlendOver, "lines (solid tile)");
     for (int i = 0; i < extraLineBuffers; ++i) {
-        LineBuffer lb{device_->newBuffer(NS::UInteger(1u << 20),
+        LineBuffer lb{makeBuffer(device_, NS::UInteger(1u << 20),
                                          MTL::ResourceStorageModeShared | MTL::ResourceCPUCacheModeWriteCombined),
                       std::make_shared<std::atomic<bool>>(false)};
         if (!lb.buf) throw std::runtime_error("line buffer allocation failed");
@@ -1428,7 +1429,7 @@ void ScenePipeline::encodeTileLines(MTL::CommandBuffer* cmd, MTL::Texture* tile,
     att->setLoadAction(MTL::LoadActionClear);
     att->setClearColor(MTL::ClearColor(0, 0, 0, 1));
     att->setStoreAction(MTL::StoreActionStore);
-    MTL::RenderCommandEncoder* enc = cmd->renderCommandEncoder(pass);
+    MTL::RenderCommandEncoder* enc = makeRenderEncoder(cmd, pass);
     enc->setLabel(NS::String::string("solid tile lines", NS::UTF8StringEncoding));
     if (count > 0 && tileLinePso_) {
         LineParams lp{{float(tile->width()), float(tile->height())}, 1.f, 0.f, {}};
@@ -1460,7 +1461,7 @@ MTL::Buffer* ScenePipeline::lineBuffer(MTL::CommandBuffer* cmd, const void* data
         // Headroom so a growing shape does not reallocate every frame.
         const std::size_t cap = std::max<std::size_t>(bytes + bytes / 2, 64 * 1024);
         perf::countRenderAlloc();
-        slot->buf = device_->newBuffer(NS::UInteger(cap), MTL::ResourceStorageModeShared | MTL::ResourceCPUCacheModeWriteCombined);
+        slot->buf = makeBuffer(device_, NS::UInteger(cap), MTL::ResourceStorageModeShared | MTL::ResourceCPUCacheModeWriteCombined);
         if (!slot->buf) throw std::runtime_error("line buffer allocation failed");
     }
     std::memcpy(slot->buf->contents(), data, bytes);
@@ -1528,7 +1529,7 @@ void ScenePipeline::encodeStep(MTL::CommandBuffer* cmd, const engine::LineSegmen
             sc->setClearColor(MTL::ClearColor(-1, 0, 0, 0));  // no path yet
             sc->setStoreAction(MTL::StoreActionDontCare);
         }
-        MTL::RenderCommandEncoder* e = cmd->renderCommandEncoder(pass);
+        MTL::RenderCommandEncoder* e = makeRenderEncoder(cmd, pass);
         e->setLabel(NS::String::string(label, NS::UTF8StringEncoding));
         return e;
     };
@@ -1581,7 +1582,7 @@ void ScenePipeline::encodeStep(MTL::CommandBuffer* cmd, const engine::LineSegmen
             td->setUsage(MTL::TextureUsageRenderTarget | MTL::TextureUsageShaderRead);
             td->setStorageMode(MTL::StorageModePrivate);
             perf::countRenderAlloc();  // once, when the option is first used
-            edge_ = device_->newTexture(td);
+            edge_ = makeTexture(device_, td);
             if (!edge_) throw std::runtime_error("line coverage texture allocation failed");
             edge_->setLabel(NS::String::string("line coverage", NS::UTF8StringEncoding));
         }
@@ -1591,7 +1592,7 @@ void ScenePipeline::encodeStep(MTL::CommandBuffer* cmd, const engine::LineSegmen
         ea->setLoadAction(MTL::LoadActionClear);
         ea->setClearColor(MTL::ClearColor(0, 0, 0, 0));
         ea->setStoreAction(MTL::StoreActionStore);
-        MTL::RenderCommandEncoder* ee = cmd->renderCommandEncoder(ep);
+        MTL::RenderCommandEncoder* ee = makeRenderEncoder(cmd, ep);
         ee->setLabel(NS::String::string("line coverage", NS::UTF8StringEncoding));
         const float mode = pathAa ? (opts_.thinLines == ThinLines::GForce ? 4.f : 2.f) : 1.f;
         LineParams lp{{float(width_), float(height_)}, mode, 0.f, {}};
@@ -1617,7 +1618,7 @@ void ScenePipeline::encodeStep(MTL::CommandBuffer* cmd, const engine::LineSegmen
             td->setUsage(MTL::TextureUsageRenderTarget | MTL::TextureUsageShaderRead);
             td->setStorageMode(MTL::StorageModePrivate);
             perf::countRenderAlloc();
-            display_ = device_->newTexture(td);
+            display_ = makeTexture(device_, td);
             if (!display_) throw std::runtime_error("display texture allocation failed");
             display_->setLabel(NS::String::string("displayed intensity", NS::UTF8StringEncoding));
         }

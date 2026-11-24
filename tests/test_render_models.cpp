@@ -13,6 +13,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "PerfBudget.hpp"
 #include "engine/CameraMoves.hpp"
 #include "engine/FlowFieldBuilder.hpp"
 #include "engine/ModelFile.hpp"
@@ -281,8 +282,8 @@ TEST_CASE("models: cost at 1920x1080 with ~500k triangles, both looks; no render
     }
     const double a = sumA / n, b = sumB / n;
     MESSAGE("model cost at 1920x1080, ~500k triangles: look A " << a << " ms, look B (bloom) " << b << " ms GPU");
-    CHECK(a < 4.0);
-    CHECK(b < 5.0);
+    PERF_BUDGET(a < 4.0);
+    PERF_BUDGET(b < 5.0);
     CHECK(perf::renderAllocs().load() == allocs0);
     out->release();
     q->release();
