@@ -1,5 +1,5 @@
 Vers=100
-Meta="reforce organic: light cycles seen in 3D from a camera chasing one of them across the grid, swinging wide round its turns, dipping and widening on the beat; every few bars the director cuts or glides to another cycle and another angle (low, alongside, ahead, high); on the phrase lines it cranes up over the arena as the walls burst, then swoops back down behind a cycle; a drop brings a low, fast angle with speed lines; a crash is orbited before the cut."
+Meta="reforce organic: light cycles seen in 3D from a camera chasing one of them across the grid, swinging wide round its turns, dipping and widening on the beat; every few bars the director cuts or glides to another angle (low, alongside, ahead, high), staying with one cycle for at least 8 bars unless it crashes; on the phrase lines it cranes up over the arena as the walls burst, then swoops back down behind a cycle; a drop brings a low, fast angle with speed lines; a crash is orbited before the cut."
 Kind="chase"
 PBar="32"
 Num="4"

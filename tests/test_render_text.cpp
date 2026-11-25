@@ -172,3 +172,77 @@ TEST_CASE("text: the shadow shows only on a bright background") {
         writePngBgra8(path, shaded.data(), W, H, std::size_t(W * 4));
     q->release();
 }
+
+TEST_CASE("text: karaoke lines report their words and shrink to fit") {
+    TextBlockSpec k;
+    k.maxWidth = 1700;
+    k.fit = true;
+    k.spans = true;
+    k.lines = {{"If the river runs away, will you find your way?", 64, true, 0, 0}};
+    const TextImage a = rasterizeText(k);
+    REQUIRE(a.spans.size() == 2 * 10);
+    for (std::size_t i = 0; i + 1 < a.spans.size(); ++i) CHECK(a.spans[i] <= a.spans[i + 1]);  // in order
+    CHECK(a.spans[0] == doctest::Approx(0).epsilon(0.5));
+    CHECK(a.spans.back() <= a.width - 2 * a.inset + 1);
+    // Too wide at 64 px for 600 px: smaller type, every word still there (no ellipsis).
+    k.maxWidth = 600;
+    const TextImage b = rasterizeText(k);
+    REQUIRE(b.spans.size() == 2 * 10);
+    CHECK(b.width - 2 * b.inset <= 601);
+    CHECK(b.spans.back() <= 601);
+    CHECK(b.height < a.height);
+    // Without `fit`, the same line is cut and keeps its size.
+    k.fit = false;
+    CHECK(rasterizeText(k).height == a.height);
+}
+
+TEST_CASE("text: karaoke fill, full left of the split and dim right of it") {
+    MTL::Device* dev = MTL::CreateSystemDefaultDevice();
+    REQUIRE(dev);
+    const int W = 1920, H = 1080;
+    MTL::TextureDescriptor* td =
+        MTL::TextureDescriptor::texture2DDescriptor(MTL::PixelFormatBGRA8Unorm, NS::UInteger(W), NS::UInteger(H), false);
+    td->setUsage(MTL::TextureUsageRenderTarget | MTL::TextureUsageShaderRead);
+    td->setStorageMode(MTL::StorageModeShared);
+    MTL::Texture* out = dev->newTexture(td);
+    std::vector<std::uint8_t> px(std::size_t(W * H * 4));
+    for (std::size_t i = 0; i < px.size(); i += 4) px[i + 3] = 255;   // black, opaque
+    out->replaceRegion(MTL::Region(0, 0, NS::UInteger(W), NS::UInteger(H)), 0, px.data(), NS::UInteger(W * 4));
+    MTL::CommandQueue* q = dev->newCommandQueue();
+    TextOverlay text(dev);
+    TextBlockSpec k;
+    k.maxWidth = 1700;
+    k.fit = k.spans = true;
+    k.lines = {{"SLOW BOATS OVER SILVER LAKES", 64, true, 0, 0}};
+    text.set(0, k);
+    for (int i = 0; i < 200 && text.width(0) == 0; ++i) {
+        text.adoptReady();
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    REQUIRE(text.width(0) > 0);
+    REQUIRE(text.spans(0).size() == 10);
+    TextOverlay::Draw d;
+    d.x = 100;
+    d.y = 500;
+    d.fillX = text.spans(0)[3];   // through "DIVE"
+    d.dim = 0.4;
+    MTL::CommandBuffer* c = q->commandBuffer();
+    text.encode(c, out, &d, 1);
+    c->commit();
+    c->waitUntilCompleted();
+    out->getBytes(px.data(), NS::UInteger(W * 4), MTL::Region(0, 0, NS::UInteger(W), NS::UInteger(H)), 0);
+    int leftMax = 0, rightMax = 0;
+    const int split = int(d.x + d.fillX);
+    for (int y = int(d.y); y < int(d.y) + text.height(0); ++y)
+        for (int x = int(d.x); x < int(d.x) + text.width(0); ++x) {
+            const int v = px[std::size_t((y * W + x) * 4 + 1)];
+            if (x < split - 2) leftMax = std::max(leftMax, v);
+            if (x > split + 2) rightMax = std::max(rightMax, v);
+        }
+    CHECK(leftMax > 240);
+    CHECK(rightMax > 60);
+    CHECK(rightMax < 0.4 * 255 + 8);
+    if (const char* path = std::getenv("REFORCE_TEXT_KARAOKE_PNG")) writePngBgra8(path, px.data(), W, H, std::size_t(W * 4));
+    out->release();
+    q->release();
+}

@@ -102,7 +102,9 @@ void Visualizer::stepBeatClock(double t, const audio::AudioFrame* audio) {
 void Visualizer::stepDeckStarts(const sync::BeatClockState& s) {
     // Deck starts (PLAN 5O.8): the song just brought in started on a phrase line.
     if (!deckFeed_) return;
-    deckFeed_->drain(deckStarts_);
+    deckFeed_->drain(deckStarts_, [this](double now, const sync::DeckFrame& f) {
+        if (f.deck >= 0 && f.deck < sync::DeckStarts::kDecks) deckClocks_[std::size_t(f.deck)].frame(now, f);
+    });
     // A jump moves the master deck's bar phase and rkbx_link then moves Link's timeline to match; that arrives
     // after the jump's frame, so a start is placed only once Link has settled.
     const double now = sync::DeckFeed::now();
@@ -127,6 +129,7 @@ void Visualizer::stepDeckStarts(const sync::BeatClockState& s) {
                              : "(none)");
         }
     }
+    stepLyrics(now);
     for (const sync::DeckCommit& c : deckStarts_.take()) deckPending_.emplace_back(now + 0.4, c);
     std::vector<sync::DeckCommit> due;
     for (auto it = deckPending_.begin(); it != deckPending_.end();) {
@@ -203,6 +206,17 @@ std::string Visualizer::setBeatParam(const std::string& key, const std::string& 
         npShadow_.strength = num;
     } else if (key == "nowplayingshadowfrom") {
         npShadow_.from = num;
+    } else if (key == "lyrics") {
+        lyricsOn_ = value == "on" || value == "1";
+    } else if (key == "lyricssize") {
+        lyricsSize_ = num;
+    } else if (key == "lyricsposition") {
+        lyricsPosition_ = value;
+    } else if (key == "lyricsoffset") {
+        lyricsOffsetMs_ = num;
+    } else if (key == "lyricsreviewed") {
+        lyricsReviewedOnly_ = value == "on" || value == "1";
+        for (DeckLyrics& d : deckLyrics_) d.version = ~std::uint64_t(0);  // look them up again
     } else if (key == "nowplayingswitch") {
         sync::NowPlayingConfig nc = nowPlaying_.config();
         nc.switchSeconds = num;
@@ -345,6 +359,28 @@ void Visualizer::rhythmState(engine::RhythmState& r) const {
                     t.vocalArtist + " – " + t.vocalTitle;
         r.nowPlayingLine = line;
     }
+    r.lyrics = lyricsOn_;
+    r.lyricsSize = lyricsSize_;
+    r.lyricsPosition = lyricsPosition_;
+    r.lyricsOffsetMs = lyricsOffsetMs_;
+    r.lyricsReviewedOnly = lyricsReviewedOnly_;
+    r.lyricsLibrary = lyricsLib_ ? lyricsLib_->status() : std::string("needs rkbx_link (the deck feed)");
+    {
+        std::string line;
+        if (lyricsDeck_ >= 0 && deckLyrics_[std::size_t(lyricsDeck_)].song) {
+            const sync::LyricsSong& s = *deckLyrics_[std::size_t(lyricsDeck_)].song;
+            line = "deck " + std::to_string(lyricsDeck_ + 1) + " · " + s.artist + " – " + s.title;
+            if (lyricsLineNow_ >= 0)
+                line += " · line " + std::to_string(lyricsLineNow_ + 1) + " of " + std::to_string(s.lines.size());
+            if (!s.reviewed) line += " · not reviewed";
+        } else {
+            for (int i = 0; i < sync::DeckStarts::kDecks; ++i)
+                if (deckLyrics_[std::size_t(i)].song)
+                    line += std::string(line.empty() ? "" : ", ") + "deck " + std::to_string(i + 1);
+            line = line.empty() ? std::string() : line + " has lyrics (not heard)";
+        }
+        r.lyricsLine = line;
+    }
     r.kick = kick_;
     r.breakdown = drop_.state().breakdown;
     r.build = drop_.state().build;
@@ -431,6 +467,134 @@ void Visualizer::encodeNowPlaying(MTL::CommandBuffer* cmd, MTL::Texture* output)
         d[1].y = H - pad - (mh > 0 ? mh + 48 * s : 0) - vh;
     }
     text_->encode(cmd, output, d, 2, npShadow_, dt);
+}
+
+void Visualizer::setDeckFeed(sync::DeckFeed* feed) {
+    deckFeed_ = feed;
+    if (feed && !lyricsLib_) {
+        std::string folder = opts_.prefs.lyricsFolder;
+        if (folder.empty()) {
+            const char* home = std::getenv("HOME");
+            if (home && *home) folder = std::string(home) + "/Music/PioneerDJ/LocalSamples/Lyrics";
+        } else if (folder.rfind("~/", 0) == 0) {
+            const char* home = std::getenv("HOME");
+            if (home && *home) folder = std::string(home) + folder.substr(1);
+        }
+        lyricsLib_ = std::make_unique<sync::LyricsLibrary>(folder);
+        rlog("[reforce] lyrics: watching %s\n", folder.empty() ? "(no folder: HOME not set)" : folder.c_str());
+    }
+}
+
+double Visualizer::lyricsSongTime(int deck, const sync::LyricsSong& song, double now) const {
+    // The deck's position as heard now: ahead by the beat offset (display latency, as the beat clock), less the
+    // lyrics' own nudge (+ = words later) and the song's offset (djtools' review page: + = words later).
+    const double ahead = (beatOffsetMs() - lyricsOffsetMs_) / 1000.0;
+    return deckClocks_[std::size_t(deck)].position(now + ahead) - song.offset;
+}
+
+void Visualizer::stepLyrics(double now) {
+    if (!deckFeed_) return;
+    const std::uint64_t version = lyricsLib_ ? lyricsLib_->version() : 0;
+    bool has[sync::DeckStarts::kDecks] = {};
+    double level[sync::DeckStarts::kDecks] = {};
+    bool playing[sync::DeckStarts::kDecks] = {};
+    for (int i = 0; i < sync::DeckStarts::kDecks; ++i) {
+        DeckLyrics& d = deckLyrics_[std::size_t(i)];
+        const sync::DeckTrack track = deckFeed_->track(i);
+        if (track != d.track || version != d.version) {
+            d.track = track;
+            d.version = version;
+            auto song = lyricsLib_ ? lyricsLib_->find(track.artist, track.title) : nullptr;
+            if (song && lyricsReviewedOnly_ && !song->reviewed) song = nullptr;
+            if (song != d.song && song && (!d.song || d.song->title != song->title))
+                rlog("[reforce] lyrics: deck %d has lyrics for %s - %s (%zu lines%s)\n", i + 1, song->artist.c_str(),
+                     song->title.c_str(), song->lines.size(), song->reviewed ? "" : ", not reviewed");
+            d.song = std::move(song);
+        }
+        has[i] = d.song != nullptr;
+        level[i] = deckStarts_.level(i);
+        playing[i] = deckClocks_[std::size_t(i)].playing();
+    }
+    const int before = lyricsDeck_;
+    lyricsDeck_ = karaokePick_.update(now, has, level, playing, deckFeed_->masterDeck(), deckStarts_.fadersSeen());
+    if (lyricsDeck_ != before)
+        rlog("[reforce] lyrics: %s\n", lyricsDeck_ < 0 ? "none heard"
+                                                       : ("deck " + std::to_string(lyricsDeck_ + 1) + " " +
+                                                          deckLyrics_[std::size_t(lyricsDeck_)].song->artist + " - " +
+                                                          deckLyrics_[std::size_t(lyricsDeck_)].song->title)
+                                                             .c_str());
+    lyricsLineNow_ = -1;
+    if (lyricsDeck_ >= 0) {
+        const sync::LyricsSong& s = *deckLyrics_[std::size_t(lyricsDeck_)].song;
+        const double t = lyricsSongTime(lyricsDeck_, s, now);
+        auto it = std::lower_bound(s.lines.begin(), s.lines.end(), t,
+                                   [](const sync::LyricLine& l, double x) { return l.t1 < x; });
+        if (it != s.lines.end()) lyricsLineNow_ = int(it - s.lines.begin());
+    }
+}
+
+void Visualizer::encodeLyrics(MTL::CommandBuffer* cmd, MTL::Texture* output) {
+    // Two centered rows of bold white type (64 px at 1080 p and 100 %), the sung part full white, the rest dimmed;
+    // line i in row i % 2 (sync/karaokeLines). A new song fades the old one out first.
+    if (!lyricsText_ || !output) return;
+    const double now = sync::DeckFeed::now();
+    const double dt = lyricsLastT_ < 0 ? 0 : std::clamp(now - lyricsLastT_, 0.0, 0.25);
+    lyricsLastT_ = now;
+    std::shared_ptr<const sync::LyricsSong> want;
+    if (lyricsOn_ && deckFeed_ && lyricsDeck_ >= 0) want = deckLyrics_[std::size_t(lyricsDeck_)].song;
+    if (want != lyricsSong_ && (lyricsAlpha_ <= 0 || !lyricsSong_)) {
+        lyricsSong_ = want;
+        lyricsSongDeck_ = lyricsDeck_;
+    }
+    if (lyricsSong_ && lyricsSong_ == want) lyricsSongDeck_ = lyricsDeck_;
+    const bool in = lyricsSong_ && lyricsSong_ == want;
+    lyricsAlpha_ = in ? std::min(1.0, lyricsAlpha_ + dt / 0.3) : std::max(0.0, lyricsAlpha_ - dt / 0.3);
+    if (!lyricsSong_ || lyricsAlpha_ <= 0 || lyricsSongDeck_ < 0) return;
+    const sync::LyricsSong& song = *lyricsSong_;
+    const double t = lyricsSongTime(lyricsSongDeck_, song, now);
+    const std::vector<sync::KaraokeShown> shown = sync::karaokeLines(song, t);
+
+    const double H = double(output->height()), W = double(output->width());
+    const double s = H / 1080.0 * lyricsSize_ / 100.0;
+    const double em = 64 * s, margin = 0.06 * W;
+    auto spec = [&](int line) {
+        render::TextBlockSpec b;
+        b.lines = {{song.lines[std::size_t(line)].text(), em, true, 0, 0}};
+        b.maxWidth = std::max(100.0, W - 2 * margin);
+        b.fit = true;
+        b.spans = true;
+        return b;
+    };
+    int last = -1;
+    for (const sync::KaraokeShown& k : shown) {
+        lyricsText_->set(k.line % kLyricSlots, spec(k.line));
+        last = std::max(last, k.line);
+    }
+    // The next line, laid out ahead so it is ready when it appears.
+    if (last >= 0 && last + 1 < int(song.lines.size())) lyricsText_->set((last + 1) % kLyricSlots, spec(last + 1));
+    lyricsText_->adoptReady();
+
+    // Rows: each 1.2 em high, 0.25 em apart; bottom / top 7 % in, or around the middle.
+    const double rowH = 1.2 * em, gap = 0.25 * em, pad = 0.07 * H;
+    double top = H - pad - 2 * rowH - gap;
+    if (lyricsPosition_ == "top") top = pad;
+    if (lyricsPosition_ == "center") top = 0.5 * (H - 2 * rowH - gap);
+    std::vector<render::TextOverlay::Draw> draws;
+    for (const sync::KaraokeShown& k : shown) {
+        const int slot = k.line % kLyricSlots;
+        if (!lyricsText_->ready(slot)) continue;
+        const double w = lyricsText_->width(slot), h = lyricsText_->height(slot);
+        if (w <= 0) continue;
+        render::TextOverlay::Draw d;
+        d.slot = slot;
+        d.x = 0.5 * (W - w);
+        d.y = top + k.row * (rowH + gap) + 0.5 * (rowH - h);
+        d.opacity = k.opacity * lyricsAlpha_;
+        d.fillX = sync::karaokeFillX(song.lines[std::size_t(k.line)], t, lyricsText_->spans(slot));
+        d.dim = 0.5;
+        draws.push_back(d);
+    }
+    if (!draws.empty()) lyricsText_->encode(cmd, output, draws.data(), int(draws.size()), npShadow_, dt);
 }
 
 }  // namespace reforce::app

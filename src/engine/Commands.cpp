@@ -199,7 +199,8 @@ std::string validateBeatSetting(const std::string& key, const std::string& value
     if (key == "phrasenow") return {};
     if (key == "phrasenudge") return number(-64, 64, v) ? std::string() : "phrasenudge: bars, -64..64";
     if (key == "phrasebars") return number(1, 64, v) ? std::string() : "phrasebars: 1..64";
-    if (key == "phraseauto" || key == "dropswitch" || key == "phrasedecks" || key == "nowplaying")
+    if (key == "phraseauto" || key == "dropswitch" || key == "phrasedecks" || key == "nowplaying" || key == "lyrics" ||
+        key == "lyricsreviewed")
         return value == "on" || value == "off" || value == "1" || value == "0" ? std::string() : key + ": on | off";
     if (key == "quantize" || key == "quantizemanual" || key == "quantizespawn")
         return value == "off" || value == "beat" || value == "bar" || value == "phrase"
@@ -212,6 +213,11 @@ std::string validateBeatSetting(const std::string& key, const std::string& value
     if (key == "nowplayingswitch") return number(0, 30, v) ? std::string() : "nowplayingswitch: 0..30 s";
     if (key == "nowplayingshadow" || key == "nowplayingshadowfrom")
         return number(0, 1, v) ? std::string() : key + ": 0..1";
+    if (key == "lyricssize") return number(25, 300, v) ? std::string() : "lyricssize: 25..300 %";
+    if (key == "lyricsoffset") return number(-1000, 1000, v) ? std::string() : "lyricsoffset: -1000..1000 ms";
+    if (key == "lyricsposition")
+        return value == "bottom" || value == "center" || value == "top" ? std::string()
+                                                                         : "lyricsposition: bottom | center | top";
     if (key == "nowplayingcorner")
         return value == "bl" || value == "br" || value == "tl" || value == "tr" ? std::string()
                                                                                  : "nowplayingcorner: bl | br | tl | tr";
@@ -497,6 +503,11 @@ PrefsTable slideshowSaveEntries(const Command& c) {
         if (c.text == "nowplayingswitch") t.set("reforce.NowPlaying.SwitchSeconds", v, false);
         if (c.text == "nowplayingshadow") t.set("reforce.NowPlaying.Shadow", v, false);
         if (c.text == "nowplayingshadowfrom") t.set("reforce.NowPlaying.ShadowFrom", v, false);
+        if (c.text == "lyrics") t.set("reforce.Lyrics.Show", v == "on" || v == "1" ? "1" : "0", false);
+        if (c.text == "lyricssize") t.set("reforce.Lyrics.Size", v, false);
+        if (c.text == "lyricsposition") t.set("reforce.Lyrics.Position", v, true);
+        if (c.text == "lyricsoffset") t.set("reforce.Lyrics.OffsetMs", v, false);
+        if (c.text == "lyricsreviewed") t.set("reforce.Lyrics.ReviewedOnly", v == "on" || v == "1" ? "1" : "0", false);
         return t;
     }
     if (c.type == CommandType::VideoSet) {  // panel toggles saved like the slideshow sliders

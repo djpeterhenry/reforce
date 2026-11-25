@@ -65,6 +65,7 @@ struct Controls {
     double drizzle = 1.0;  // Drz: small drops per 16th line
     double cluster = 1.0;  // Clus: clusters per bar line
     double wet = 0.65;     // Wet: floor: the share of the glass under puddles (0 dry .. 1 one sheet of water)
+    double flow = 1.0;     // Flow: floor: how much the puddles' edges move (creep, swell with the rain; 0 = still)
 };
 
 // The look (render/RainPipeline), per frame.
@@ -134,9 +135,17 @@ struct Tally {
 double volumeOf(double r, double degrees);
 double radiusOf(double volume, double degrees);
 
-// Floor puddles: the water cover at (x, y) frame heights, 0 dry .. 1 in a puddle, for cover `wet` (0..1). The GPU
-// computes the same function (render/RainPipeline's puddle()).
-double puddle(double x, double y, double wet, std::uint32_t seed);
+// Floor puddles. The water's edge is where puddleField(x, y, t) crosses puddleThreshold(wet): two fixed octaves of
+// seeded value noise (the puddles' shapes) plus two that slowly change over the creep time t (Sim::puddleTime()), so
+// the edges creep a little, each of them a crossfade between noise layers (9 s and 4 s apart). puddle() is the cover
+// at (x, y) frame heights, 0 dry .. 1 in a puddle, for cover `wet` (0..1). The GPU computes the same functions
+// (render/RainPipeline's puddleN / puddleThr / puddle).
+double puddleField(double x, double y, double t, std::uint32_t seed);
+double puddleThreshold(double wet);
+double puddle(double x, double y, double wet, std::uint32_t seed, double t = 0.0);
+// An upper bound of |grad puddleField| (per frame height): a point this far below the threshold, over the slope, is
+// at least that far from any water.
+inline constexpr double kPuddleSlope = 9.0;
 
 // One floor wave-equation step of `dt` seconds on a grid `rows` cells high (render/RainPipeline, rain_wave_fs):
 //   h' = (2 h - h_prev + c2 L(h) - b L(L(h)) + nu L(h - h_prev)) * damp - impulses
@@ -193,6 +202,15 @@ public:
     double simTime() const { return double(done_) * kSubstep; }
     // Seconds simulated in the last step (the GPU steps the fog / waves by the same time).
     double lastDt() const { return lastDt_; }
+    // Floor: the puddles' creep time (advances at Flow) and their cover now: Wet plus a swell that rises while rain
+    // pours into them and drains over ~20 s (none when Wet is 0 or 1). The GPU draws puddle(x, y, puddleWet(),
+    // seed, puddleTime()).
+    double puddleTime() const { return creep_; }
+    double puddleWet() const;
+    double swell() const { return swell_; }
+    // Floor: whether a drop of contact radius r at (x, y) touches a puddle (its center or any point of its contact
+    // line in the water); (cx, cy) is where it touches (the center when that is wet).
+    bool touchesPuddle(double x, double y, double r, double& cx, double& cy) const;
 
 private:
     void spawnLine(std::int64_t k, double beatAt, const Clock& clock, const Controls& c);
@@ -201,6 +219,7 @@ private:
     void slide(Drop& d, double h, Drop& residual);
     void mergeAll();
     void bound();
+    void pool(double volume);  // floor: volume taken into a puddle (counted, swells the puddles)
     double rand01(std::uint64_t& h) const;
 
     Settings settings_;
@@ -213,6 +232,9 @@ private:
     std::int64_t nextLine_ = 0;     // the next 16th line to spawn
     double lastDt_ = 0;
     double cascade_ = 0;
+    double creep_ = 0;   // floor: the puddles' creep time
+    double swell_ = 0;   // floor: the puddles' swell (added to Wet)
+    std::uint32_t seed32_ = 0;
     std::uint32_t nextId_ = 1;
     std::vector<Drop> drops_;
     std::vector<Impulse> impulses_;

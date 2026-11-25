@@ -2,7 +2,7 @@
 # test tool and the sync unit tests. Included from the top-level CMakeLists.txt.
 
 add_library(reforce_sync STATIC src/sync/LinkClock.cpp src/sync/BeatClock.cpp src/sync/PhraseClock.cpp src/sync/DropDetector.cpp
-    src/sync/DeckStarts.cpp src/sync/DeckFeed.cpp src/sync/ControllerMap.cpp src/sync/NowPlaying.cpp)
+    src/sync/DeckStarts.cpp src/sync/DeckFeed.cpp src/sync/ControllerMap.cpp src/sync/NowPlaying.cpp src/sync/Lyrics.cpp)
 target_include_directories(reforce_sync PUBLIC src)
 target_compile_options(reforce_sync PRIVATE ${REFORCE_WARNINGS})
 # Link and asio headers are third-party: no reforce warnings for them.
@@ -16,7 +16,7 @@ if(REFORCE_BUILD_PROBE)
 endif()
 
 if(REFORCE_BUILD_TESTS)
-    add_executable(reforce_sync_tests tests/test_main.cpp tests/test_sync_link.cpp tests/test_sync_beatclock.cpp tests/test_sync_phrase.cpp tests/test_sync_drop.cpp tests/test_sync_deckstarts.cpp tests/test_sync_nowplaying.cpp)
+    add_executable(reforce_sync_tests tests/test_main.cpp tests/test_sync_link.cpp tests/test_sync_beatclock.cpp tests/test_sync_phrase.cpp tests/test_sync_drop.cpp tests/test_sync_deckstarts.cpp tests/test_sync_nowplaying.cpp tests/test_sync_lyrics.cpp)
     target_compile_options(reforce_sync_tests PRIVATE ${REFORCE_WARNINGS})
     target_link_libraries(reforce_sync_tests PRIVATE reforce_sync doctest::doctest)
     target_compile_definitions(reforce_sync_tests PRIVATE REFORCE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")

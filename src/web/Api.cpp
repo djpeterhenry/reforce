@@ -595,6 +595,7 @@ void writeRhythmLive(json::Writer& w, const engine::RhythmState& r) {
     w.field("confidence", r.confidence).field("kick", r.kick);
     w.field("breakdown", r.breakdown).field("build", r.build).field("drop", r.drop).field("drops", r.drops);
     w.field("decks", r.decks).field("deckInputs", r.deckInputs).field("nowPlayingLine", r.nowPlayingLine);
+    w.field("lyricsLine", r.lyricsLine).field("lyricsLibrary", r.lyricsLibrary);
     w.key("dancing").stringArray(r.dancing);
     w.key("danceRuns").beginArray();
     for (const auto& d : r.danceRuns)
@@ -678,6 +679,8 @@ std::string stateToJson(const engine::EngineState& s, bool stable) {
         w.field("nowPlaying", r.nowPlaying).field("nowPlayingSize", r.nowPlayingSize);
         w.field("nowPlayingCorner", r.nowPlayingCorner).field("nowPlayingSwitch", r.nowPlayingSwitch);
         w.field("nowPlayingShadow", r.nowPlayingShadow).field("nowPlayingShadowFrom", r.nowPlayingShadowFrom);
+        w.field("lyrics", r.lyrics).field("lyricsSize", r.lyricsSize).field("lyricsPosition", r.lyricsPosition);
+        w.field("lyricsOffsetMs", r.lyricsOffsetMs).field("lyricsReviewedOnly", r.lyricsReviewedOnly);
         w.field("danceFloor", r.danceFloor).field("danceLighting", r.danceLighting);
         w.field("danceReflection", r.danceReflection);
         w.field("danceRandom", r.danceRandom);

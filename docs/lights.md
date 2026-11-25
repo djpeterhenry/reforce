@@ -2,7 +2,7 @@
 
 reforce drives Nanoleaf panels directly over the local network, in place of the Nanoleaf Desktop app's screen
 mirroring. The panels follow **the visuals only**: scenes, solids, sprites, the color movie layer and movie sprites,
-body trails and burn. Never the camera backdrop, dancers, name tags, bubbles or now-playing text. That holds whatever
+body trails and burn. Never the camera backdrop, dancers, name tags, bubbles, now-playing text or lyrics. That holds whatever
 the window shows (see "Window shows the visuals only" in backdrop.md for the screen-mirroring route).
 
 Turn it on: View > Room Lights (Nanoleaf), or the **Lights** button in the control panel's top bar ("Lights …" while

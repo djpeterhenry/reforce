@@ -69,6 +69,11 @@ Visualizer::Visualizer(MTL::Device* device, const VisualizerOptions& opts)
         sync::NowPlayingConfig nc;
         nc.switchSeconds = opts.prefs.nowPlayingSwitch;
         nowPlaying_.setConfig(nc);
+        lyricsOn_ = opts.prefs.lyrics;
+        lyricsSize_ = opts.prefs.lyricsSize;
+        lyricsPosition_ = opts.prefs.lyricsPosition;
+        lyricsOffsetMs_ = opts.prefs.lyricsOffsetMs;
+        lyricsReviewedOnly_ = opts.prefs.lyricsReviewedOnly;
     }
     {
         const render::ScenePipelineOptions& po = opts.pipeline;
@@ -135,6 +140,7 @@ Visualizer::Visualizer(MTL::Device* device, const VisualizerOptions& opts)
         }
         try {
             text_ = std::make_unique<render::TextOverlay>(pipeline_->device());
+            lyricsText_ = std::make_unique<render::TextOverlay>(pipeline_->device(), kLyricSlots);
         } catch (const std::exception& e) {
             rlog("[reforce] now playing text unavailable: %s\n", e.what());
         }
@@ -621,6 +627,7 @@ void Visualizer::colorize(MTL::CommandBuffer* cmd, MTL::Texture* output, double 
     if (dancers_ && (stage_.bodyCount > 0 || stage_.floor > 0.001f) && stage_.opacity > 0.001f)
         dancers_->encode(cmd, output, stage_, trackAlpha && !backdrop);
     encodeNameTags(cmd, output);
+    encodeLyrics(cmd, output);
     encodeNowPlaying(cmd, output);
 }
 

@@ -258,7 +258,7 @@ void DeckFeed::push(const DeckFeedEvent& e) {
     queue_.push_back(e);
 }
 
-void DeckFeed::drain(DeckStarts& s) {
+void DeckFeed::drain(DeckStarts& s, const std::function<void(double now, const DeckFrame&)>& frames) {
     std::vector<DeckFeedEvent> q;
     {
         std::lock_guard<std::mutex> lock(mu_);
@@ -266,7 +266,10 @@ void DeckFeed::drain(DeckStarts& s) {
     }
     for (const DeckFeedEvent& e : q) {
         switch (e.kind) {
-            case DeckFeedEvent::Kind::Frame: s.frame(e.now, e.senderT, e.frame); break;
+            case DeckFeedEvent::Kind::Frame:
+                s.frame(e.now, e.senderT, e.frame);
+                if (frames) frames(e.now, e.frame);
+                break;
             case DeckFeedEvent::Kind::Fader: s.fader(e.now, e.deck, e.value); break;
             case DeckFeedEvent::Kind::Crossfader: s.crossfader(e.now, e.value); break;
             case DeckFeedEvent::Kind::Assign: s.assign(e.now, e.deck, int(e.value)); break;

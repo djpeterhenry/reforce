@@ -89,7 +89,8 @@ public:
     Rocks(scene::OrganicInstance& in, std::uint64_t seed)
         : num_(keyCount(in, "NUM", 4, 1, 12)), hitsPerBeat_(keyNum(in, "HITS", 1, 0.125, 16)),
           spd_(keyNum(in, "SPD", 0.12, 0, 2)), wdth_(keyNum(in, "WDTH", 1.1, 0, 20)), size_(keyNum(in, "SIZE", 1, 0.2, 4)),
-          waveBars_(keyNum(in, "WAVE", 16, 0, 1024)), glow_(keyNum(in, "GLOW", 0.35, 0, 1)), rng_(seed ^ 0x70c45ULL) {
+          waveBars_(keyNum(in, "WAVE", 16, 0, 1024)), glow_(keyNum(in, "GLOW", 0.35, 0, 1)),
+          fill_(keyNum(in, "FILL", 0.3, 0, 1)), rng_(seed ^ 0x70c45ULL) {
         baseFire_ = fireStepFor(keyNum(in, "FIRE", 2, 0.5, 16));
         // A shot flies about half a beat, a whole number of fire steps, so it lands on the fire grid.
         flight_ = baseFire_ * std::max(1, int(std::ceil(0.45 * kTicks / baseFire_ - 1e-9)));
@@ -606,6 +607,13 @@ private:
             const double ox = k.vx * mv, oy = k.vy * mv, da = k.spin * mv;
             if (std::abs(k.x + ox) > halfW_ + k.r * 1.1 || std::abs(k.y + oy) > kHalfH + k.r * 1.1) continue;
             const double p = pen * (kPenRock + (kPenFlash - kPenRock) * k.flash);
+            // Solid (Peter 2026-11-24: outlines alone hardly show): the inside filled dimmer than the rim (`Fill`),
+            // lighting up a little with a hit's flash. Fills are hard-edged scanlines: in the core pass only.
+            if (fill_ > 0 && !haloPass_ && k.n >= 3) {
+                double xs[kMaxVerts], ys[kMaxVerts];
+                for (int i = 0; i < k.n; ++i) k.vertex(i, ox, oy, da, xs[i], ys[i]);
+                c.fillPolygon(xs, ys, k.n, pen * std::min(1.0, fill_ * (1 + 0.5 * k.flash)));
+            }
             double px0, py0, pxa, pya;
             k.vertex(0, ox, oy, da, px0, py0);
             pxa = px0;
@@ -668,6 +676,19 @@ private:
         };
         static constexpr double hull[6][2] = {{0.62, 0},     {0.15, 0.27},  {-0.38, 0.27},
                                               {-0.52, 0},    {-0.38, -0.27}, {0.15, -0.27}};
+        // Solid like the rocks (Peter 2026-11-24), a little brighter than a rock's inside so it stands out from
+        // them: the hull and the two fins filled under the lines (core pass only).
+        if (fill_ > 0 && !haloPass_) {
+            const double fp = s.pen * std::min(1.0, 1.5 * fill_);
+            double xs[6], ys[6];
+            for (int i = 0; i < 6; ++i) P(hull[i][0], hull[i][1], xs[i], ys[i]);
+            c.fillPolygon(xs, ys, 6, fp);
+            for (int m = -1; m <= 1; m += 2) {
+                static constexpr double fin[4][2] = {{-0.02, 0.27}, {-0.42, 0.62}, {-0.62, 0.62}, {-0.38, 0.27}};
+                for (int i = 0; i < 4; ++i) P(fin[i][0], m * fin[i][1], xs[i], ys[i]);
+                c.fillPolygon(xs, ys, 4, fp);
+            }
+        }
         for (int i = 0; i < 6; ++i) L(hull[i][0], hull[i][1], hull[(i + 1) % 6][0], hull[(i + 1) % 6][1], w, pen);
         for (int m = -1; m <= 1; m += 2) {
             L(0.25, m * 0.12, 1.0, m * 0.12, w, pen);  // twin barrels, out of the hull's front faces
@@ -698,7 +719,7 @@ private:
     }
 
     int num_;
-    double hitsPerBeat_, spd_, wdth_, size_, waveBars_, glow_;
+    double hitsPerBeat_, spd_, wdth_, size_, waveBars_, glow_, fill_;
     int baseFire_ = 24, fireStep_ = 24, flight_ = 24, hitStep_ = 48;
     double largeR_ = 0.2, margin_ = 0.24;
     expr::Pcg32 rng_;

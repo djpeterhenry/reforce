@@ -73,15 +73,39 @@ double radiusOf(double volume, double degrees) {
     return volume > 0 ? std::cbrt(volume / unit) : 0.0;
 }
 
-double puddle(double x, double y, double wet, std::uint32_t seed) {
+namespace {
+// One creeping octave: value noise at `freq`, crossfading from one seeded layer to the next every `period` seconds of
+// creep time (the MSL creep() is the same).
+double creep(double x, double y, double t, double freq, double period, double ox, double oy, std::uint32_t seed,
+             std::uint32_t salt) {
+    const double s = t / period, i = std::floor(s);
+    double f = s - i;
+    f = f * f * (3 - 2 * f);
+    const auto layer = std::uint32_t(std::int32_t(i));
+    const double a = valueNoise(x * freq + ox, y * freq + oy, seed + layer * 0x9e3779b9u + salt);
+    const double b = valueNoise(x * freq + ox, y * freq + oy, seed + (layer + 1u) * 0x9e3779b9u + salt);
+    return a + (b - a) * f;
+}
+}  // namespace
+
+double puddleField(double x, double y, double t, std::uint32_t seed) {
+    t = clampFinite(t, 0.0, 1e6, 0.0);
+    return 0.65 * valueNoise(x * 2.2, y * 2.2, seed) + 0.35 * valueNoise(x * 5.1 + 17.0, y * 5.1 + 3.0, seed) +
+           0.16 * (creep(x, y, t, 3.4, 9.0, 5.3, 11.7, seed, 0x2545f491u) - 0.5) +
+           0.05 * (creep(x, y, t, 7.9, 4.0, 29.1, 7.3, seed, 0x68e31da4u) - 0.5);
+}
+
+double puddleThreshold(double wet) { return 0.5 + (0.5 - wet) * 0.6; }
+
+double puddle(double x, double y, double wet, std::uint32_t seed, double t) {
     wet = clampFinite(wet, 0.0, 1.0, 0.0);
     if (wet <= 0.001) return 0.0;
     if (wet >= 0.999) return 1.0;
-    const double n = 0.65 * valueNoise(x * 2.2, y * 2.2, seed) + 0.35 * valueNoise(x * 5.1 + 17.0, y * 5.1 + 3.0, seed);
-    const double thr = 0.5 + (0.5 - wet) * 0.6;
+    const double n = puddleField(x, y, t, seed);
+    const double thr = puddleThreshold(wet);
     const double e0 = thr - 0.025, e1 = thr + 0.025;
-    const double t = std::clamp((n - e0) / (e1 - e0), 0.0, 1.0);
-    return t * t * (3 - 2 * t);
+    const double u = std::clamp((n - e0) / (e1 - e0), 0.0, 1.0);
+    return u * u * (3 - 2 * u);
 }
 
 WaveStep waveStep(double dt, double speed, double decay, int rows) {
@@ -162,6 +186,46 @@ Sim::Sim(const Settings& s, double aspect, double startTime) : settings_(s) {
     wetRows_ = 96;
     wetCols_ = std::max(8, int(std::lround(96.0 * aspect_)));
     wet_.assign(std::size_t(wetCols_ * wetRows_), -1.0f);  // never wet
+    seed32_ = std::uint32_t(settings_.seed ^ (settings_.seed >> 32));
+}
+
+double Sim::puddleWet() const {
+    const double w = controls_.wet;
+    if (w <= 0.001 || w >= 0.999) return w;
+    return std::min(0.98, w + swell_);
+}
+
+bool Sim::touchesPuddle(double x, double y, double r, double& cx, double& cy) const {
+    cx = x;
+    cy = y;
+    const double wet = puddleWet();
+    if (wet <= 0.001) return false;
+    if (wet >= 0.999) return true;
+    const double thr = puddleThreshold(wet);
+    double best = puddleField(x, y, creep_, seed32_) - thr;
+    if (best > 0) return true;
+    // The contact line (and a pixel more: the meniscus reaches it first).
+    const double R = r + kPx;
+    if (-best > kPuddleSlope * R) return false;
+    for (int i = 0; i < 12; ++i) {
+        const double a = 2 * kPi * i / 12.0;
+        const double px = x + std::cos(a) * R, py = y + std::sin(a) * R;
+        const double v = puddleField(px, py, creep_, seed32_) - thr;
+        if (v > best) {
+            best = v;
+            cx = px;
+            cy = py;
+        }
+    }
+    return best > 0;
+}
+
+void Sim::pool(double volume) {
+    tally_.pooled += volume;
+    // Steady state gain x rate x 20 s: Rain Floor's rain pools ~25 drops of Size 9 a second (+.015 of cover, the
+    // edges out by a few pixels), its downpour ~130 (+.08, a few tens of pixels); at most +.1.
+    static const double kRef = volumeOf(9.0 * kPx, 55.0);
+    swell_ = std::min(0.1, swell_ + clampFinite(controls_.flow, 0.0, 4.0, 1.0) * 3e-5 * volume / kRef);
 }
 
 double Sim::rand01(std::uint64_t& h) const {
@@ -191,12 +255,13 @@ void Sim::addDrop(double x, double y, double r, bool impact, std::uint64_t h) {
     d.pinCell = std::int32_t(std::floor(d.y * 160.0));
     if (impact) tally_.spawned += v0;
     if (settings_.mode == Mode::Floor) {
-        const std::uint32_t seed32 = std::uint32_t(settings_.seed ^ (settings_.seed >> 32));
-        const bool inPuddle = puddle(d.x, d.y, controls_.wet, seed32) > 0.5;
+        // Any part of it in the water: the puddle takes it in (a drop never sits across a puddle's edge).
+        double ix = d.x, iy = d.y;
+        const bool inPuddle = touchesPuddle(d.x, d.y, r, ix, iy);
         if (!impact) {
             if (inPuddle) {
-                tally_.pooled += v0;
-                if (int(impulses_.size()) < kMaxImpulses) impulses_.push_back({d.x, d.y, std::max(1.5 * kPx, r), 0.8 * r});
+                pool(v0);
+                if (int(impulses_.size()) < kMaxImpulses) impulses_.push_back({ix, iy, std::max(1.5 * kPx, r), 0.8 * r});
                 return;
             }
             drops_.push_back(d);
@@ -229,9 +294,9 @@ void Sim::addDrop(double x, double y, double r, bool impact, std::uint64_t h) {
             rest -= vc;
         }
         if (inPuddle) {
-            tally_.pooled += rest;
+            pool(rest);
             if (int(impulses_.size()) < kMaxImpulses)
-                impulses_.push_back({d.x, d.y, std::max(1.5 * kPx, 0.9 * r), std::min(0.8 * r, 9.0 * kPx)});
+                impulses_.push_back({ix, iy, std::max(1.5 * kPx, 0.9 * r), std::min(0.8 * r, 9.0 * kPx)});
             return;
         }
         d.r = radiusOf(rest, contact_);
@@ -492,7 +557,10 @@ void Sim::bound() {
 void Sim::substep(const Controls& c) {
     const double h = kSubstep;
     const bool window = settings_.mode == Mode::Window;
-    const std::uint32_t seed32 = std::uint32_t(settings_.seed ^ (settings_.seed >> 32));
+    if (!window) {
+        creep_ += h * clampFinite(c.flow, 0.0, 4.0, 1.0);
+        swell_ *= std::exp(-h / 20.0);
+    }
     for (std::size_t i = 0; i < drops_.size(); ++i) {
         Drop& d = drops_[i];
         d.age += h;
@@ -512,10 +580,11 @@ void Sim::substep(const Controls& c) {
                 d.age = 0.6;
                 d.x = std::clamp(d.x, d.r, std::max(d.r, aspect_ - d.r));
                 d.y = std::clamp(d.y, d.r, std::max(d.r, 1.0 - d.r));
-                if (puddle(d.x, d.y, c.wet, seed32) > 0.5) {
-                    tally_.pooled += volumeOf(d.r, contact_);
+                double ix = d.x, iy = d.y;
+                if (touchesPuddle(d.x, d.y, d.r, ix, iy)) {
+                    pool(volumeOf(d.r, contact_));
                     if (int(impulses_.size()) < kMaxImpulses)
-                        impulses_.push_back({d.x, d.y, std::max(1.2 * kPx, 1.4 * d.r), 1.2 * d.r});
+                        impulses_.push_back({ix, iy, std::max(1.2 * kPx, 1.4 * d.r), 1.2 * d.r});
                     d.r = 0;
                 }
             }
@@ -557,14 +626,26 @@ void Sim::substep(const Controls& c) {
             const double keep = nr > 0.45 * kPx ? nr : 0.0;
             tally_.evaporated += volumeOf(d.r, contact_) - volumeOf(keep, contact_);
             d.r = keep;
-            if (d.r > 0 && puddle(d.x, d.y, c.wet, seed32) > 0.6) {
-                tally_.pooled += volumeOf(d.r, contact_);
-                d.r = 0;
-            }
         }
     }
     drops_.erase(std::remove_if(drops_.begin(), drops_.end(), [](const Drop& d) { return !(d.r > 0); }), drops_.end());
     mergeAll();
+    if (!window) {
+        // A puddle reaching a bead (its edge creeping or swelling, or the bead grown by a merge) takes it in, with a
+        // little ripple where they touch: no bead ever sits across a puddle's edge.
+        bool taken = false;
+        for (Drop& d : drops_) {
+            double ix = d.x, iy = d.y;
+            if (d.flight > 0 || !(d.r > 0) || !touchesPuddle(d.x, d.y, d.r, ix, iy)) continue;
+            pool(volumeOf(d.r, contact_));
+            if (int(impulses_.size()) < kMaxImpulses) impulses_.push_back({ix, iy, std::max(1.2 * kPx, d.r), 0.35 * d.r});
+            d.r = 0;
+            taken = true;
+        }
+        if (taken)
+            drops_.erase(std::remove_if(drops_.begin(), drops_.end(), [](const Drop& d) { return !(d.r > 0); }),
+                         drops_.end());
+    }
     if (cascade_ > 0) cascade_ -= h;
 }
 
@@ -574,6 +655,7 @@ void Sim::step(double t, const Controls& c, const Clock& clock) {
     lastDt_ = 0;
     controls_ = c;
     controls_.wet = clampFinite(c.wet, 0.0, 1.0, 0.65);
+    controls_.flow = clampFinite(c.flow, 0.0, 4.0, 1.0);
     // The beat: the clock while it is on (junk clamped), else 120 BPM from the start.
     const double age = std::isfinite(t) ? std::clamp(t - start_, 0.0, 1e8) : simTime();
     const bool on = clock.on && std::isfinite(clock.beat) && std::fabs(clock.beat) < 1e9;

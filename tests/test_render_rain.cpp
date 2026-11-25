@@ -13,12 +13,14 @@
 #include <Metal/Metal.hpp>
 
 #include <algorithm>
+#include <cstdlib>
 #include <cmath>
 #include <cstdint>
 #include <string>
 #include <vector>
 
 #include "engine/Rain.hpp"
+#include "render/ImageFiles.hpp"
 #include "render/RainPipeline.hpp"
 #include "render/ScenePipeline.hpp"
 #include "render/SolidPipeline.hpp"
@@ -267,6 +269,96 @@ TEST_CASE("rain render: the floor's waves stay finite and bounded, and spread fr
     CHECK(impulses > 100);
     CHECK(peak > 0.05);   // waves
     CHECK(peak < 200.0);  // bounded
+}
+
+TEST_CASE("rain render: the floor's puddles are drawn where the sim has them, after their edges crept") {
+    if (!device()) return;
+    Rig r(640, 360);
+    engine::rain::Settings st;
+    st.mode = engine::rain::Mode::Floor;
+    st.seed = 9;
+    engine::rain::Sim sim(st, 640.0 / 360.0, 0.0);
+    engine::rain::Controls c;
+    c.density = c.drizzle = c.cluster = 0;  // no rain: only the puddles
+    c.wet = 0.5;
+    for (int i = 1; i <= 25 * 60; ++i) sim.step(i / 60.0, c, {});
+    REQUIRE(sim.puddleTime() > 24.0);
+    render::RainLook look;
+    look.mode = engine::rain::Mode::Floor;
+    look.wet = 0.5f;
+    r.fill(2.0);  // all 200
+    MTL::CommandBuffer* cmd = r.q->commandBuffer();
+    r.rain.encodeStep(cmd, sim, look, true);
+    r.rain.encodeComposite(cmd, r.out, sim, look, false);
+    cmd->commit();
+    cmd->waitUntilCompleted();
+    r.read();
+    // Inside a puddle a little darker, outside untouched; compared away from the edges (the rim, the lens).
+    const std::uint32_t seed32 = std::uint32_t(st.seed ^ (st.seed >> 32));
+    const double thr = engine::rain::puddleThreshold(sim.puddleWet());
+    int checked = 0, agree = 0;
+    for (int y = 4; y < 360; y += 7)
+        for (int x = 4; x < 640; x += 7) {
+            const double n = engine::rain::puddleField(x / 360.0, y / 360.0, sim.puddleTime(), seed32);
+            if (std::abs(n - thr) < 0.04) continue;
+            ++checked;
+            agree += (n > thr) == (r.at(x, y) < 190);
+        }
+    REQUIRE(checked > 2000);
+    CHECK(agree >= checked * 0.99);
+    // Not the puddles of t = 0: the edges moved.
+    int moved = 0;
+    for (int y = 4; y < 360; y += 7)
+        for (int x = 4; x < 640; x += 7)
+            moved += (engine::rain::puddle(x / 360.0, y / 360.0, 0.5, seed32, 0.0) > 0.5) != (r.at(x, y) < 190);
+    CHECK(moved > 20);
+
+    // REFORCE_RAIN_PREVIEW=<dir>: a rainy floor over stripes at a few moments, as PNGs, to look at.
+    if (const char* dir = std::getenv("REFORCE_RAIN_PREVIEW")) {
+        engine::rain::Sim rainy(st, 640.0 / 360.0, 0.0);
+        engine::rain::Controls rc;
+        rc.density = 3;
+        rc.size = 9;
+        rc.drizzle = 0.6;
+        rc.wet = 0.65;
+        look.wet = 0.65f;
+        bool first = true;
+        for (int i = 1; i <= 40 * 60; ++i) {
+            const double t = i / 60.0;
+            engine::rain::Clock k;
+            k.on = true;
+            k.beat = t * 2.0;
+            k.bar = k.beat / 4;
+            k.phrase = k.beat / 128;
+            k.drop = t > 20 && t < 32 ? 1.0 : 0.0;
+            rainy.step(t, rc, k);
+            MTL::CommandBuffer* cb = r.q->commandBuffer();
+            r.rain.encodeStep(cb, rainy, look, first);
+            first = false;
+            if (i % 300 == 0) {
+                std::vector<std::uint8_t> init(std::size_t(r.W * r.H * 4));
+                for (int y = 0; y < r.H; ++y)
+                    for (int x = 0; x < r.W; ++x) {
+                        std::uint8_t* q = &init[std::size_t((y * r.W + x) * 4)];
+                        const bool on = ((x / 24) + (y / 24)) % 2 == 0;
+                        q[0] = on ? 60 : 210;
+                        q[1] = on ? 120 : 190;
+                        q[2] = on ? 200 : 80;
+                        q[3] = 255;
+                    }
+                r.out->replaceRegion(MTL::Region(0, 0, NS::UInteger(r.W), NS::UInteger(r.H)), 0, init.data(),
+                                     NS::UInteger(r.W * 4));
+                r.rain.encodeComposite(cb, r.out, rainy, look, false);
+            }
+            cb->commit();
+            cb->waitUntilCompleted();
+            if (i % 300 == 0) {
+                r.read();
+                render::writePngBgra8(std::string(dir) + "/rain_floor_" + std::to_string(i / 60) + "s.png",
+                                      r.px.data(), r.W, r.H, std::size_t(r.W) * 4);
+            }
+        }
+    }
 }
 
 TEST_CASE("rain render: cost at 1920x1080") {

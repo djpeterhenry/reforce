@@ -223,6 +223,86 @@ TEST_CASE("rain: the floor conserves volume, throws crowns and hands impulses to
     }
 }
 
+TEST_CASE("rain: the floor's puddle edges creep and swell, and no bead sits across one") {
+    // The edges creep: over 20 s some of the glass changes, most of it does not, and the cover stays about the same.
+    int changed = 0, wet0 = 0, wet1 = 0;
+    for (int y = 0; y < 120; ++y)
+        for (int x = 0; x < 200; ++x) {
+            const double px = x / 200.0 * kAspect, py = y / 120.0;
+            const bool a = puddle(px, py, 0.5, 7, 0.0) > 0.5, b = puddle(px, py, 0.5, 7, 20.0) > 0.5;
+            changed += a != b;
+            wet0 += a;
+            wet1 += b;
+        }
+    MESSAGE("puddles: ", changed, " of 24000 points changed over 20 s; cover ", wet0, " -> ", wet1);
+    CHECK(changed > 24000 * 0.02);
+    CHECK(changed < 24000 * 0.3);
+    CHECK(std::abs(wet0 - wet1) < 24000 * 0.12);
+    // Continuous in time: a frame later almost nothing moved.
+    int jumped = 0;
+    for (int i = 0; i < 4000; ++i) {
+        const double px = (i % 100) / 100.0 * kAspect, py = (i / 100) / 40.0;
+        jumped += std::abs(puddle(px, py, 0.5, 7, 13.0) - puddle(px, py, 0.5, 7, 13.0 + 1.0 / 60.0)) > 0.25;
+    }
+    CHECK(jumped < 40);
+    // The bound of the field's slope holds.
+    for (int i = 0; i < 20000; ++i) {
+        const double px = std::fmod(i * 0.61803, 1.0) * kAspect, py = std::fmod(i * 0.41421, 1.0), t = i * 0.01;
+        const double e = 1e-5;
+        const double gx = (puddleField(px + e, py, t, 3) - puddleField(px - e, py, t, 3)) / (2 * e);
+        const double gy = (puddleField(px, py + e, t, 3) - puddleField(px, py - e, t, 3)) / (2 * e);
+        REQUIRE(std::hypot(gx, gy) < kPuddleSlope);
+    }
+
+    rain::Settings st;
+    st.mode = Mode::Floor;
+    st.seed = 5;
+    Sim s(st, kAspect, 0.0);
+    rain::Controls c;
+    c.density = 8;
+    c.drizzle = 3;
+    c.wet = 0.45;
+    double maxSwell = 0, atDropEnd = 0;
+    for (int i = 1; i <= 60 * 30; ++i) {
+        const double t = i / 60.0;
+        rain::Clock k = clock120(t);
+        k.drop = t > 10 && t < 20 ? 1.0 : 0.0;  // a downpour in the middle
+        s.step(t, c, k);
+        maxSwell = std::max(maxSwell, s.swell());
+        if (i == 60 * 20) atDropEnd = s.swell();
+        if (i % 6 != 0) continue;
+        const double thr = puddleThreshold(s.puddleWet());
+        for (const Drop& d : s.drops()) {
+            if (d.flight > 0) continue;
+            // Its center and its contact line all on dry glass.
+            REQUIRE(puddleField(d.x, d.y, s.puddleTime(), 5) <= thr);
+            for (int a = 0; a < 24; ++a) {
+                const double ang = a * 2 * 3.141592653589793 / 24;
+                REQUIRE(puddleField(d.x + std::cos(ang) * d.r, d.y + std::sin(ang) * d.r, s.puddleTime(), 5) <= thr);
+            }
+        }
+    }
+    CHECK(s.puddleTime() == doctest::Approx(30.0).epsilon(0.01));
+    MESSAGE("puddle swell: ", maxSwell, " at most (downpour), ", s.swell(), " 10 s after");
+    CHECK(maxSwell > 0.02);
+    CHECK(s.swell() < atDropEnd);  // it drains once the downpour ends (to this heavy rain's own level)
+    CHECK(maxSwell <= 0.1);
+    CHECK(s.puddleWet() > 0.45);
+    CHECK(accounted(s) == doctest::Approx(s.tally().spawned).epsilon(1e-9));
+    // The rain stops: the puddles shrink back towards Wet.
+    const double before = s.swell();
+    rain::Controls dry = c;
+    dry.density = dry.drizzle = dry.cluster = 0;
+    for (int i = 1; i <= 60 * 20; ++i) s.step(30.0 + i / 60.0, dry, clock120(30.0 + i / 60.0));
+    CHECK(s.swell() < 0.5 * before);
+    // Flow 0: still edges.
+    Sim f(st, kAspect, 0.0);
+    c.flow = 0;
+    for (int i = 1; i <= 600; ++i) f.step(i / 60.0, c, clock120(i / 60.0));
+    CHECK(f.puddleTime() == 0.0);
+    CHECK(f.puddleWet() == 0.45);
+}
+
 TEST_CASE("rain: deterministic, and the same at any frame rate without a clock") {
     rain::Settings st;
     st.seed = 42;

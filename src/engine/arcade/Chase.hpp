@@ -3,7 +3,8 @@
 // camera chasing one cycle. Projected on the CPU: the grid is the floor, each wall a vertical ribbon along a trail,
 // the cycles small line-art machines of our own; drawn far to near (painter's algorithm, one path per occluder), with
 // fog towards the horizon. The camera is a director stepped on the beat clock: springy chase shots that swing wide
-// around turns, cuts / glides to another cycle on `Cut` lines, a crane up over the arena on phrase lines (the walls
+// around turns, cuts / glides to another shot on `Cut` lines (another cycle only after `Hold` bars on one, or a
+// crash), a crane up over the arena on phrase lines (the walls
 // bursting), a low fast angle with speed lines on a drop, an orbit round the explosion when its cycle crashes.
 //
 // World coordinates are cell units: X along the grid's columns, Z along its rows (row 0 nearest Z = 0), Y up; a cell
@@ -67,7 +68,8 @@ struct ChaseConfig {
     double walH = 0.8;   // wall height, cells
     double fog = 42;     // distance (cells) at which lines have faded to about a tenth
     double grid = 0.45;  // floor grid intensity
-    double cut = 2;      // bars between camera changes
+    double cut = 2;      // bars between camera changes (the shot)
+    double hold = 8;     // bars at least on one cycle (unless it crashes); then it changes on a cut line
     double wdth = 2.4;   // line width (LWdt units) at the chase distance
     int shot = 0;        // 0: the director mixes shots; 1..5: always that shot (chase, low, side, ahead, high)
     int bike = 0;        // the machine's design: 0 arc, 1 blade, 2 orb
@@ -116,7 +118,8 @@ private:
         double fade;  // 1, falling towards 0 right at the camera (see-through: outlines only)
         bool ghost, fill;
     };
-    void chooseTarget(std::uint64_t key, Reason why);
+    // stay: how much the cycle chased counts for (negative: a little away from it).
+    void chooseTarget(std::uint64_t key, Reason why, double stay = -0.35);
     int pickShot(std::uint64_t key) const;
     void desired(double beat, V3& eye, V3& look, double& fov) const;
     void snapSprings(double beat);
@@ -141,6 +144,7 @@ private:
     bool started_ = false;
     double last_ = 0, lastBar_ = 0;
     long cutIdx_ = 0;
+    double targetBar_ = 0;  // the bar the chased cycle was picked on
     int target_ = 0, shot_ = kChase;
     double side_ = 1;  // which side of its cycle the shot keeps to (+1 right)
     Reason reason_ = kStart;

@@ -288,6 +288,13 @@ struct Settings {
     double nowPlayingSwitch = 3;              // reforce.NowPlaying.SwitchSeconds: a louder deck leads this long first
     double nowPlayingShadow = 0.8;            // reforce.NowPlaying.Shadow: adaptive shadow strength 0..1 (0 = off)
     double nowPlayingShadowFrom = 0.55;       // reforce.NowPlaying.ShadowFrom: background brightness where it starts
+    // Lyrics (sync/Lyrics): word-timed karaoke for the songs djtools made lyrics for, from rkbx_link's deck positions.
+    bool lyrics = false;                      // reforce.Lyrics.Show (off until it has been tried live)
+    double lyricsSize = 100;                  // reforce.Lyrics.Size: % of 64 px type at 1080 p
+    std::string lyricsPosition = "bottom";    // reforce.Lyrics.Position: bottom | center | top
+    double lyricsOffsetMs = 0;                // reforce.Lyrics.OffsetMs: + = words later (on top of the beat offset)
+    bool lyricsReviewedOnly = false;          // reforce.Lyrics.ReviewedOnly: only lyrics marked reviewed in djtools
+    std::string lyricsFolder;                 // reforce.Lyrics.Folder ("" = ~/Music/PioneerDJ/LocalSamples/Lyrics)
     // Drops (PLAN 5O.5, sync/DropDetector.hpp).
     bool dropSwitch = false;                  // reforce.Drop.Switch: on a drop, cut FlowField, WaveShape and ColorMap
                                               //   to their next configs

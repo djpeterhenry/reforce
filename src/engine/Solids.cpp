@@ -206,6 +206,7 @@ SolidSpec SolidRun::evaluate(double t, const SpriteAudio& audio) {
         c.drizzle = key("DRZ", 1.0, 0.0, 40.0);
         c.cluster = key("CLUS", 1.0, 0.0, 8.0);
         c.wet = key("WET", 0.65, 0.0, 1.0);
+        c.flow = key("FLOW", 1.0, 0.0, 4.0);
         rain::Look& l = s.rainLook;
         l.mode = rainSettings_.mode;
         l.depth = float(key("DPTH", floor ? 0.25 : 0.5, 0.0, 4.0));

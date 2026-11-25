@@ -38,6 +38,10 @@ struct TextBlockSpec {
     // in full color (emoji too) on a dark rounded box with a light outline and a tail at the bottom center pointing
     // down. Drawn as a color image (rasterizeBubble); the box's size is the whole image, tail included.
     bool bubble = false;
+    // Karaoke lines (sync/Lyrics): `fit` shrinks a line too wide for maxWidth to fit instead of cutting it with an
+    // ellipsis; `spans` reports where each word of the first line lies (TextImage::spans, TextOverlay::spans).
+    bool fit = false;
+    bool spans = false;
     bool operator==(const TextBlockSpec& o) const;
 };
 
@@ -47,6 +51,8 @@ struct TextBlockSpec {
 struct TextImage {
     int width = 0, height = 0, inset = 0;
     std::vector<std::uint8_t> bgra;
+    std::vector<float> spans;   // TextBlockSpec::spans: x0, x1 per space-separated word of the first line, px from
+                                // the text box's left
 };
 TextImage rasterizeText(const TextBlockSpec& spec);
 // A speech bubble (TextBlockSpec::bubble): premultiplied BGRA in full color, inset 0.
@@ -72,6 +78,14 @@ public:
     int width(int slot) const { return ok(slot) && slots_[slot].tex ? slots_[slot].w - 2 * slots_[slot].inset : 0; }
     int height(int slot) const { return ok(slot) && slots_[slot].tex ? slots_[slot].h - 2 * slots_[slot].inset : 0; }
     int slots() const { return int(slots_.size()); }
+    // Render thread: the slot's word spans (TextBlockSpec::spans; empty while none is ready).
+    const std::vector<float>& spans(int slot) const;
+    // Render thread: the slot shows what was last set (its newest layout is in; until then it keeps the one before).
+    bool ready(int slot) const {
+        return ok(slot) && slots_[std::size_t(slot)].haveWant && slots_[std::size_t(slot)].serial == serial_[std::size_t(slot)];
+    }
+    // Render thread: take in finished layouts now (encode does it too), so width / height / spans are current.
+    void adoptReady() { adopt(); }
 
     struct Draw {
         int slot = 0;
@@ -79,6 +93,10 @@ public:
         double opacity = 1;
         double scale = 1;       // drawn this much bigger / smaller around the box's center (a pop)
         bool image = false;     // the slot holds a color image (a speech bubble): drawn as it is, no shadow
+        // Karaoke: the letters left of `fillX` (px from the text box's left) white, the rest gray at `dim` (0..1).
+        // fillX < 0: all full.
+        double fillX = -1;
+        double dim = 1;
     };
     using Shadow = TextShadow;
     // Render thread: picks up finished images, then blends the draws over `output`. `dt`: seconds since the last
@@ -96,6 +114,8 @@ private:
         bool haveWant = false;
         MTL::Texture* tex = nullptr;
         int w = 0, h = 0, inset = 0;
+        std::vector<float> spans;
+        std::uint64_t serial = 0;   // of the layout it holds
     };
     struct Job {
         int slot = 0;
@@ -107,6 +127,7 @@ private:
         MTL::Texture* tex = nullptr;   // retained; null = empty block
         int w = 0, h = 0, inset = 0;
         std::uint64_t serial = 0;
+        std::vector<float> spans;
     };
 
     MTL::Device* device_;

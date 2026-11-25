@@ -297,6 +297,13 @@ struct RhythmState {
     double nowPlayingSwitch = 3;        // reforce.NowPlaying.SwitchSeconds
     double nowPlayingShadow = 0.8, nowPlayingShadowFrom = 0.55;  // reforce.NowPlaying.Shadow / ShadowFrom
     std::string nowPlayingLine;         // what it shows (live): "deck 2 · ARTIST – TITLE · 2003 + vocal ..."
+    bool lyrics = false;                // reforce.Lyrics.Show
+    double lyricsSize = 100;            // reforce.Lyrics.Size (%)
+    std::string lyricsPosition = "bottom";
+    double lyricsOffsetMs = 0;          // reforce.Lyrics.OffsetMs
+    bool lyricsReviewedOnly = false;    // reforce.Lyrics.ReviewedOnly
+    std::string lyricsLine;             // live: "deck 2 · ARTIST – TITLE · line 12 of 38" / which decks have lyrics
+    std::string lyricsLibrary;          // "12 songs in ..." / what went wrong
     double confidence = 0;              // auto: how clear the peak is (live)
     bool autoAlign = true;              // reforce.Phrase.AutoAlign
     std::string quantize = "bar", quantizeManual = "beat", quantizeSpawn = "off";

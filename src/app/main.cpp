@@ -85,6 +85,7 @@
 //                         Implies --allow-multiple.
 //   --lights              a --background instance drives the room lights (docs/lights.md) too (quit the live one's
 //                         lights first: both would fight over the panels)
+//   --rkbx-port PORT      a --background instance takes rkbx_link datagrams on PORT (e.g. a test feed; no MIDI)
 //   --log-file PATH       log file (default ~/Library/Logs/reforce/reforce.log, rotated at 4 MB, 3 kept);
 //                         stderr is copied there, and still printed when it is a terminal. --no-log-file: off
 // Debug: --quit-after SEC  --minimize-after SEC  --fullscreen-after SEC
@@ -160,7 +161,7 @@ void usage() {
                  "               [--save-frames A,B,...] [--save-every K]\n"
                  "               [--video SOURCE] [--syphon-name NAME] [--solid-test SPEC] [--dancer-test STYLES]\n"
                  "               [--ui-port N] [--ui-lan] [--no-ui] [--no-link]\n"
-                 "               [--write-setting KEY=VALUE] [--allow-multiple] [--background] [--lights]\n"
+                 "               [--write-setting KEY=VALUE] [--allow-multiple] [--background] [--lights] [--rkbx-port PORT]\n"
                  "               [--log-file PATH | --no-log-file]\n"
                  "               [--quit-after SEC] [--minimize-after SEC] [--fullscreen-after SEC]\n"
                  "               [--stress] [--stress-interval SEC] [--perf-report SEC] [--eval-threads N]\n"
@@ -240,6 +241,7 @@ int main(int argc, char** argv) {
     std::vector<std::string> dancerTests;            // --dancer-test (PLAN 5P test hook)
     std::vector<std::pair<std::string, std::string>> blends, sets, writeSettings;
     bool lightsFlag = false;  // --lights: a --background instance drives the room lights too
+    int rkbxPort = 0;         // --rkbx-port: a --background instance listens for rkbx_link there (test feeds)
     bool allowMultiple = false, logToFile = true, background = false, haveSyphonName = false, haveUiPort = false;
     std::string logPath;
     auto splitKv = [](const std::string& s, std::pair<std::string, std::string>& out) {
@@ -294,6 +296,7 @@ int main(int argc, char** argv) {
         else if (arg == "--allow-multiple") allowMultiple = true;
         else if (arg == "--background") background = true;
         else if (arg == "--lights") lightsFlag = true;
+        else if (arg == "--rkbx-port" && hasValue) rkbxPort = std::atoi(value().c_str());
         else if (arg == "--video" && hasValue) videoSource = value();
         else if (arg == "--dancer-test" && hasValue) {  // test hook (PLAN 5P)
             std::string v = value(), cur;
@@ -613,9 +616,10 @@ int main(int argc, char** argv) {
                 options.linkQuantum = prefs.linkQuantum;
                 options.linkFollow = prefs.linkFollow;
                 options.linkDriveBeat = prefs.linkDriveBeat;
-                options.deckFeed = !deterministic && !background;
-                options.deckFeedPort = prefs.phraseRkbxPort;
-                options.deckFeedMidi = prefs.phraseMidiDevice;
+                options.deckFeed = !deterministic && (!background || rkbxPort > 0);
+                options.deckFeedPort = rkbxPort > 0 ? rkbxPort : prefs.phraseRkbxPort;
+                // A test feed on its own port leaves the controller to the live copy.
+                options.deckFeedMidi = background && rkbxPort > 0 ? std::string("none") : prefs.phraseMidiDevice;
                 // Controller maps: reforce's own (content/Controllers), then the user's next to settings.json.
                 if (!dopts.contentDir.empty()) options.controllerDirs.push_back(dopts.contentDir / "Controllers");
                 options.controllerDirs.push_back(fs::path(settingsPath).parent_path() / "Controllers");

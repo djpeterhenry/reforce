@@ -11,7 +11,8 @@
 //   - floor ripples: the wave equation h' = (2 h - h_prev + c2 L h - b L L h + nu L (h - h_prev)) damp on a sim-size
 //     R32F grid (three textures in a ring), stepped per sim step with the step's impulses (engine::rain::waveStep:
 //     substeps, capillary dispersion b, viscosity nu; the dry glass between puddles damps it, the frame edges absorb);
-//     the puddles' meniscus (engine::rain::puddle, the same noise here) adds its own slope;
+//     the puddles' meniscus (engine::rain::puddle, the same noise here, its edges creeping over Sim::puddleTime and
+//     swelling with Sim::puddleWet) adds its own slope;
 //   - window fog: condensation (RG32F sim-size ping-pong: r fog 0..1, g wet film) easing back towards Fog over Refg
 //     seconds, wiped clear by each running drop's capsule this step and left with a wet film that fades.
 // The optics (rain_composite_fs): the surface normal N from the total slope; the view ray refracts into the water
@@ -45,7 +46,7 @@ using RainLook = engine::rain::Look;
 struct RainDropGpu {
     float cx, cy;      // center, output px
     float r;           // contact radius, px
-    float k;           // cap height / contact radius
+    float k;           // cap height / contact radius (negative: a droplet in the air, no halo)
     float ax, ay;      // the stretch axis (unit)
     float stretch;     // along the axis (area kept)
     float tail;        // a run's tail: the back half longer
@@ -85,11 +86,13 @@ private:
     int cols_ = 0, rows_ = 0;
     MTL::RenderPipelineState* copyPso_ = nullptr;
     MTL::RenderPipelineState* wavePso_ = nullptr;
+    MTL::RenderPipelineState* maskPso_ = nullptr;
     MTL::RenderPipelineState* fogPso_ = nullptr;
     MTL::RenderPipelineState* dropPso_ = nullptr;
     MTL::RenderPipelineState* compositePso_ = nullptr;
     MTL::Texture* copy_ = nullptr;   // the frame, mipmapped
     MTL::Texture* drops_ = nullptr;  // RG16F: height px, halo
+    MTL::Texture* mask_ = nullptr;   // R16F, sim size: the floor's puddle cover this step (the wave substeps read it)
     MTL::Texture* wave_[3] = {nullptr, nullptr, nullptr};
     MTL::Texture* fog_[2] = {nullptr, nullptr};
     int waveCur_ = 0, fogCur_ = 0;

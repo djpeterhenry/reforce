@@ -164,6 +164,44 @@ TEST_CASE("arcade chase: the chase camera stays behind its cycle; it changes cyc
     CHECK(changes >= 3);
 }
 
+TEST_CASE("arcade chase: one cycle is chased at least Hold bars unless it crashes; shots still change every Cut") {
+    for (int num : {4, 8}) {
+        ChaseConfig cfg;
+        cfg.game.num = num;
+        cfg.cut = num == 8 ? 1 : 2;  // as Chase Swarm / Chase Normal
+        View w(cfg, 11);
+        int prev = -1, prevShot = -1, holds = 0, shotChanges = 0;
+        double since = 0, lenSum = 0;
+        bool crashed = false;
+        for (int f = 0; f <= 30 * 4 * 160; ++f) {  // 160 bars at 30 frames per beat
+            const double beat = f / 30.0, bar = beat / 4.0;
+            w.at(beat);
+            const auto& v = w.v;
+            const int t = v.target();
+            if (prev >= 0 && t != prev) {
+                CAPTURE(num);
+                CAPTURE(bar);
+                // Before Hold bars only after a crash (the old cycle died, or the cut followed its crash orbit).
+                if (bar - since < cfg.hold - 1e-6) CHECK((crashed || v.reason() == ChaseView::kCrashed));
+                if (!crashed && v.reason() != ChaseView::kCrashed) {
+                    ++holds;
+                    lenSum += bar - since;
+                }
+                since = bar;
+                crashed = false;
+            }
+            if (!v.sim().cycles()[std::size_t(t)].alive) crashed = true;
+            if (prevShot >= 0 && v.shot() != prevShot) ++shotChanges;
+            prevShot = v.shot();
+            prev = t;
+        }
+        MESSAGE(num << " cycles: " << holds << " changes by choice, " << (holds ? lenSum / holds : 0)
+                    << " bars each on average; " << shotChanges << " shot changes");
+        CHECK(holds >= 3);
+        CHECK(shotChanges > 160 / cfg.cut / 4);
+    }
+}
+
 TEST_CASE("arcade chase: the director: shots change on cut lines, a crane on phrase lines, a drop shot, a crash orbit") {
     ChaseConfig cfg;
     cfg.game.num = 8;  // crowded: crashes

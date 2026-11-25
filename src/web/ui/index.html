@@ -270,6 +270,22 @@
           <span>Shadow starts at <b id="rhNpShadowFromVal">0.55</b></span><input type="range" id="rhNpShadowFrom" min="0" max="0.95" step="0.05"></label>
       </div>
       <p class="rh-decks" id="rhNpLine" title="What the now-playing text shows (also while it is hidden)"></p>
+      <h3 class="rh-sub" title="Word-timed lyrics as karaoke over the output, for songs djtools made lyrics for (lyrics.py, reviewed in lyrics_server.py). They follow the deck's position in rekordbox through rkbx_link, so cues, loops and the pitch fader stay in sync. Shown for the deck you hear most that has lyrics (rekordbox's master deck without the controller).">Lyrics</h3>
+      <div class="row buttons">
+        <button class="toggle" id="rhLy" aria-pressed="false" title="Show lyrics over the output when the deck you hear has them. Saved to settings.json (reforce.Lyrics.Show).">Show lyrics</button>
+        <button class="toggle" id="rhLyReviewed" aria-pressed="false" title="Only lyrics marked reviewed in djtools' lyrics page. Saved to settings.json (reforce.Lyrics.ReviewedOnly).">Reviewed only</button>
+        <label class="field compact" title="Where the two lines go. Saved to settings.json (reforce.Lyrics.Position).">
+          <span>Position</span>
+          <select id="rhLyPosition"><option value="bottom">bottom</option><option value="center">center</option><option value="top">top</option></select>
+        </label>
+      </div>
+      <div class="rh-grid">
+        <label class="field" title="Text size; 100 % = 64 px type on a 1080 p output (long lines get smaller to fit). Saved to settings.json (reforce.Lyrics.Size).">
+          <span>Size <b id="rhLySizeVal">100 %</b></span><input type="range" id="rhLySize" min="25" max="300" step="5"></label>
+        <label class="field" title="Moves every word later (+) or earlier (−), on top of the beat offset and each song's own offset. For a fixed lag of the whole chain; a single song's timing is fixed in djtools. Saved to settings.json (reforce.Lyrics.OffsetMs).">
+          <span>Words later by <b id="rhLyOffsetVal">0 ms</b></span><input type="range" id="rhLyOffset" min="-300" max="300" step="5"></label>
+      </div>
+      <p class="rh-decks" id="rhLyLine" title="What the lyrics show (also while hidden), and the lyrics folder (reforce.Lyrics.Folder)"></p>
       <p class="rh-decks" id="rhDeckLine" title="Decks seen through rkbx_link: ▶ playing, ■ stopped; up / down = channel fader (down? = not moved yet, counts as down); ★ the start that set the phrase lines, ✓ a start used before, (start) one waiting for its fader"></p>
       <div class="rh-grid">
         <label class="field" title="Slideshow changes (FlowField, WaveShape, ColorMap) wait for the next line. Beat and bar: with Link only. Saved to settings.json (reforce.Link.Quantize).">

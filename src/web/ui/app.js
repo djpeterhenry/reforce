@@ -114,11 +114,25 @@
     renderFavorites();
     for (const v of views.values()) if (layerOf(v.key) === layer && v.list) renderList(v);
   }
+  // Favorites in the order they appear in the cards (Peter 2026-11-24): card by card as the page reads (left to right,
+  // top to bottom), then down each card's list; ones no longer in any list last, in the order they were added.
+  function sortedFavorites() {
+    const rank = new Map();  // layer + id -> [card, place in its list]
+    const cards = [...views.values()].filter((v) => v.root && v.configs)
+      .sort((a, b) => (a.root.compareDocumentPosition(b.root) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
+    cards.forEach((v, ci) => listOrder(v).forEach((c, i) => {
+      const k = `${layerOf(v.key)}\n${c.id}`;
+      if (!rank.has(k)) rank.set(k, [ci, i]);
+    }));
+    const none = [Infinity, Infinity];
+    return favorites.map((f, i) => [rank.get(`${f.layer}\n${f.id}`) || none, i, f])
+      .sort((a, b) => a[0][0] - b[0][0] || a[0][1] - b[0][1] || a[1] - b[1]).map((x) => x[2]);
+  }
   function renderFavorites() {
     const box = $('#favButtons');
     if (!box) return;
     box.replaceChildren();
-    for (const f of favorites) {
+    for (const f of sortedFavorites()) {
       if (f.layer === 'sprite' && isHidden(f.id)) continue;  // hidden: reforce would refuse it
       const lib = libLayer(f.layer);
       const cfg = lib.configs.find((c) => c.id === f.id);
@@ -521,22 +535,28 @@
     return words.every((w) => hay.includes(w));
   }
 
+  // Objects, all groups: in group order under headings (configs in no group last, under "Other"): [rank, i, cfg].
+  function groupOrder(view) {
+    const rank = (c) => {
+      const i = view.groups.findIndex((g) => (c.categories || []).includes(g.name));
+      return i < 0 ? view.groups.length : i;
+    };
+    return view.configs.map((c, i) => [rank(c), i, c]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  }
+  // A card's list as it reads with no filter.
+  const listOrder = (view) => (view.groups && view.groups.length ? groupOrder(view).map((x) => x[2]) : view.configs);
+
   function renderList(view) {
     const words = view.search.value.toLowerCase().split(/\s+/).filter(Boolean);
     const filter = view.filter.value;
     const ls = viewState(view);
     const frag = document.createDocumentFragment();
     let n = 0;
-    // Objects, all groups: in group order under headings (configs in no group last, under "Other").
     let order = view.configs, heads = null;
     if (!filter && view.groups && view.groups.length) {
-      const rank = (c) => {
-        const i = view.groups.findIndex((g) => (c.categories || []).includes(g.name));
-        return i < 0 ? view.groups.length : i;
-      };
-      order = view.configs.map((c, i) => [rank(c), i, c]).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-      heads = order.map(([r]) => (r < view.groups.length ? view.groups[r].name : 'Other'));
-      order = order.map((x) => x[2]);
+      const g = groupOrder(view);
+      order = g.map((x) => x[2]);
+      heads = g.map(([r]) => (r < view.groups.length ? view.groups[r].name : 'Other'));
     }
     let lastHead = null;
     const hideHidden = layerOf(view.key) === 'sprite';
@@ -1904,6 +1924,9 @@
     $('#rhBars').addEventListener('change', (e) => bset('phrasebars', e.target.value));
     beatToggle($('#rhDecks'), 'phrasedecks');
     beatToggle($('#rhNp'), 'nowplaying');
+    beatToggle($('#rhLy'), 'lyrics');
+    beatToggle($('#rhLyReviewed'), 'lyricsreviewed');
+    $('#rhLyPosition').addEventListener('change', (e) => bset('lyricsposition', e.target.value));
     $('#rhNpCorner').addEventListener('change', (e) => bset('nowplayingcorner', e.target.value));
     beatToggle($('#rhDropSwitch'), 'dropswitch');
     for (const [id, key] of [['rhQuantize', 'quantize'], ['rhQuantizeManual', 'quantizemanual'],
@@ -1917,6 +1940,8 @@
       ['rhNpSwitch', 'rhNpSwitchVal', 'nowplayingswitch', (v) => v.toFixed(1).replace(/\.0$/, '') + ' s'],
       ['rhNpShadow', 'rhNpShadowVal', 'nowplayingshadow', (v) => Math.round(v * 100) + ' %'],
       ['rhNpShadowFrom', 'rhNpShadowFromVal', 'nowplayingshadowfrom', (v) => v.toFixed(2)],
+      ['rhLySize', 'rhLySizeVal', 'lyricssize', (v) => v.toFixed(0) + ' %'],
+      ['rhLyOffset', 'rhLyOffsetVal', 'lyricsoffset', (v) => (v > 0 ? '+' : '') + v.toFixed(0) + ' ms'],
     ];
     for (const [id, lbl, key, fmt] of sliders) beatSlider($('#' + id), lbl, key, fmt);
   }
@@ -2210,6 +2235,8 @@
     setText(dt, hit ? `drop! (${r.drops || 0} so far)` : r.breakdown ? `breakdown · build ${Math.round((r.build || 0) * 100)} %`
       : (r.drops ? `${r.drops} drop${r.drops === 1 ? '' : 's'} so far` : 'waiting for a breakdown'));
     if (r.nowPlayingLine !== undefined) setText($('#rhNpLine'), r.nowPlayingLine || 'nothing yet (needs rkbx_link)');
+    if (r.lyricsLine !== undefined)
+      setText($('#rhLyLine'), (r.lyricsLine || 'no lyrics for what is loaded') + (r.lyricsLibrary ? ' · ' + r.lyricsLibrary : ''));
     if (r.deckInputs !== undefined) {
       // Decks, then each input colored by whether it is there (missing ones start with "no ").
       const el = $('#rhDeckLine');
@@ -2243,15 +2270,19 @@
     $('#rhDecks').setAttribute('aria-pressed', String(r.deckStarts !== false));
     $('#rhDropSwitch').setAttribute('aria-pressed', String(!!r.dropSwitch));
     $('#rhNp').setAttribute('aria-pressed', String(!!r.nowPlaying));
+    $('#rhLy').setAttribute('aria-pressed', String(!!r.lyrics));
+    $('#rhLyReviewed').setAttribute('aria-pressed', String(!!r.lyricsReviewedOnly));
     const sel = (id, v) => { const el = $('#' + id); if (document.activeElement !== el && v !== undefined) el.value = String(v); };
     sel('rhBars', bars);
     sel('rhQuantize', r.quantize);
     sel('rhQuantizeManual', r.quantizeManual);
     sel('rhQuantizeSpawn', r.quantizeSpawn);
     sel('rhNpCorner', r.nowPlayingCorner);
+    sel('rhLyPosition', r.lyricsPosition);
     for (const [id, v] of [['rhZoom', r.kickZoom], ['rhRot', r.kickRotate], ['rhDecay', r.kickDecayMs],
                            ['rhNpSize', r.nowPlayingSize], ['rhNpSwitch', r.nowPlayingSwitch],
-                           ['rhNpShadow', r.nowPlayingShadow], ['rhNpShadowFrom', r.nowPlayingShadowFrom]])
+                           ['rhNpShadow', r.nowPlayingShadow], ['rhNpShadowFrom', r.nowPlayingShadowFrom],
+                           ['rhLySize', r.lyricsSize], ['rhLyOffset', r.lyricsOffsetMs]])
       beatSliderShow(id, v);
   }
 

@@ -22,7 +22,8 @@ const char* kShader = R"(
 #include <metal_stdlib>
 using namespace metal;
 // rect: NDC left, top, right, bottom; spread: shadow brightness taps apart, in output uv
-struct TextQuad { float4 rect; float opacity; float strength; float from; float spread; float4 mode; };  // mode.x 1: a color image
+// mode.x 1: a color image; mode.y the karaoke split (uv x; > 1.5: none), mode.z the dim beyond it, mode.w its softness
+struct TextQuad { float4 rect; float opacity; float strength; float from; float spread; float4 mode; };
 struct VOut { float4 position [[position]]; float2 uv; float2 screen; };
 vertex VOut text_vs(uint vid [[vertex_id]], constant TextQuad& q [[buffer(0)]]) {
     const float2 p = float2(vid & 1, vid >> 1);
@@ -40,6 +41,8 @@ fragment float4 text_fs(VOut in [[stage_in]], texture2d<float> tex [[texture(0)]
     const float4 t = tex.sample(smp, in.uv);
     if (q.mode.x > 0.5f) return t * q.opacity;  // a color image (speech bubble), premultiplied
     const float a = t.r;
+    // Karaoke: past the split the letters are gray (as opaque as the rest, so they read over bright pictures).
+    const float c = q.mode.y < 1.5f ? mix(1.0f, q.mode.z, smoothstep(q.mode.y - q.mode.w, q.mode.y + q.mode.w, in.uv.x)) : 1.0f;
     float h = 0.0f;
     if (q.strength > 0.0f) {
         const float2 d = float2(q.spread, q.spread * 0.6f);
@@ -48,7 +51,7 @@ fragment float4 text_fs(VOut in [[stage_in]], texture2d<float> tex [[texture(0)]
                                 lum.sample(smp, in.screen - float2(0, d.y)).r);
         h = q.strength * smoothstep(q.from, q.from + 0.3f, l) * saturate(t.g * 1.5f);
     }
-    return float4(a, a, a, a + h * (1.0f - a)) * q.opacity;
+    return float4(a * c, a * c, a * c, a + h * (1.0f - a)) * q.opacity;
 }
 // The frame's luminance at 1/8 size (16 taps per 8 x 8 block), blended into the running average.
 struct LumOut { float4 position [[position]]; float2 uv; };
@@ -74,7 +77,7 @@ fragment float4 lum_fs(LumOut in [[stage_in]], texture2d<float> src [[texture(0)
 struct TextQuad {
     float rect[4];
     float opacity, strength, from, spread;
-    float mode[4];  // mode[0] 1: a color image (speech bubble)
+    float mode[4];  // mode[0] 1: a color image (speech bubble); [1] karaoke split (uv x, 2 = none), [2] dim, [3] soft
 };
 
 CFStringRef cfString(const std::string& s, bool upper) {
@@ -106,7 +109,8 @@ CTLineRef makeLine(const std::string& text, CTFontRef font, bool upper) {
 }  // namespace
 
 bool TextBlockSpec::operator==(const TextBlockSpec& o) const {
-    if (maxWidth != o.maxWidth || uppercase != o.uppercase || bubble != o.bubble || lines.size() != o.lines.size())
+    if (maxWidth != o.maxWidth || uppercase != o.uppercase || bubble != o.bubble || fit != o.fit || spans != o.spans ||
+        lines.size() != o.lines.size())
         return false;
     for (std::size_t i = 0; i < lines.size(); ++i) {
         const TextLine &a = lines[i], &b = o.lines[i];
@@ -136,6 +140,21 @@ TextImage rasterizeText(const TextBlockSpec& spec) {
         CTLineRef line = makeLine(l.text, d.font, spec.uppercase);
         CGFloat asc = 0, desc = 0, lead = 0;
         double w = CTLineGetTypographicBounds(line, &asc, &desc, &lead);
+        double size = l.sizePx;
+        if (w > spec.maxWidth && spec.fit && w > 0) {
+            // Smaller type until it fits (once by the ratio, then a step or two for rounding in the layout).
+            for (int k = 0; k < 4 && w > spec.maxWidth && size > 4; ++k) {
+                size = std::max(4.0, std::floor(size * spec.maxWidth / w * 0.995));
+                CTFontRef smaller = CTFontCreateUIFontForLanguage(l.bold ? kCTFontUIFontEmphasizedSystem : kCTFontUIFontSystem,
+                                                                 CGFloat(size), nullptr);
+                if (!smaller) break;
+                CFRelease(d.font);
+                d.font = smaller;
+                CFRelease(line);
+                line = makeLine(l.text, d.font, spec.uppercase);
+                w = CTLineGetTypographicBounds(line, &asc, &desc, &lead);
+            }
+        }
         if (w > spec.maxWidth) {
             CTLineRef dots = makeLine("\xE2\x80\xA6", d.font, false);
             CTLineRef cut = CTLineCreateTruncatedLine(line, spec.maxWidth, kCTLineTruncationEnd, dots);
@@ -149,7 +168,22 @@ TextImage rasterizeText(const TextBlockSpec& spec) {
         d.line = line;
         d.ascent = asc;
         d.descent = desc;
-        d.box = 1.2 * l.sizePx;
+        d.box = 1.2 * size;
+        if (spec.spans && laid.empty()) {
+            // Each space-separated word's start and end, from the laid-out line (UTF-16 indices of the same string).
+            CFStringRef str = cfString(l.text, spec.uppercase);
+            const CFIndex n = CFStringGetLength(str);
+            CFIndex k = 0;
+            while (k < n) {
+                while (k < n && CFStringGetCharacterAtIndex(str, k) == ' ') ++k;
+                if (k >= n) break;
+                const CFIndex start = k;
+                while (k < n && CFStringGetCharacterAtIndex(str, k) != ' ') ++k;
+                img.spans.push_back(float(CTLineGetOffsetForStringIndex(line, start, nullptr)));
+                img.spans.push_back(float(CTLineGetOffsetForStringIndex(line, k, nullptr)));
+            }
+            CFRelease(str);
+        }
         y += first ? l.marginTop : std::max(prevBottom, l.marginTop);
         d.top = y;
         y += d.box;
@@ -384,7 +418,7 @@ void TextOverlay::worker() {
         }
         NS::AutoreleasePool* pool = NS::AutoreleasePool::alloc()->init();
         const TextImage img = job.spec.bubble ? rasterizeBubble(job.spec) : rasterizeText(job.spec);
-        Done done{job.slot, nullptr, img.width, img.height, img.inset, job.serial};
+        Done done{job.slot, nullptr, img.width, img.height, img.inset, job.serial, img.spans};
         if (img.width > 0 && img.height > 0) {
             MTL::TextureDescriptor* td = MTL::TextureDescriptor::texture2DDescriptor(
                 MTL::PixelFormatBGRA8Unorm, NS::UInteger(img.width), NS::UInteger(img.height), false);
@@ -419,7 +453,14 @@ void TextOverlay::adopt() {
         s.w = d.w;
         s.h = d.h;
         s.inset = d.inset;
+        s.spans = std::move(d.spans);
+        s.serial = d.serial;
     }
+}
+
+const std::vector<float>& TextOverlay::spans(int slot) const {
+    static const std::vector<float> none;
+    return ok(slot) && slots_[std::size_t(slot)].tex ? slots_[std::size_t(slot)].spans : none;
 }
 
 void TextOverlay::encode(MTL::CommandBuffer* cmd, MTL::Texture* output, const Draw* draws, int count,
@@ -499,6 +540,13 @@ void TextOverlay::encode(MTL::CommandBuffer* cmd, MTL::Texture* output, const Dr
         q.from = float(std::clamp(shadow.from, 0.0, 1.0));
         q.spread = float(0.025 * H / W);
         q.mode[0] = d.image ? 1.0f : 0.0f;
+        q.mode[1] = 2.0f;
+        if (d.fillX >= 0 && !d.image) {
+            // The split in the quad's uv: the box starts `inset` in; a soft edge of about a pixel.
+            q.mode[1] = float((s.inset + d.fillX) / double(s.w));
+            q.mode[2] = float(std::clamp(d.dim, 0.0, 1.0));
+            q.mode[3] = float(1.0 / std::max(1, s.w));
+        }
         enc->setVertexBytes(&q, sizeof q, 0);
         enc->setFragmentBytes(&q, sizeof q, 0);
         enc->setFragmentTexture(s.tex, 0);

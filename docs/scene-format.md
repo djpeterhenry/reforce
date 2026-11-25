@@ -761,6 +761,7 @@ at a time: a newer one replaces an older one at once.
 | `Fros` | FrameOutput | Blur of the fog in pixels at 1080p (16). |
 | `Dpth` | FrameOutput | The visuals' distance behind the glass in frame heights (window .5, floor .25): how strongly drops bend and invert them. |
 | `Wet` | FrameOutput | Floor: the share of the glass under puddles, 0 dry (beads only) .. 1 one sheet of water (.65; Rain Pool 1). The dry glass holds the water at rest, so ripples bounce off a puddle's edge. |
+| `Flow` | FrameOutput | Floor: how much the puddles' edges move (0..4; 1): they creep slowly and swell a little while rain pours in, draining after; 0 = still edges. |
 | `Pudl` | FrameOutput | Floor: how visible the puddles are (0..3; 1): a bright meniscus on the water's edge, a dark contact line just outside, a little deeper and cooler inside, a stronger lens at the edge; 0 = the edges only bend the visuals faintly. |
 | `Spd`, `Dcay` | FrameOutput | Floor: ripple speed in frame heights per second (.3) and decay in seconds (1.6). |
 | `Spec`, `Rim` | FrameOutput | Highlight strength (1); the dark contact line and halo that make drops read on any visuals (1). |

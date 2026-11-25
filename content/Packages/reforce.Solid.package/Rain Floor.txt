@@ -1,5 +1,5 @@
 Vers=100
-Meta="reforce solid: rain on a glass floor seen from above, the visuals below it (Rain floor). Water stands in puddles on the glass (Wet: how much of it they cover). Drops strike on the beat (Dens per beat, a cluster on every bar line, a drizzle on the 16ths): in a puddle each pushes the surface down and throws a crown of droplets, and the rings spread, cross and interfere (a damped wave equation with capillary dispersion, Spd, Dcay), bending the visuals beneath; on the dry glass between the puddles drops stay as beads and merge. Each puddle shows (Pudl): a bright meniscus on its edge, a dark contact line just outside, a little deeper inside; its ripples bounce off the edge rather than running onto the dry glass. A build thins the beats and thickens the drizzle, a drop is a downpour. Drawn over the visuals, which keep running underneath."
+Meta="reforce solid: rain on a glass floor seen from above, the visuals below it (Rain floor). Water stands in puddles on the glass (Wet: how much of it they cover); their edges creep slowly and swell a little while the rain pours in (Flow). Drops strike on the beat (Dens per beat, a cluster on every bar line, a drizzle on the 16ths): in a puddle each pushes the surface down and throws a crown of droplets, and the rings spread, cross and interfere (a damped wave equation with capillary dispersion, Spd, Dcay), bending the visuals beneath; on the dry glass between the puddles drops stay as beads and merge, and a bead the water touches is drawn into it. Each puddle shows (Pudl): a bright meniscus on its edge, a dark contact line just outside, a little deeper inside; its ripples bounce off the edge rather than running onto the dry glass. A build thins the beats and thickens the drizzle, a drop is a downpour. Drawn over the visuals, which keep running underneath."
 Mesh="rain"
 Rain="floor"
 PBar="32"
@@ -10,6 +10,7 @@ Clus="1"
 // the puddles' cover, the ripples' speed (frame heights per second) and decay (seconds), the visuals' depth below
 Wet=".65"
 Pudl="1"
+Flow="1"
 Spd=".3"
 Dcay="1.6"
 Dpth=".25"

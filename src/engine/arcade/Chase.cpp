@@ -193,6 +193,7 @@ ChaseView::ChaseView(const ChaseConfig& cfg, std::uint64_t seed) : cfg_(cfg), se
     cfg_.fog = std::clamp(finiteOr(cfg_.fog, 42), 2.0, 1000.0);
     cfg_.grid = std::clamp(finiteOr(cfg_.grid, 0.45), 0.0, 1.0);
     cfg_.cut = std::clamp(finiteOr(cfg_.cut, 2), 0.25, 1024.0);
+    cfg_.hold = std::clamp(finiteOr(cfg_.hold, 8), 0.0, 1024.0);
     cfg_.wdth = std::clamp(finiteOr(cfg_.wdth, 2.4), 0.0, 50.0);
     cfg_.shot = std::clamp(cfg_.shot, 0, int(kShots));
     cfg_.bike = std::clamp(cfg_.bike, 0, 2);
@@ -211,7 +212,7 @@ void ChaseView::headAt(int i, double beat, V3& p, double& angle) const {
     p = {x, 0, y};
 }
 
-void ChaseView::chooseTarget(std::uint64_t key, Reason why) {
+void ChaseView::chooseTarget(std::uint64_t key, Reason why, double stay) {
     // Prefer cycles near others (where the action is) and near a fresh explosion; a little away from the one chased.
     const auto& cs = sim_.cycles();
     const int n = int(cs.size());
@@ -232,7 +233,7 @@ void ChaseView::chooseTarget(std::uint64_t key, Reason why) {
         }
         for (const auto& b : sim_.blasts())
             if (now - b.t < 4) score += 0.5 * std::exp(-length(V3{b.x, 0, b.y} - p) / 8.0);
-        if (i == target_) score -= 0.35;
+        if (i == target_) score += stay;
         if (score > bestScore) {
             bestScore = score;
             best = i;
@@ -331,16 +332,26 @@ void ChaseView::advance(double beat, double bar, double drop, double build, doub
         orbiting_ = false;
         cutIdx_ = ci;
         chooseTarget(key, started_ ? kCutLine : kStart);
+        targetBar_ = bar;
         shot_ = started_ || cfg_.shot >= 2 ? pickShot(key) : int(kChase);
         side_ = hashU(key, 103) < 0.5 ? -1.0 : 1.0;
         snap_ = true;
     } else if (ci != cutIdx_) {
-        // A cut line: maybe another cycle, maybe another shot. A new shot (or a far target) is a cut, else a glide.
+        // A cut line: maybe another shot; another cycle only once it has been chased `Hold` bars (a crash aside).
+        // On a round's first bar (the crane swooping down) the director prefers another cycle; mid-round it stays
+        // unless another is clearly where the action is. A new shot (or a far target) is a cut, else a glide.
         cutIdx_ = ci;
         V3 before;
         double a;
         headAt(target_, beat, before, a);
-        chooseTarget(key, kCutLine);
+        const double lineBar = double(ci) * cfg_.cut;
+        if (lineBar - targetBar_ >= cfg_.hold - 1e-6) {
+            const double rs = sim_.config().reset;
+            const bool roundStart = rs > 0 && std::abs(lineBar / rs - std::round(lineBar / rs)) * rs < 1e-6;
+            const int was = target_;
+            chooseTarget(key, kCutLine, roundStart ? -0.35 : 1.2);
+            if (target_ != was) targetBar_ = lineBar;
+        }
         const int s = pickShot(key);
         V3 after;
         headAt(target_, beat, after, a);
@@ -366,6 +377,7 @@ void ChaseView::advance(double beat, double bar, double drop, double build, doub
         if (beat >= std::ceil(orbitT_ + 2.5 - 1e-9)) {
             chooseTarget(mix(seed_ ^ bitsOf(orbitT_)), kCrashed);
             if (sim_.cycles()[std::size_t(target_)].alive) {
+                targetBar_ = bar;
                 orbiting_ = false;
                 snap_ = true;
             }
@@ -1215,6 +1227,7 @@ public:
         c.fog = keyNum(in, "FOG", 42, 2, 1000);
         c.grid = keyNum(in, "GRID", 0.45, 0, 1);
         c.cut = keyNum(in, "CUT", 2, 0.25, 1024);
+        c.hold = keyNum(in, "HOLD", 8, 0, 1024);
         c.wdth = keyNum(in, "WDTH", 2.4, 0, 50);
         c.shot = keyCount(in, "SHOT", 0, 0, ChaseView::kShots);
         c.bike = keyCount(in, "BIKE", 0, 0, 2);
@@ -1227,9 +1240,10 @@ public:
 
     std::string summary() const override {
         const auto& c = view_.config();
-        char b[160];
-        std::snprintf(b, sizeof b, "%d cycles on %d x %d in 3D, %d cells per beat, camera %g behind, cut every %g bars",
-                      c.game.num, c.game.cols, c.game.rows, c.game.spd, c.cam, c.cut);
+        char b[200];
+        std::snprintf(b, sizeof b, "%d cycles on %d x %d in 3D, %d cells per beat, camera %g behind, cut every %g bars, "
+                      "one cycle at least %g bars",
+                      c.game.num, c.game.cols, c.game.rows, c.game.spd, c.cam, c.cut, c.hold);
         return b;
     }
 

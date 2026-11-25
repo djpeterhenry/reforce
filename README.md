@@ -59,6 +59,7 @@ Everything here is optional. reforce runs without any of it, and without a camer
 | Cameras, movies, Syphon input | Color video layer, movie sprites, a camera backdrop, body tracking | macOS asks for camera access the first time one is opened |
 | Ableton Link | Tempo and bar sync with rekordbox, Ableton Live, Traktor | Automatic on the local network |
 | rekordbox decks | Track positions and titles from a "reforce" output module for [rkbx_link](https://github.com/grufkork/rkbx_link) (UDP port 4470; the module is not in rkbx_link yet), plus a DJ controller's faders over MIDI, mapped by a text file in [content/Controllers](content/Controllers/) (Pioneer DDJ-1000 included) | [docs/rhythm-design.md](docs/rhythm-design.md) |
+| Song lyrics | Word-timed karaoke for songs with a lyrics file, following the rekordbox deck you hear | Off by default; [docs/lyrics.md](docs/lyrics.md) |
 | Stream guests | Viewers check in on your own guest page and dance on stage with a name tag | Off by default; [docs/guests.md](docs/guests.md) |
 | Nanoleaf Light Panels | Each panel follows its part of the picture | Pair from the control panel; [docs/lights.md](docs/lights.md) |
 
@@ -70,7 +71,7 @@ Everything here is optional. reforce runs without any of it, and without a camer
 - Design notes for each part: [3D solids](docs/3d-design.md), [organics](docs/organics-design.md),
   [dancers](docs/dancers-design.md), [rhythm](docs/rhythm-design.md), [beat detection](docs/beat-detection.md),
   [camera backdrop](docs/backdrop.md), [body tracking](docs/body.md), [lights](docs/lights.md),
-  [stream guests](docs/guests.md)
+  [stream guests](docs/guests.md), [lyrics](docs/lyrics.md)
 
 ## Repository layout
 

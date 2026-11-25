@@ -40,7 +40,7 @@ dynamically." The light-cycle game itself (`CyclesSim`, the same rules, AI, cras
 3D from a camera chasing one cycle. Engine: src/engine/arcade/Chase.cpp / Chase.hpp (`ChaseView`: the game, the
 director and the drawing; `ChaseCamera`: the projection, tested on its own); tests:
 tests/test_engine_arcade_chase.cpp; content: Chase Normal (4 cycles, 40 x 24), Chase Swarm (8 on a wide fine grid at
-Chase Normal's speed, walls and turns, a higher camera cutting every bar); Chase Duel was removed 2026-11-22.
+Chase Normal's speed, walls and turns, a higher camera changing shot every bar); Chase Duel was removed 2026-11-22.
 
 - **3D on the CPU.** World units are cells (X along the columns, Z along the rows, Y up). A perspective camera (eye,
   look-at, vertical FOV, roll) projects to tree units; lines are clipped at the near plane, then to the frame
@@ -95,11 +95,14 @@ same beats give the same film:
   look-at point are springs too, so it swings wide round each 90-degree turn and rolls a little into it.
 - **Beats.** On every beat line a FOV kick (+7 %) and the camera dipping (a fifth of `CamH`), stronger on bar lines
   and with the onset (`BEAT`), never down past the top of the walls.
-- **Cut lines** (every `Cut` bars, aligned to the bar clock): it picks the cycle to chase (preferring cycles near
-  others and near a fresh explosion, a little away from the one it had) and a shot: the chase (most often), low and
-  fast beside the wall, alongside (a tracking shot from the side), ahead looking back at the cycle and its wall
-  streaming out, or high behind. A new shot (or a far cycle) is a cut; the same shot on another cycle is a glide
-  (the springs carry the camera across).
+- **Cut lines** (every `Cut` bars, aligned to the bar clock): it picks a shot: the chase (most often), low and fast
+  beside the wall, alongside (a tracking shot from the side), ahead looking back at the cycle and its wall streaming
+  out, or high behind. The cycle chased changes on its own, slower clock (Peter 2026-11-24: follow the same one for
+  longer): only once it has been chased `Hold` bars (8), on a cut line, unless it crashes. On a round's first bar (the
+  crane swooping down) it prefers another cycle (near others and near a fresh explosion, a little away from the one
+  it had); mid-round it stays unless another is clearly where the action is. So a cycle is usually followed from
+  the swoop down to its crash or the round's end (about 16 bars on average in Chase Normal, 11 in Chase Swarm). A new
+  shot (or a far cycle) is a cut; the same shot on another cycle is a glide (the springs carry the camera across).
 - **Phrase lines** (the round's reset, `Rsd` bars): from two beats before, the camera cranes up to a high wide shot
   over the whole arena, holds it as the walls burst and the new formation appears, drifting round a little, then
   swoops back down behind a cycle over the next three beats (alternating sides from phrase to phrase).
@@ -121,9 +124,10 @@ same beats give the same film:
 | `WalH` | Load | .8 | Wall height, cells (0..10). |
 | `Fog` | Load | 42 | Distance (cells) at which lines have faded to about a tenth (2..1000). |
 | `Grid` | Load | .45 | Floor grid intensity (0..1; 0 = only the border). |
-| `Cut` | Load | 2 | Bars between camera changes (.25..1024). |
+| `Cut` | Load | 2 | Bars between shot changes (.25..1024). |
+| `Hold` | Load | 8 | Bars at least on one cycle before the director may pick another (0..1024); a crash cuts sooner. |
 | `Wdth` | Load | 2.4 | Line width (LWdt units) at the chase distance; nearer lines are wider, farther thinner. |
-| `Shot` | Load | 0 | 0: the director mixes shots; 1..5: always that shot: 1 chase, 2 low, 3 alongside, 4 ahead, 5 high (cycles still change on cut lines). |
+| `Shot` | Load | 0 | 0: the director mixes shots; 1..5: always that shot: 1 chase, 2 low, 3 alongside, 4 ahead, 5 high (cycles still change after `Hold` bars). |
 | `Bike` | Load | 0 | The machines' design: 0 Arc (every Chase config), 1 Blade, 2 Orb. |
 | `X`, `Y`, `Scal`, `Rot`, `Pen` | Frame | 0, 0, 1, 0, 1 | As for every organic. |
 
@@ -133,7 +137,7 @@ same beats give the same film:
 Vector rocks drift and slowly turn through a field that wraps at the frame's edges (a rock's width outside the frame,
 so a rock is wholly off screen when it jumps to the other side: nothing pops). Our own ship sits in the middle: a
 stretched hexagonal hull, twin barrels, swept fins, a cockpit dot. It turns to aim and fires; every shot connects.
-Everything is thin line art with an optional halo (`Glow`): the halos go in a first path, the cores in a second over
+Everything is thin line art with an optional halo (`Glow`), the rocks and the ship filled solid inside (`Fill`, hard-edged scanlines): the halos go in a first path, the cores in a second over
 them, since within one path the stroke with the most coverage wins. Engine: src/engine/arcade/Rocks.cpp; tests:
 tests/test_engine_arcade_rocks.cpp; content: Rock Field, Rock Storm.
 
@@ -172,10 +176,11 @@ ship .92, flame .74, shots 1, edge debris .5, sparks .8, shockwave .7; debris fa
 | `Size` | Load | Scale of the rocks and the ship (1; .2..4): a large rock's radius is .2 × Size tree units, the ship .2 × Size long. |
 | `Wave` | Load | Bars between fresh waves (16, a phrase; 0 = only when the field is clear). |
 | `Glow` | Load | Halo strength (.35; 0 = none, 1): a dim stroke 3.2 × as wide under each line. |
+| `Fill` | Load | The rocks' and the ship's inside (.3; 0 = outlines only, 1): solid (Peter 2026-11-24: outlines alone hardly showed), dimmer than the rim; a rock's brightens by half with a hit's flash, the ship's hull and fins are 1.5 × `Fill`. |
 | `X`, `Y`, `Scal`, `Rot`, `Pen` | Frame | As for every organic. The field wraps at the frame's edges (its real aspect), so `Rot` or a large `X` / `Y` shows the wrap edges. |
 
 Bounds: at most 48 rocks (a wave only comes while there is room for it to split fully), 640 pieces of debris (the
-oldest give way), 32 shots; under 1,000 segments a frame even in a stress run (12 rocks a wave, 16 shots and 16 hits a
+oldest give way), 32 shots; under 4,000 segments a frame (most of them the fills' scanlines) even in a stress run (12 rocks a wave, 16 shots and 16 hits a
 beat, a wave every bar, drops and breakdowns), about 6 µs a step.
 
 

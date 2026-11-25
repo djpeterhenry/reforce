@@ -956,6 +956,18 @@ docs/model-design.md.
   content/Camera (and the model folder's Camera/), tested against the old code; warp was removed first (Peter: not
   compelling), with the model's own offset / stretch / flash / streaks.
 
+### 5S. Lyrics: word-timed karaoke for songs that have them  (Peter, 2026-11-24)  `[~]` built; Peter to try live
+
+[docs/lyrics.md](docs/lyrics.md). djtools makes the lyrics files (`lyrics.py`: LRCLIB text, Demucs vocals, Whisper for
+the song's structure, MMS forced alignment per word) and `lyrics_server.py` reviews / corrects them (waveform, drag
+words, tap timing, re-align a line after editing its text); saves show in reforce within a second.
+- [x] `sync/Lyrics`: sidecar + index, `DeckClock` (position between rkbx_link frames), `KaraokePicker`, two-row layout
+- [x] TextOverlay: word spans, shrink to fit, a fill split (sung white, the rest gray)
+- [x] Rhythm card: show, reviewed only, position, size, offset; `--rkbx-port` for a test feed on a background copy
+- [x] MP3 start: rekordbox / Ableton ignore the LAME gapless header, ffmpeg trims it: gapless MP3s timed 51 ms early;
+  djtools now decodes on rekordbox's timeline (measured on ~300 songs against warp markers, 2026-11-24)
+- [ ] Peter: check the timing live with rekordbox
+
 ### Fidelity choices: match G-Force vs do it right  (Peter, 2026-11-11)  `[ ]` Peter to decide defaults
 Past decisions that copy a G-Force quirk. "Option" = can already switch it; "Proposed" = what the "done right" option
 would be. **Peter decided 2026-11-12: "Done right" for all of these, plus polar/aligned/oklab blends, set in his settings.json** (decision log). **Look card (2026-11-11):** F1, F2, F4, F5 and line AA switch

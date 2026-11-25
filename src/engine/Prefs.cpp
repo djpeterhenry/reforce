@@ -410,6 +410,13 @@ void Settings::apply(const PrefsTable& t) {
     nowPlayingSwitch = std::clamp(t.number("reforce.NowPlaying.SwitchSeconds", nowPlayingSwitch), 0.0, 30.0);
     nowPlayingShadow = std::clamp(t.number("reforce.NowPlaying.Shadow", nowPlayingShadow), 0.0, 1.0);
     nowPlayingShadowFrom = std::clamp(t.number("reforce.NowPlaying.ShadowFrom", nowPlayingShadowFrom), 0.0, 1.0);
+    lyrics = t.flag("reforce.Lyrics.Show", lyrics);
+    lyricsSize = std::clamp(t.number("reforce.Lyrics.Size", lyricsSize), 25.0, 300.0);
+    lyricsPosition = t.string("reforce.Lyrics.Position", lyricsPosition);
+    if (lyricsPosition != "bottom" && lyricsPosition != "center" && lyricsPosition != "top") lyricsPosition = "bottom";
+    lyricsOffsetMs = std::clamp(t.number("reforce.Lyrics.OffsetMs", lyricsOffsetMs), -1000.0, 1000.0);
+    lyricsReviewedOnly = t.flag("reforce.Lyrics.ReviewedOnly", lyricsReviewedOnly);
+    lyricsFolder = t.string("reforce.Lyrics.Folder", lyricsFolder);
     dropSwitch = t.flag("reforce.Drop.Switch", dropSwitch);
     linkTransitionBeats = std::max(0.0, t.number("reforce.Link.TransitionBeats", linkTransitionBeats));
     for (const char* const* k = videoSettingKeys(); *k; ++k) {

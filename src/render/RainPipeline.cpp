@@ -47,16 +47,34 @@ static float vnoise(float2 p, uint seed) {
     const float c = lattice(ix, iy + 1, seed), d = lattice(ix + 1, iy + 1, seed);
     return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
 }
-static float puddleN(float2 p, uint seed) {
-    return 0.65f * vnoise(p * 2.2f, seed) + 0.35f * vnoise(p * 5.1f + float2(17.0f, 3.0f), seed);
+// One creeping octave: crossfading from one seeded layer to the next every `period` seconds of creep time.
+static float creep(float2 p, float t, float freq, float period, float2 o, uint seed, uint salt) {
+    const float s = t / period, i = floor(s);
+    float f = s - i;
+    f = f * f * (3.0f - 2.0f * f);
+    const uint layer = uint(int(i));
+    const float a = vnoise(p * freq + o, seed + layer * 0x9e3779b9u + salt);
+    const float b = vnoise(p * freq + o, seed + (layer + 1u) * 0x9e3779b9u + salt);
+    return mix(a, b, f);
+}
+static float puddleN(float2 p, uint seed, float t) {
+    return 0.65f * vnoise(p * 2.2f, seed) + 0.35f * vnoise(p * 5.1f + float2(17.0f, 3.0f), seed) +
+           0.16f * (creep(p, t, 3.4f, 9.0f, float2(5.3f, 11.7f), seed, 0x2545f491u) - 0.5f) +
+           0.05f * (creep(p, t, 7.9f, 4.0f, float2(29.1f, 7.3f), seed, 0x68e31da4u) - 0.5f);
 }
 static float puddleThr(float wet) { return 0.5f + (0.5f - wet) * 0.6f; }
-static float puddle(float2 p, float wet, uint seed) {
+static float puddleOf(float n, float wet) {
     if (wet <= 0.001f) return 0.0f;
     if (wet >= 0.999f) return 1.0f;
-    const float n = 0.65f * vnoise(p * 2.2f, seed) + 0.35f * vnoise(p * 5.1f + float2(17.0f, 3.0f), seed);
-    const float thr = 0.5f + (0.5f - wet) * 0.6f;
+    const float thr = puddleThr(wet);
     return smoothstep(thr - 0.025f, thr + 0.025f, n);
+}
+
+// ---- floor: the puddles' cover at the sim size, once per step (the wave substeps read it)
+struct MaskP { float rows; float wet; uint seed; float t; };
+fragment float4 rain_mask_fs(FullOut in [[stage_in]], constant MaskP& P [[buffer(0)]]) {
+    const float2 p = in.position.xy / P.rows;
+    return float4(puddleOf(puddleN(p, P.seed, P.t), P.wet), 0.0f, 0.0f, 0.0f);
 }
 
 // ---- the frame copy (any size into level 0 of the mipmapped copy)
@@ -70,7 +88,8 @@ struct WaveP { int2 size; float c2; float b; float nu; float damp; float wet; ui
                float sponge; float pad; float4 imp[48]; };
 static float rd(texture2d<float> t, int2 q, int2 m) { return t.read(uint2(clamp(q, int2(0), m))).r; }
 fragment float4 rain_wave_fs(FullOut in [[stage_in]], constant WaveP& P [[buffer(0)]],
-                             texture2d<float> cur [[texture(0)]], texture2d<float> prev [[texture(1)]]) {
+                             texture2d<float> cur [[texture(0)]], texture2d<float> prev [[texture(1)]],
+                             texture2d<float> mask [[texture(2)]]) {
     const int2 p = int2(in.position.xy);
     const int2 m = P.size - 1;
     const float h = rd(cur, p, m);
@@ -87,7 +106,7 @@ fragment float4 rain_wave_fs(FullOut in [[stage_in]], constant WaveP& P [[buffer
                      (s - rd(prev, p + int2(0, 1), m)) + (n - rd(prev, p - int2(0, 1), m)) - 4.0f * (h - hp);
     float v = (2.0f * h - hp + P.c2 * l0 - P.b * l2 + P.nu * lv) * P.damp;
     // The dry glass between puddles holds the water at rest, so ripples bounce off a puddle's edge.
-    if (P.wet < 0.999f) v *= puddle((float2(p) + 0.5f) / P.rows, P.wet, P.seed);
+    if (P.wet < 0.999f) v *= mask.read(uint2(clamp(p, int2(0), m))).r;
     // The frame's edges absorb (a sponge).
     const float edge = float(min(min(p.x, m.x - p.x), min(p.y, m.y - p.y)));
     if (edge < P.sponge) {
@@ -155,9 +174,9 @@ fragment float4 rain_drop_fs(DropOut in [[stage_in]]) {
     float across = in.r / sqrt(s);
     if (u < 0.0f) across *= 1.0f - 0.45f * in.tail * saturate(-u / along);
     const float q2 = (u / along) * (u / along) + (v / across) * (v / across);
-    const float halo = 1.0f - smoothstep(1.0f, 1.5f, sqrt(q2));
+    const float halo = in.k < 0.0f ? 0.0f : 1.0f - smoothstep(1.0f, 1.5f, sqrt(q2));  // (k < 0: in the air, none)
     if (q2 >= 1.0f) return float4(0.0f, halo, 0.0f, 0.0f);
-    const float k = max(in.k, 0.05f);
+    const float k = max(abs(in.k), 0.05f);
     const float Rs = (1.0f + k * k) / (2.0f * k);
     const float hN = (sqrt(max(Rs * Rs - q2, 0.0f)) - (Rs - k)) / k;
     return float4(in.r * k * max(hN, 0.0f), halo, 0.0f, 0.0f);
@@ -180,7 +199,7 @@ struct CompP {
     int opaque;
     float waveGain;     // wave cells -> slope
     float pudl;         // the puddles' visibility (floor)
-    float pad;
+    float creepT;       // the puddles' creep time (engine::rain::Sim::puddleTime)
 };
 
 static float3 sampleFrame(texture2d<float> t, float2 uv, float2 dx, float2 dy) {
@@ -220,16 +239,16 @@ fragment float4 rain_composite_fs(FullOut in [[stage_in]], constant CompP& C [[b
         if (C.wet > 0.001f && C.wet < 0.999f) {
             const float e = 1.5f / C.size.y;
             const float2 p = float2(uv.x * C.aspect, uv.y);
-            const float mx = puddle(p + float2(e, 0), C.wet, C.seed) - puddle(p - float2(e, 0), C.wet, C.seed);
-            const float my = puddle(p + float2(0, e), C.wet, C.seed) - puddle(p - float2(0, e), C.wet, C.seed);
+            const float nE = puddleN(p + float2(e, 0), C.seed, C.creepT), nW = puddleN(p - float2(e, 0), C.seed, C.creepT);
+            const float nS = puddleN(p + float2(0, e), C.seed, C.creepT), nN = puddleN(p - float2(0, e), C.seed, C.creepT);
+            const float mx = puddleOf(nE, C.wet) - puddleOf(nW, C.wet);
+            const float my = puddleOf(nS, C.wet) - puddleOf(nN, C.wet);
             g += C.puddleDepth * float2(mx, my) / 3.0f;
             if (C.pudl > 0.0f) {
                 // The distance to the water's edge in output px (+ inside): the noise over its gradient, so the rim
                 // and the contact line are a couple of pixels wide whatever the puddle's size.
-                const float thr = puddleThr(C.wet), n0 = puddleN(p, C.seed);
-                const float2 gn = float2(puddleN(p + float2(e, 0), C.seed) - puddleN(p - float2(e, 0), C.seed),
-                                         puddleN(p + float2(0, e), C.seed) - puddleN(p - float2(0, e), C.seed)) /
-                                  (2.0f * e);
+                const float thr = puddleThr(C.wet), n0 = 0.25f * (nE + nW + nS + nN);
+                const float2 gn = float2(nE - nW, nS - nN) / (2.0f * e);
                 const float s = C.size.y / 1080.0f;
                 const float dpx = (n0 - thr) / max(length(gn), 1e-4f) * C.size.y;
                 const float a = (dpx - 1.5f * s) / (1.3f * s), b = (dpx + 2.0f * s) / (1.8f * s);
@@ -302,7 +321,7 @@ fragment float4 rain_composite_fs(FullOut in [[stage_in]], constant CompP& C [[b
         col *= 1.0f - min(0.6f, 0.42f * over * pudLine);
         col += min(0.6f, 0.32f * over * pudRim) * float3(0.92f, 0.96f, 1.0f);
     }
-    const float halo = C.rim * dc.g * (1.0f - water) * 0.22f;
+    const float halo = C.rim * dc.g * (1.0f - water) * (1.0f - pudIn) * 0.22f;  // (no drop's halo on open water)
     col *= 1.0f - halo;
     // Window fog: the frosted copy, a little milky, where no water clears it.
     const float4 orig = frame.read(uint2(clamp(pi, int2(0), int2(frame.get_width(), frame.get_height()) - 1)));
@@ -328,6 +347,12 @@ struct WaveP {
 };
 static_assert(sizeof(WaveP) == 48 + 48 * 16, "WaveP must match the MSL struct");
 static_assert(engine::rain::kMaxImpulses <= 48);
+struct MaskP {
+    float rows, wet;
+    uint32_t seed;
+    float t;
+};
+static_assert(sizeof(MaskP) == 16, "MaskP must match the MSL struct");
 struct FogP {
     float rows, target, refog, film;
     int32_t count;
@@ -345,7 +370,7 @@ struct CompP {
     float aspect, puddleDepth;
     int32_t opaque;
     float waveGain;
-    float pudl, pad;
+    float pudl, creepT;
 };
 static_assert(sizeof(CompP) == 72, "CompP must match the MSL struct");
 
@@ -442,12 +467,12 @@ RainDropGpu rainDropGpu(const engine::rain::Drop& d, double contactDegrees, doub
             tail = 0;
         }
     }
-    if (d.flight > 0) {  // a crown droplet in the air: rounder, a little nearer the eye
-        r *= 1.25;
-        k = 0.95;
-    }
+    // A crown droplet in the air: a small sphere above the water, not a bead on the glass: no contact line, no halo
+    // (k < 0 tells the splat), and a gentler lens, so it never reads as a bead sitting on a puddle.
+    const bool airborne = d.flight > 0;
+    if (airborne) k = 0.55;
     g.r = float(std::max(1.2, r));
-    g.k = float(k);
+    g.k = float(airborne ? -k : k);
     g.ax = float(ax);
     g.ay = float(ay);
     g.stretch = float(std::clamp(stretch, 0.4, 2.5));
@@ -471,6 +496,7 @@ RainPipeline::RainPipeline(SolidPipeline& solids) : solids_(solids) {
     MTL::Library* lib = compileLibrary(device_, kRainShaders, "reforce.rain");
     copyPso_ = makePso(device_, lib, "rain_full_vs", "rain_copy_fs", MTL::PixelFormatBGRA8Unorm, false, "rain copy");
     wavePso_ = makePso(device_, lib, "rain_full_vs", "rain_wave_fs", MTL::PixelFormatR32Float, false, "rain waves");
+    maskPso_ = makePso(device_, lib, "rain_full_vs", "rain_mask_fs", MTL::PixelFormatR16Float, false, "rain puddles");
     fogPso_ = makePso(device_, lib, "rain_full_vs", "rain_fog_fs", MTL::PixelFormatRG32Float, false, "rain fog");
     dropPso_ = makePso(device_, lib, "rain_drop_vs", "rain_drop_fs", MTL::PixelFormatRG16Float, true, "rain drops");
     compositePso_ = makePso(device_, lib, "rain_full_vs", "rain_composite_fs", MTL::PixelFormatBGRA8Unorm, false,
@@ -480,19 +506,28 @@ RainPipeline::RainPipeline(SolidPipeline& solids) : solids_(solids) {
     copy_ = makeTarget(device_, MTL::PixelFormatBGRA8Unorm, width_, height_, true, "rain frame copy");
     drops_ = makeTarget(device_, MTL::PixelFormatRG16Float, width_, height_, false, "rain drops");
     for (auto& w : wave_) w = makeTarget(device_, MTL::PixelFormatR32Float, uint32_t(cols_), uint32_t(rows_), false, "rain waves");
+    mask_ = makeTarget(device_, MTL::PixelFormatR16Float, uint32_t(cols_), uint32_t(rows_), false, "rain puddles");
     for (auto& f : fog_) f = makeTarget(device_, MTL::PixelFormatRG32Float, uint32_t(cols_), uint32_t(rows_), false, "rain fog");
 }
 
 RainPipeline::~RainPipeline() {
-    for (auto* p : {copyPso_, wavePso_, fogPso_, dropPso_, compositePso_})
+    for (auto* p : {copyPso_, wavePso_, maskPso_, fogPso_, dropPso_, compositePso_})
         if (p) p->release();
-    for (auto* t : {copy_, drops_, wave_[0], wave_[1], wave_[2], fog_[0], fog_[1]})
+    for (auto* t : {copy_, drops_, mask_, wave_[0], wave_[1], wave_[2], fog_[0], fog_[1]})
         if (t) t->release();
     if (device_) device_->release();
 }
 
 MTL::Texture* RainPipeline::waveTexture() const { return wave_[waveCur_]; }
 MTL::Texture* RainPipeline::fogTexture() const { return fog_[fogCur_]; }
+
+// The floor's puddle cover now: the look's Wet and the sim's swell (as Sim::puddleWet).
+static float puddleWet(const RainLook& look, const engine::rain::Sim& sim) {
+    const float w = std::isfinite(look.wet) ? std::clamp(look.wet, 0.0f, 1.0f) : 0.65f;
+    if (w <= 0.001f || w >= 0.999f) return w;
+    const double sw = std::isfinite(sim.swell()) ? std::clamp(sim.swell(), 0.0, 0.1) : 0.0;
+    return std::min(0.98f, w + float(sw));
+}
 
 void RainPipeline::clearFields(MTL::CommandBuffer* cmd, float fog) {
     for (MTL::Texture* w : wave_) pass(cmd, w, MTL::LoadActionClear, "rain waves clear")->endEncoding();
@@ -518,9 +553,18 @@ void RainPipeline::encodeStep(MTL::CommandBuffer* cmd, const engine::rain::Sim& 
         p.b = float(w.b);
         p.nu = float(w.nu);
         p.damp = float(w.damp);
-        p.wet = std::isfinite(look.wet) ? std::clamp(look.wet, 0.0f, 1.0f) : 0.65f;
+        // The puddles now (their edges creep and swell with the rain): drawn once for this step's substeps.
+        p.wet = puddleWet(look, sim);
         p.seed = seed32;
         p.rows = float(rows_);
+        if (p.wet < 0.999f) {
+            MaskP m{float(rows_), p.wet, seed32, float(sim.puddleTime())};
+            MTL::RenderCommandEncoder* enc = pass(cmd, mask_, MTL::LoadActionDontCare, "rain puddles");
+            enc->setRenderPipelineState(maskPso_);
+            enc->setFragmentBytes(&m, sizeof(m), 0);
+            enc->drawPrimitives(MTL::PrimitiveTypeTriangle, NS::UInteger(0), NS::UInteger(3));
+            enc->endEncoding();
+        }
         p.sponge = float(std::max(3.0, 0.03 * rows_));
         for (int i = 0; i < w.substeps; ++i) {
             p.count = 0;
@@ -539,6 +583,7 @@ void RainPipeline::encodeStep(MTL::CommandBuffer* cmd, const engine::rain::Sim& 
             enc->setFragmentBytes(&p, sizeof(p), 0);
             enc->setFragmentTexture(wave_[waveCur_], 0);
             enc->setFragmentTexture(wave_[prev], 1);
+            enc->setFragmentTexture(mask_, 2);
             enc->drawPrimitives(MTL::PrimitiveTypeTriangle, NS::UInteger(0), NS::UInteger(3));
             enc->endEncoding();
             waveCur_ = next;
@@ -627,7 +672,8 @@ void RainPipeline::encodeComposite(MTL::CommandBuffer* cmd, MTL::Texture* output
     c.rim = fin(look.rim, 0.0f, 4.0f, 1.0f);
     c.opacity = fin(look.opacity, 0.0f, 1.0f, 0.0f);
     c.mode = window ? 0 : 1;
-    c.wet = fin(look.wet, 0.0f, 1.0f, 0.65f);
+    c.wet = window ? fin(look.wet, 0.0f, 1.0f, 0.65f) : puddleWet(look, sim);
+    c.creepT = float(sim.puddleTime());
     c.seed = std::uint32_t(sim.settings().seed ^ (sim.settings().seed >> 32));
     c.aspect = W / H;
     c.pudl = window ? 0.0f : fin(look.pudl, 0.0f, 3.0f, 1.0f);

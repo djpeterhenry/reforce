@@ -62,6 +62,7 @@
 #include "sync/BeatClock.hpp"
 #include "sync/DeckFeed.hpp"
 #include "sync/NowPlaying.hpp"
+#include "sync/Lyrics.hpp"
 #include "render/TextOverlay.hpp"
 #include "web/GuestBook.hpp"
 #include "web/Guests.hpp"
@@ -289,8 +290,9 @@ public:
     bool dancerFileAllowed(const std::filesystem::path& path);
     void rhythmState(engine::RhythmState& out) const;
     const sync::PhraseState& phraseState() const { return phrase_.state(); }
-    // Deck starts (PLAN 5O.8): the live rkbx_link / MIDI feed (owned by the App; null offline and in tests).
-    void setDeckFeed(sync::DeckFeed* feed) { deckFeed_ = feed; }
+    // Deck starts (PLAN 5O.8): the live rkbx_link / MIDI feed (owned by the App; null offline and in tests). The first
+    // feed also starts watching the lyrics folder (sync/Lyrics).
+    void setDeckFeed(sync::DeckFeed* feed);
     // True once per drop (PLAN 5O.5): the Director cuts the layers when reforce.Drop.Switch is on.
     bool takeDrop() {
         const bool d = dropPending_;
@@ -643,6 +645,33 @@ private:
     TextFade npMain_, npVocal_;
     double npLastT_ = -1;
     void encodeNowPlaying(MTL::CommandBuffer* cmd, MTL::Texture* output);
+    // Lyrics (sync/Lyrics): karaoke for the deck heard most that has lyrics, over the finished frame. Line i of the
+    // song is laid out in slot i % kLyricSlots (at most three lines show at once).
+    static constexpr int kLyricSlots = 4;
+    std::unique_ptr<sync::LyricsLibrary> lyricsLib_;
+    std::array<sync::DeckClock, sync::DeckStarts::kDecks> deckClocks_;
+    sync::KaraokePicker karaokePick_;
+    std::unique_ptr<render::TextOverlay> lyricsText_;
+    bool lyricsOn_ = false;                   // reforce.Lyrics.Show
+    double lyricsSize_ = 100;                 // reforce.Lyrics.Size (%)
+    std::string lyricsPosition_ = "bottom";   // reforce.Lyrics.Position
+    double lyricsOffsetMs_ = 0;               // reforce.Lyrics.OffsetMs
+    bool lyricsReviewedOnly_ = false;         // reforce.Lyrics.ReviewedOnly
+    struct DeckLyrics {
+        sync::DeckTrack track;                // what the song was looked up for
+        std::uint64_t version = ~std::uint64_t(0);
+        std::shared_ptr<const sync::LyricsSong> song;
+    };
+    std::array<DeckLyrics, sync::DeckStarts::kDecks> deckLyrics_;
+    int lyricsDeck_ = -1;                     // picked this step
+    std::shared_ptr<const sync::LyricsSong> lyricsSong_;  // drawn (kept while it fades out)
+    int lyricsSongDeck_ = -1;
+    double lyricsAlpha_ = 0;
+    double lyricsLastT_ = -1;
+    int lyricsLineNow_ = -1;                  // the line being sung (or next), for the panel
+    void stepLyrics(double now);
+    void encodeLyrics(MTL::CommandBuffer* cmd, MTL::Texture* output);
+    double lyricsSongTime(int deck, const sync::LyricsSong& song, double now) const;
     std::vector<std::pair<double, sync::DeckCommit>> deckPending_;  // (apply at, commit): waits for Link to settle
     void stepDeckStarts(const sync::BeatClockState& s);
     bool dropPending_ = false;  // a drop the Director has not taken yet

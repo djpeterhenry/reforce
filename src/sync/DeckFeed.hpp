@@ -15,6 +15,7 @@
 // the render thread in arrival order.
 
 #include <atomic>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -50,7 +51,8 @@ public:
     DeckFeed& operator=(const DeckFeed&) = delete;
 
     static double now();  // seconds, monotonic
-    void drain(DeckStarts& starts);
+    // `frames`: also sees every deck frame (sync/Lyrics' deck clocks).
+    void drain(DeckStarts& starts, const std::function<void(double now, const DeckFrame&)>& frames = {});
 
     // Status for the panel / log.
     bool rkbxActive() const;            // a datagram within the last second

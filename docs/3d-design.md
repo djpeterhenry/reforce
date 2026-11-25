@@ -519,6 +519,11 @@ time (its fields are shared): a newer rain replaces an older one at once.
   `amp (1 - q²) e^(-q²)`: no net push, so the mean level never drifts (a plain Gaussian kick made the flat mode grow
   without bound in the long CPU run). Puddles: `engine::rain::puddle`, seeded value noise thresholded by `Wet`, the
   same function in C++ and MSL, so the CPU knows where a drop falls into water; their meniscus adds its own slope.
+  The edges are not still (Peter 2026-11-24: "too static"): two more octaves creep over the sim's creep time
+  (`Flow` x seconds; each a crossfade between seeded noise layers 9 s and 4 s apart: ~6 % of the glass changes over
+  20 s, the cover stays the same), and the cover swells while rain pours in (+.015 in Rain Floor's rain, +.08 in a
+  downpour, at most +.1) and drains over ~20 s. The GPU draws the cover once per step into a sim-size R16F mask the
+  wave substeps read (the noise is not evaluated per substep).
 - **Window fog** (GPU): condensation in an RG32F sim-size pair (r: fog 0..1 easing back to full over `Refg` seconds,
   g: wet film fading over 2.5 s). Each running drop's capsule this step wipes it clear and leaves film. Shown as the
   frosted half-size copy (`SolidPipeline::encodeFrost`, the glass's first step, Gaussian `Fros`), a little milky,
@@ -551,7 +556,12 @@ outside each drop (`Rim`; drops only, not waves), so drops read over white as we
 
 **Floor**: a strike in a puddle is an impulse (radius ~r, depth capped) plus a crown of 5-10 droplets thrown 2.5-7
 radii out over 80-220 ms; they land as small impulses, or as beads on dry glass. Beads merge like the window's but
-never run, dry slowly and are taken in when a puddle reaches them.
+never run, dry slowly and are taken in when a puddle reaches them. No drop ever sits across a puddle's edge
+(Peter 2026-11-24): a drop is in the water when its center or any point of its contact line (12 points, a pixel
+out) is (`Sim::touchesPuddle`; `kPuddleSlope` bounds the field's gradient, so drops far from any edge cost one
+sample); a strike or landing touching the water joins it (the impulse where they touch), and after every substep's
+merges a bead the water reaches (a creeping or swelling edge, or a merge that grew it) is taken in with a small
+ripple. A crown droplet in the air is drawn as a small lens with no contact line or halo (it is not on the glass).
 
 **Music**: every 16th line of the beat clock (phrase-aligned `SYNC_*` while it is on, else 120 BPM from the start):
 `Dens` drops on beat lines, `Clus` clusters (a 1.9x drop and 3-7 satellites) on bar lines, `Drz` small drops on the

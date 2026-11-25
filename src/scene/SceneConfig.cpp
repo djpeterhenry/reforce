@@ -194,7 +194,7 @@ Tier tierFor(SceneType type, const std::string& key, int& family, int& index, bo
         // Rain on glass (docs/3d-design.md "Rain on glass"): the rain and the look, per frame (Rain is a literal).
         if (key == "DENS" || key == "SIZE" || key == "DRZ" || key == "CLUS" || key == "WET" || key == "FOG" ||
             key == "REFG" || key == "DPTH" || key == "SPEC" || key == "RIM" || key == "SPD" || key == "DCAY" ||
-            key == "PUDL")
+            key == "PUDL" || key == "FLOW")
             return Tier::FrameOutput;
         // Fractal solids (docs/3d-design.md "Fractal zoom"): the zoom position, the camera's sway, the fog.
         if (key == "ZOOM" || key == "ORBT" || key == "LKX" || key == "LKY" || key == "FOG") return Tier::FrameOutput;
