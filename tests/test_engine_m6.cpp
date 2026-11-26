@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <sstream>
 
 #include "engine/Commands.hpp"
 #include "engine/MediaOptions.hpp"
@@ -561,6 +562,39 @@ TEST_CASE("media options: <stem>.reforce.txt beside a movie") {
     CHECK(parseMediaOptions("Loop=off").loop == std::optional<bool>(false));
     CHECK(!parseMediaOptions("// nothing\n").loop);
     CHECK(!loadMediaOptions("/nonexistent/x.mov").loop);
+}
+
+TEST_CASE("media options: setMediaColorKey writes and clears ColorKey") {
+    using namespace reforce::engine;
+    namespace fs = std::filesystem;
+    const fs::path dir = fs::temp_directory_path() / "reforce_test_colorkey";
+    fs::remove_all(dir);
+    fs::create_directories(dir);
+    const fs::path movie = dir / "a.mov";
+    const fs::path opts = mediaOptionsPath(movie);
+    auto read = [&] {
+        std::ifstream f(opts);
+        std::stringstream ss;
+        ss << f.rdbuf();
+        return ss.str();
+    };
+    CHECK(setMediaColorKey(movie, true).empty());  // keyed is the default: no file made
+    CHECK_FALSE(fs::exists(opts));
+    CHECK(setMediaColorKey(movie, false).empty());
+    CHECK(read() == "ColorKey = 0\n");
+    CHECK(loadMediaOptions(movie).colorKey == std::optional<bool>(false));
+    CHECK(setMediaColorKey(movie, true).empty());  // nothing else in it: removed
+    CHECK_FALSE(fs::exists(opts));
+    {
+        std::ofstream f(opts);
+        f << "Loop = 1\ncolorkey=\"1\"  // old\nBPM = 120\n";
+    }
+    CHECK(setMediaColorKey(movie, false).empty());  // in place of the old line, the rest kept
+    CHECK(read() == "Loop = 1\nColorKey = 0\nBPM = 120\n");
+    CHECK(setMediaColorKey(movie, true).empty());
+    CHECK(read() == "Loop = 1\nBPM = 120\n");
+    CHECK(loadMediaOptions(movie).loop == std::optional<bool>(true));
+    fs::remove_all(dir);
 }
 
 TEST_CASE("media options: End, and m:ss times") {

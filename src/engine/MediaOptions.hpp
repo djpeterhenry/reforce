@@ -12,9 +12,10 @@
 //   Black = 0.05   luminance levels of a movie sprite (PLAN 5K): l = ((l - Black) / (White - Black))^Gamma, clamped;
 //   White = 0.9    Black and White 0..1 (defaults 0 and 1; ignored unless White > Black), Gamma > 0 (default 1;
 //   Gamma = 0.7    below 1 brightens), multiplied by the global reforce.MovieSprite.Gamma
-//   ColorKey = 0   with reforce.Syphon.Alpha: the movie sprite is opaque in the Syphon alpha (not keyed out
-//                  where it is dark, like the dancers). Default 1 (keyed like the visuals). Needs full-color movie
-//                  sprites (reforce.MovieSprite.Color = over): otherwise the movie is part of the visuals.
+//   ColorKey = 0   with reforce.Syphon.Alpha / the camera backdrop: the movie sprite is opaque there (not keyed out
+//                  where it is dark, like the dancers). Default 1 (keyed like the visuals). Without full-color movie
+//                  sprites (reforce.MovieSprite.Color = off) the movie is part of the visuals and its whole frame is
+//                  kept opaque (its trails are keyed like the rest).
 // Times are seconds into the movie; "m:ss" (e.g. 1:05.5) works too.
 // A plain "<stem>.txt" stays G-Force's sprite params file (it replaces the
 // package defaults), so reforce options live in their own file. Written by
@@ -45,6 +46,11 @@ std::filesystem::path mediaOptionsPath(const std::filesystem::path& movie);
 MediaOptions parseMediaOptions(std::string_view text);
 // Missing file: all unset.
 MediaOptions loadMediaOptions(const std::filesystem::path& movie);
+
+// Sets ColorKey in the movie's .reforce.txt (control panel: "play it the other way and remember"). false writes
+// "ColorKey = 0" in place of any ColorKey lines (the file is created if needed); true removes them (1 is the default),
+// and removes the file when nothing else is left in it. Other lines are kept as they are. Returns "" or an error.
+std::string setMediaColorKey(const std::filesystem::path& movie, bool colorKey);
 
 // Frame-interpolated copies (tools/dance_sync/interpolate.py): "<stem>.rife<N>x.<ext>" beside a movie, same start
 // and length, played in its place and never listed as a movie of their own (isSpriteVideoFile).

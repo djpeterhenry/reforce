@@ -777,6 +777,8 @@ private:
     void captureLights(MTL::CommandBuffer* cmd, MTL::Texture* frame);
     double keySimilarity_ = 80, keySmoothness_ = 50;
     std::vector<render::SpriteQuad> colorQuads_;  // this step's color sprites, drawn by every colorize until the next
+    std::vector<render::SpriteQuad> opaqueMovies_;  // this step's ColorKey = 0 movie sprites in the visuals (wholeRect)
+    std::vector<render::SpriteQuad> opaqueScratch_; // opaqueSolids_ + opaqueMovies_ for encodeColorize
     std::vector<video::FramePtr> colorFrames_;     // their frames, kept alive for those colorize passes
     std::vector<video::FramePtr> colorHold_;       // scratch for holdFrames
     // Camera backdrop (reforce.Backdrop.*; videoset backdrop / backdropmirror / backdropfit / backdropopacity).

@@ -1,5 +1,5 @@
 Vers=100
-Meta="reforce organic: an oak that grows from the bottom of the frame into a wide crown, its growth surging on every beat, leafing out as it grows (leaves unfurling over a bar on the outer twigs), swaying slowly back and forth with the bars (over to one side on one bar line, the other side on the next) about its fixed base, the leaves rustling with a flutter on the beat, buds opening on the bar line, the leaves falling as it ungrows back into the ground at the end."
+Meta="reforce organic: an oak that grows from the bottom of the frame into a wide crown, its growth surging on every beat, leafing out as it grows (leaves unfurling over a bar on the outer twigs), swaying slowly back and forth with the bars (over to one side on one bar line, the other side on the next) about its fixed base, the leaves rustling with a flutter on the beat, the leaves falling as it ungrows back into the ground at the end."
 Kind="tree"
 // the crown: a wide dome above the trunk (C vars run once per point: angle and radius)
 Pts="700"
@@ -13,8 +13,9 @@ Seg=".015"
 Infl=".28"
 Jitr=".2"
 Wdth="11"
+// the branches a little dimmer than the leaves, so the leaves read as in front of them (Peter 2026-11-26)
+Pen=".8"
 Tip="1"
-BudW="5"
 // beat clock: SYNC_BEAT when locked, else 120 BPM
 B0="t - START_TIME"
 B1="SYNC_ON * SYNC_BEAT + (1 - SYNC_ON) * 2 * B0"
@@ -24,9 +25,8 @@ TrpY=".15"
 // wider with the bass
 SwyB="8"
 Sway=".25 + .12 * BASS"
-Bud=".9 * exp(-3 * wrap(B1 / 4))"
 // leaves on the outer twigs: every node and every tip, .07 long, unfurling over 4 beats; their own color
-Leaf=".85"
+Leaf="1.25"
 LeafW=".07"
 LeafD="1"
 LeafA=".9"

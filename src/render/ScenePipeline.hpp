@@ -186,6 +186,9 @@ struct SpriteQuad {
     float u0 = 0, v0 = 0, u1 = 1, v1 = 1;
     // Full-color movie sprites: opaque in the Syphon alpha (the movie's ColorKey = 0) while it is tracked.
     bool opaque = false;
+    // encodeColorize's opaqueSolids: the whole quad raises the alpha (a ColorKey = 0 movie sprite drawn into the
+    // visuals), not the coverage in the texture's G channel (3D solids).
+    bool wholeRect = false;
     // Puzzle solids drawn in color (encodeColorize's colorSolids): 0 rubik (stickers and plastic), 1 fifteen (tiles
     // with numbers in a contrasting shade), 2 labyrinth (board, walls, ball; black holes; highlights to white).
     int puzzle = 0;
@@ -335,7 +338,8 @@ public:
     // order. The output's alpha stays 1; with `trackAlpha` (reforce.Syphon.Alpha) it is 0 instead, raised by
     // the opaque quads (SpriteQuad::opaque) and later the dancers: how much encodeSyphonAlpha keeps opaque.
     // `opaqueSolids` (with trackAlpha only): 3D solid quads with ColorKey = 0; their coverage x opacity raises the
-    // alpha (max), so the whole solid stays opaque even where its colors are dark.
+    // alpha (max), so the whole solid stays opaque even where its colors are dark. Quads with wholeRect (ColorKey = 0
+    // movie sprites without Full color) raise it by their opacity over the whole quad.
     // `colorSolids`: rubik solids drawn over the frame in color from their targets (solid_color_fs: sticker and
     // plastic colors mixed by their shares, so borders anti-alias in color); SpriteQuad::opaque = ColorKey 0.
     void encodeColorize(MTL::CommandBuffer* cmd, const engine::Palette& palette, const engine::MapLut& lut,

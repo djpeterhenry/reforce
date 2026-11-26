@@ -132,7 +132,9 @@ bool Visualizer::startSprite(const std::filesystem::path& image, const std::stri
     PendingSprite p;
     if (video::isVideoFile(image)) {
         const std::string key = "video\n" + image.string();
-        if (prefetchVideo_ && key == prefetchKey_) {
+        // The prerolled copy, unless its ColorKey changed since (control panel: "play it the other way").
+        if (prefetchVideo_ && key == prefetchKey_ &&
+            prefetchVideo_->spec().colorKey == engine::loadMediaOptions(image).colorKey.value_or(true)) {
             p.video = std::move(prefetchVideo_);
             prefetchKey_.clear();
         } else {
@@ -419,6 +421,7 @@ void Visualizer::stepSprites(double t, const audio::AudioFrame* audio) {
     feedbackQuads_.clear();
     displayQuads_.clear();
     colorQuads_.clear();
+    opaqueMovies_.clear();
     colorFrames_.clear();
     adoptSprites(t);
     for (auto it = sprites_.begin(); it != sprites_.end();) {
@@ -483,6 +486,14 @@ void Visualizer::stepSprites(double t, const audio::AudioFrame* audio) {
             q.opaque = !s.video->spec().colorKey;  // ColorKey = 0: opaque in the Syphon alpha
             colorQuads_.push_back(q);
             continue;
+        }
+        if (s.video && !s.video->spec().colorKey) {
+            // ColorKey = 0 without Full color: the movie is part of the visuals, but its whole frame stays opaque
+            // in the Syphon alpha and over the camera backdrop (its trails are keyed like the rest).
+            render::SpriteQuad o = q;
+            o.opaque = true;
+            o.wholeRect = true;
+            opaqueMovies_.push_back(o);
         }
         const engine::SpriteLayerPlan plan =
             engine::spriteLayerPlan(d, spriteLayering_, spriteTrails_, s.video ? movieSpriteMix_ : spriteMix_);

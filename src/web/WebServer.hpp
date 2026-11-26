@@ -13,6 +13,8 @@
 //   GET  /api/video        video sources: files, cameras, Syphon servers (Phase 5F)
 //   GET  /api/sprites/hidden   hidden sprites (reforce.Sprite.Hidden); POST changes them
 //   GET  /api/sprites/image?id=ID   an image sprite's file (ids from the library only)
+//   POST /api/movies/colorkey  {"id":ID,"colorKey":bool}: ColorKey in a movie sprite's .reforce.txt
+//                          (engine::setMediaColorKey; ids from the library only), used from its next start
 //   (POST /api/command with a Look "save" writes settings.json: setLookSaver)
 //
 // Security: binds 127.0.0.1 by default and then only accepts loopback Host

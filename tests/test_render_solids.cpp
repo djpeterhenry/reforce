@@ -565,6 +565,53 @@ TEST_CASE("solids: ColorKey = 0 keeps the whole solid opaque in the tracked alph
     q->release();
 }
 
+TEST_CASE("movie sprites: ColorKey = 0 without Full color keeps the whole movie frame opaque in the tracked alpha") {
+    if (!device()) return;
+    const int W = 320, H = 180;
+    render::ScenePipeline scene(device(), W, H, {});
+    MTL::CommandQueue* q = device()->newCommandQueue();
+    MTL::TextureDescriptor* td =
+        MTL::TextureDescriptor::texture2DDescriptor(MTL::PixelFormatBGRA8Unorm, NS::UInteger(W), NS::UInteger(H), false);
+    td->setUsage(MTL::TextureUsageRenderTarget | MTL::TextureUsageShaderRead);
+    td->setStorageMode(MTL::StorageModeShared);
+    MTL::Texture* out = device()->newTexture(td);
+    MTL::Texture* frame = device()->newTexture(td);  // an all-black movie frame: the key would drop all of it
+    std::vector<std::uint8_t> black(std::size_t(W * H * 4), 0);
+    frame->replaceRegion(MTL::Region(0, 0, NS::UInteger(W), NS::UInteger(H)), 0, black.data(), NS::UInteger(W * 4));
+    const int handle = scene.addVideoSpriteTexture(false);
+    scene.setSpriteFrame(handle, frame);
+    engine::Palette pal{};
+    engine::MapLut lut{};
+    for (int k = 0; k < engine::kPaletteSize; ++k) lut[std::size_t(k)] = float(k) / 255.f;
+    std::vector<std::uint8_t> px(std::size_t(W * H * 4));
+    auto run = [&](float opacity) {
+        render::SpriteQuad o;
+        o.texture = handle;
+        o.cx = 100;
+        o.cy = 90;
+        o.w = 80;
+        o.h = 60;
+        o.opacity = opacity;
+        o.opaque = true;
+        o.wholeRect = true;
+        MTL::CommandBuffer* cmd = q->commandBuffer();
+        scene.encodeColorize(cmd, pal, lut, out, nullptr, nullptr, 0, true, &o, 1);
+        cmd->commit();
+        cmd->waitUntilCompleted();
+        out->getBytes(px.data(), NS::UInteger(W * 4), MTL::Region(0, 0, NS::UInteger(W), NS::UInteger(H)), 0);
+    };
+    auto alpha = [&](int x, int y) { return int(px[std::size_t((y * W + x) * 4 + 3)]); };
+    run(1.0f);
+    CHECK(alpha(100, 90) == 255);  // the black middle of the movie
+    CHECK(alpha(65, 65) == 255);   // near its corner
+    CHECK(alpha(150, 90) == 0);    // outside it: keyed like the visuals
+    run(0.5f);                     // fading: by its opacity
+    CHECK(std::abs(alpha(100, 90) - 128) <= 1);
+    frame->release();
+    out->release();
+    q->release();
+}
+
 TEST_CASE("solids: rubik in color: sticker borders blend the sticker and plastic colors, not the ColorMap between") {
     if (!device()) return;
     const int W = 320, H = 180;

@@ -25,7 +25,9 @@ The output's alpha is `opaque + (1 - opaque) * key(color)`:
 - **opaque** is built up while the frame is drawn, in the frame texture's alpha (0 after colorize):
   - Full-color movie sprites (`reforce.MovieSprite.Color = over`) with `ColorKey = 0` in their `.reforce.txt`
     raise it by their opacity. Other movies are keyed like the visuals. Movies drawn as luminance into the visuals
-    (Color = off) are part of the visuals and always keyed.
+    (Color = off) with `ColorKey = 0` raise it by their opacity over their whole frame (`SpriteQuad::wholeRect` in
+    `encodeColorize`'s opaque solids; Peter 2026-11-26), so the movie stays opaque, black areas included; the trails
+    it leaves in the visuals are keyed like the rest.
   - 3D solids with `ColorKey = 0` (e.g. Rubik Cube) raise it by their coverage times their opacity, so the whole
     solid stays opaque, dark colors included (`encodeColorize`'s opaque solids: the solid target's alpha, max
     blend). Other solids are part of the visuals and keyed.

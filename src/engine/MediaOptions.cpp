@@ -113,6 +113,58 @@ MediaOptions loadMediaOptions(const std::filesystem::path& movie) {
     return parseMediaOptions(ss.str());
 }
 
+std::string setMediaColorKey(const std::filesystem::path& movie, bool colorKey) {
+    namespace fs = std::filesystem;
+    const fs::path path = mediaOptionsPath(movie);
+    std::error_code ec;
+    const bool existed = fs::exists(path, ec);
+    std::string text;
+    if (existed) {
+        std::ifstream f(path, std::ios::binary);
+        if (!f) return "cannot read " + path.filename().string();
+        std::stringstream ss;
+        ss << f.rdbuf();
+        text = ss.str();
+    }
+    // Keep every line but the ColorKey ones; "ColorKey = 0" goes where the first one was (else at the end).
+    std::string out;
+    bool placed = false, onlyBlank = true;
+    std::istringstream in(text);
+    std::string line;
+    while (std::getline(in, line)) {
+        std::string body = line;
+        if (const auto c = body.find("//"); c != std::string::npos) body.resize(c);
+        const auto eq = body.find('=');
+        if (eq != std::string::npos && lower(trim(std::string_view(body).substr(0, eq))) == "colorkey") {
+            if (!colorKey && !placed) out += "ColorKey = 0\n";
+            placed = true;
+            continue;
+        }
+        if (!trim(line).empty()) onlyBlank = false;
+        out += line + "\n";
+    }
+    if (!colorKey && !placed) out += "ColorKey = 0\n";
+    if (colorKey && onlyBlank) {
+        if (existed && !fs::remove(path, ec)) return "cannot remove " + path.filename().string() + ": " + ec.message();
+        return {};
+    }
+    if (out == text) return {};
+    // Written beside it and renamed, so a movie starting meanwhile never reads half a file.
+    const fs::path tmp = path.parent_path() / ("." + path.filename().string() + ".tmp");
+    {
+        std::ofstream f(tmp, std::ios::binary | std::ios::trunc);
+        if (!f) return "cannot write " + path.filename().string();
+        f << out;
+        if (!f.flush()) return "cannot write " + path.filename().string();
+    }
+    fs::rename(tmp, path, ec);
+    if (ec) {
+        fs::remove(tmp, ec);
+        return "cannot write " + path.filename().string();
+    }
+    return {};
+}
+
 namespace {
 // ".rife<digits>x" at the end of a stem; returns the factor (0 = not one).
 int rifeFactor(const std::string& stem) {

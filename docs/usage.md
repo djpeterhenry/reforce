@@ -213,7 +213,10 @@ build/reforce-syphon-probe --alpha    # ... and prints the frame's alpha (shares
 transparency in its alpha channel, so OBS can put a camera behind reforce without a Color Key filter. The colors
 (and the window) are unchanged. The visuals are keyed exactly like OBS's Color Key on black (similarity 80,
 smoothness 50 by default: `reforce.Syphon.KeySimilarity` / `KeySmoothness`, in OBS's units). The dancers and their
-disco floor stay opaque, and so do full-color movie sprites whose `.reforce.txt` has `ColorKey = 0`. In OBS,
+disco floor stay opaque, and so do movie sprites whose `.reforce.txt` has `ColorKey = 0` (with Full color off,
+the movie's whole frame; the trails it leaves are keyed like the visuals). In the
+Movie sprites card's library, those show a **no key** tag; hovering a movie shows **▶ no key** (or **▶ key** on
+the tag), which plays it the other way and remembers that in its `.reforce.txt`. In OBS,
 tick *Allow Transparency* on the Syphon Client source and remove the Color Key filter.
 Details: [docs/syphon-alpha.md](syphon-alpha.md).
 
@@ -482,7 +485,7 @@ committed in `content/Packages/reforce.Organic.package/`:
 
 | Organic | What it does |
 |---|---|
-| Oak | a trunk from the bottom into a wide crown, growth surging on the beat, leafing out as it grows (leaves unfurling over a bar, fluttering on the beat, falling at the end), swaying over and back every 4 beats about its base, buds on the bar line |
+| Oak | a trunk from the bottom into a wide crown, growth surging on the beat, leafing out as it grows (leaves unfurling over a bar, fluttering on the beat, falling at the end), swaying over and back every 4 beats about its base |
 | Lightning | a strike on every bar line for 8 bars, each from a new point on the top edge: forks down in half a beat, flashes, flickers away |
 | Neurons | five cells grow dendrites into each other; on every beat one fires, a pulse running out to flash the tips on the next beat, cascading to the neuron it touches; every bar line a lead neuron starts a new wave with a stronger pulse, every phrase line they all fire together and the network rewires (a third of the side branches wither back, new ones grow elsewhere); a drop fires them all hardest. Two phrases long |
 | Kelp Forest | seven stalks rise from the sea floor and wave in the current |

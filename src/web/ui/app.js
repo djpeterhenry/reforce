@@ -475,10 +475,11 @@
       const li = e.target.closest('li[data-id]');
       if (!li) return;
       if (e.target.closest('.star')) { toggleFavorite(layerOf(view.key), li.dataset.id); return; }
+      if (e.target.closest('.keyflip')) { flipColorKey(view, li.dataset.id); return; }
       select(view, li.dataset.id);
     });
     view.list.addEventListener('dblclick', (e) => {
-      if (e.target.closest('.star')) return;
+      if (e.target.closest('.star, .keyflip')) return;
       const li = e.target.closest('li[data-id]');
       if (li) switchTo(view, li.dataset.id);
     });
@@ -518,6 +519,34 @@
 
   function switchTo(view, id) {
     post({ layer: layerOf(view.key), action: 'switch', config: id });
+  }
+
+  // Movie sprites: play the movie with the other ColorKey and keep that (written to its .reforce.txt first, which
+  // the movie reads as it starts).
+  async function flipColorKey(view, id) {
+    const cfg = view.configs.find((c) => c.id === id);
+    if (!cfg) return;
+    try {
+      const r = await fetch(api('/api/movies/colorkey'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, colorKey: !!cfg.noColorKey }),
+      });
+      if (!r.ok) {
+        let msg = `HTTP ${r.status}`;
+        try { msg = (await r.json()).error || msg; } catch { /* not JSON */ }
+        toast(`Color key not changed: ${msg}`);
+        return;
+      }
+      const j = await r.json();
+      cfg.noColorKey = !j.colorKey;
+    } catch {
+      toast('Not connected to reforce');
+      return;
+    }
+    select(view, id);
+    renderList(view);
+    switchTo(view, id);
   }
 
   // The state a card's list marks as current: the Movie sprites card uses the
@@ -619,11 +648,17 @@
         t.title = `Beat sync: ${Math.round(cfg.bpm * 10) / 10} BPM (from its .reforce.txt, tools/dance_sync)`;
         li.append(t);
       }
-      if (cfg.noColorKey) {
+      if (view.key === 'movie') {
+        // ColorKey: "no key" stays shown on the movies that play opaque; the others show "▶ no key" on hover (or
+        // when selected). Clicking plays the movie the other way and remembers it (its .reforce.txt).
         const t = document.createElement('span');
-        t.className = 'tag';
-        t.textContent = 'no key';
-        t.title = 'ColorKey = 0 in its .reforce.txt: opaque in the Syphon alpha (needs Syphon alpha and Full color)';
+        t.className = 'tag keyflip' + (cfg.noColorKey ? ' on' : '');
+        t.setAttribute('role', 'button');
+        t.dataset.st = cfg.noColorKey ? 'no key' : '';
+        t.dataset.act = cfg.noColorKey ? '▶ key' : '▶ no key';
+        t.title = cfg.noColorKey
+          ? 'Plays with no color key: its whole frame opaque in the Syphon alpha and over the camera backdrop (ColorKey = 0 in its .reforce.txt).\nClick: play it keyed (dark parts see-through) and keep it that way.'
+          : 'Plays color-keyed: dark parts see-through in the Syphon alpha.\nClick: play it with no key (its whole frame opaque, ColorKey = 0 in its .reforce.txt) and keep it that way.';
         li.append(t);
       }
       if (cfg.beat) {

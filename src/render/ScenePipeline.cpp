@@ -499,10 +499,12 @@ fragment float4 color_sprite_fs(SOut in [[stage_in]], texture2d<float> tex [[tex
 // ---- 3c'. opaque solids (ColorKey = 0, docs/3d-design.md): with the Syphon alpha tracked, a 3D solid's coverage
 // (its RG8 target's alpha) times its opacity raises the frame's alpha (max blend, alpha only), so the whole solid,
 // dark colors and all, stays opaque in the Syphon output and over the camera backdrop.
+// P.video = 1 (SpriteQuad::wholeRect, a ColorKey = 0 movie sprite drawn into the visuals): the whole quad.
 fragment float4 solid_opaque_fs(SOut in [[stage_in]], texture2d<float> tex [[texture(0)]],
                                 constant SpriteP& P [[buffer(0)]]) {
     constexpr sampler smp(filter::linear, address::clamp_to_edge);
-    return float4(0.0f, 0.0f, 0.0f, saturate(P.opacity * tex.sample(smp, in.uv).g));
+    const float cov = P.video == 1 ? 1.0f : tex.sample(smp, in.uv).g;
+    return float4(0.0f, 0.0f, 0.0f, saturate(P.opacity * cov));
 }
 
 // ---- 3. colorize ------------------------------------------------------------
@@ -1730,21 +1732,7 @@ void ScenePipeline::encodeColorize(MTL::CommandBuffer* cmd, const engine::Palett
             auto it = spriteTex_.find(q.texture);
             if (it == spriteTex_.end() || !it->second.tex || q.w <= 0 || q.h <= 0 || !(q.opacity > 0)) continue;
             SpriteP sp{{float(width_), float(height_)}, {q.cx, q.cy}, {q.w * 0.5f, q.h * 0.5f}, 1.0f, q.opacity, 0, 0,
-                       0.0f, 0, 0, 0, 0.0f, 0, 0.0f, 1.0f, 1.0f, 0, {q.u0, q.v0, q.u1, q.v1}};
-            enc->setRenderPipelineState(solidOpaquePso_);
-            enc->setVertexBytes(&sp, sizeof(sp), 0);
-            enc->setFragmentBytes(&sp, sizeof(sp), 0);
-            enc->setFragmentTexture(it->second.tex, 0);
-            enc->drawPrimitives(MTL::PrimitiveTypeTriangleStrip, NS::UInteger(0), NS::UInteger(4));
-        }
-    }
-    if (trackAlpha) {
-        for (std::size_t i = 0; i < opaqueCount; ++i) {
-            const SpriteQuad& q = opaqueSolids[i];
-            auto it = spriteTex_.find(q.texture);
-            if (it == spriteTex_.end() || !it->second.tex || q.w <= 0 || q.h <= 0 || !(q.opacity > 0)) continue;
-            SpriteP sp{{float(width_), float(height_)}, {q.cx, q.cy}, {q.w * 0.5f, q.h * 0.5f}, 1.0f, q.opacity, 0, 0,
-                       0.0f, 0, 0, 0, 0.0f, 0, 0.0f, 1.0f, 1.0f, 0, {q.u0, q.v0, q.u1, q.v1}};
+                       0.0f, q.wholeRect ? 1 : 0, 0, 0, 0.0f, 0, 0.0f, 1.0f, 1.0f, 0, {q.u0, q.v0, q.u1, q.v1}};
             enc->setRenderPipelineState(solidOpaquePso_);
             enc->setVertexBytes(&sp, sizeof(sp), 0);
             enc->setFragmentBytes(&sp, sizeof(sp), 0);

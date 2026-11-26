@@ -220,6 +220,17 @@ main { padding: 14px 16px 24px; max-width: 1500px; margin: 0 auto; }
 .list li .tag + .tag { margin-left: 4px; }
 .list li .tag.bpm { color: var(--ok); border-color: currentColor; min-width: 0; align-self: auto; }  /* (not the top bar's .bpm) */
 .list li .tag.bpm.num { border: none; padding: 0; font-size: 11px; font-variant-numeric: tabular-nums; }  /* movie BPM */
+/* Movie sprites' color key (Peter 2026-11-26): "no key" stays on the opaque ones; "▶ no key" / "▶ key" plays the
+   movie the other way and keeps it. The keyed ones show it only on hover or when selected, over the row's end. */
+.list li:has(.keyflip) { position: relative; }
+.list li .keyflip { cursor: pointer; }
+.list li .keyflip::after { content: attr(data-st); }
+.list li .keyflip:hover::after { content: attr(data-act); }
+.list li .keyflip.on { color: var(--accent); border-color: currentColor; }
+.list li .keyflip:not(.on) { position: absolute; right: 8px; top: 6px; background: var(--panel-2); display: none; }
+.list li .keyflip:not(.on)::after { content: attr(data-act); }
+.list li:hover .keyflip, .list li.sel .keyflip { display: inline; }
+.list li .keyflip:hover { color: var(--text, inherit); border-color: currentColor; }
 .list .empty { color: var(--faint); cursor: default; }
 .switchrow { justify-content: space-between; flex-wrap: wrap; gap: 6px; }
 .list li.group {

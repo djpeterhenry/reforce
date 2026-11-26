@@ -616,8 +616,14 @@ void Visualizer::colorize(MTL::CommandBuffer* cmd, MTL::Texture* output, double 
         colorHold_ = colorFrames_;
         holdFrames(cmd, colorHold_);
     }
+    const std::vector<render::SpriteQuad>* opaque = &opaqueSolids_;
+    if (!opaqueMovies_.empty()) {
+        opaqueScratch_ = opaqueSolids_;
+        opaqueScratch_.insert(opaqueScratch_.end(), opaqueMovies_.begin(), opaqueMovies_.end());
+        opaque = &opaqueScratch_;
+    }
     pipeline_->encodeColorize(cmd, palette_, lut_, output, layer, colorQuads_.data(), colorQuads_.size(),
-                              trackAlpha || backdrop, opaqueSolids_.data(), opaqueSolids_.size(),
+                              trackAlpha || backdrop, opaque->data(), opaque->size(),
                               colorSolids_.data(), colorSolids_.size());
     // The jigsaw of the frame (docs/3d-design.md "Jigsaw"), cut from the colorized frame.
     if (jigsaws_)

@@ -21,6 +21,7 @@
 
 #include <httplib.h>
 
+#include "engine/MediaOptions.hpp"
 #include "engine/SceneLibrary.hpp"
 #include "web/Json.hpp"
 
@@ -83,7 +84,10 @@ struct WebServer::Impl {
     engine::CommandQueue& commands;
     StateProvider state;
     std::shared_ptr<const Library> library;
-    std::string libraryJson;
+    std::mutex libMutex;
+    Library libraryShown;     // GET /api/library: the library as built, with later ColorKey changes (under libMutex)
+    std::string libraryJson;  // libraryToJson(libraryShown) (under libMutex)
+    std::map<std::string, std::filesystem::path> movieFiles;  // lower-case id -> movie sprite file
     std::function<VideoSourceList()> videoSources;
     std::function<std::string(const engine::PrefsTable&)> lookSaver;
     std::mutex favMutex;
@@ -102,10 +106,11 @@ struct WebServer::Impl {
     Impl(WebServerOptions o, engine::CommandQueue& q, StateProvider s, std::shared_ptr<const Library> lib)
         : opts(std::move(o)), commands(q), state(std::move(s)), library(std::move(lib)) {
         if (!library) library = std::make_shared<Library>();
-        libraryJson = libraryToJson(*library);
+        libraryShown = *library;
+        libraryJson = libraryToJson(libraryShown);
         if (const LibraryLayer* ll = library->find(engine::Layer::Sprite))
             for (const auto& c : ll->configs)
-                if (!c.movie && !c.path.empty()) spriteImages[lowerAscii(c.id)] = c.path;
+                if (!c.path.empty()) (c.movie ? movieFiles : spriteImages)[lowerAscii(c.id)] = c.path;
         routes();
     }
 
@@ -286,7 +291,40 @@ struct WebServer::Impl {
             res.set_content(std::move(body), type);
         });
         server.Get("/api/library", [this](const httplib::Request&, httplib::Response& res) {
+            std::lock_guard<std::mutex> lock(libMutex);
             res.set_content(libraryJson, "application/json");
+        });
+        server.Post("/api/movies/colorkey", [this](const httplib::Request& req, httplib::Response& res) {
+            // {"id":ID,"colorKey":bool}: ColorKey in the movie's .reforce.txt, read whenever the movie starts.
+            if (req.get_header_value("Content-Type").rfind("application/json", 0) != 0) {
+                jsonError(res, 415, "Content-Type must be application/json");
+                return;
+            }
+            const auto v = json::parse(req.body);
+            const json::Value* id = v ? v->get("id") : nullptr;
+            const json::Value* key = v ? v->get("colorKey") : nullptr;
+            if (!id || !id->isString() || !key || !key->isBool()) {
+                jsonError(res, 400, "expected {\"id\":ID,\"colorKey\":true|false}");
+                return;
+            }
+            const auto it = movieFiles.find(lowerAscii(id->str));  // only movies the library lists
+            if (it == movieFiles.end()) {
+                jsonError(res, 404, "no movie sprite with that id");
+                return;
+            }
+            std::lock_guard<std::mutex> lock(libMutex);
+            if (const std::string err = engine::setMediaColorKey(it->second, key->b); !err.empty()) {
+                jsonError(res, 500, err);
+                return;
+            }
+            for (auto& ll : libraryShown.layers)
+                if (ll.layer == engine::Layer::Sprite)
+                    for (auto& c : ll.configs)
+                        if (c.movie && c.path == it->second) c.noColorKey = !key->b;
+            libraryJson = libraryToJson(libraryShown);
+            json::Writer w;
+            w.beginObject().field("ok", true).field("id", id->str).field("colorKey", key->b).endObject();
+            res.set_content(w.take(), "application/json");
         });
 
         server.Get("/api/video", [this](const httplib::Request&, httplib::Response& res) {

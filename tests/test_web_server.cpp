@@ -12,6 +12,7 @@
 
 #include <httplib.h>
 
+#include "engine/MediaOptions.hpp"
 #include "web/Json.hpp"
 #include "web/WebServer.hpp"
 
@@ -478,6 +479,60 @@ TEST_CASE("web server: hidden sprites (GET/POST /api/sprites/hidden) and sprite 
         REQUIRE(res);
         CHECK(res->status == 404);
     }
+    server.stop();
+    fs::remove_all(dir);
+}
+
+TEST_CASE("web server: a movie sprite's ColorKey (POST /api/movies/colorkey)") {
+    namespace fs = std::filesystem;
+    const fs::path dir = fs::temp_directory_path() / ("reforce-colorkey-" + std::to_string(::getpid()));
+    fs::create_directories(dir);
+    auto lib = fakeLibrary();
+    web::LibraryLayer sp;
+    sp.layer = Layer::Sprite;
+    web::LibraryEntry rose{"Abstract/Rose", "Rose", false, {}, {}};
+    rose.path = dir / "Rose.jpg";
+    web::LibraryEntry movie{"External/movies/ dance", " dance", false, {}, {}};
+    movie.movie = true;
+    movie.path = dir / "dance.mov";
+    sp.configs = {rose, movie};
+    lib->layers.push_back(sp);
+
+    FakeEngine eng;
+    engine::CommandQueue queue;
+    web::WebServer server(testOptions(), queue, [&] { return eng.snapshot(); }, lib);
+    std::string err;
+    REQUIRE_MESSAGE(server.start(&err), err);
+    httplib::Client cli("127.0.0.1", server.port());
+    cli.set_read_timeout(5);
+
+    auto res = cli.Post("/api/movies/colorkey", R"({"id":"external/movies/ dance","colorKey":false})", "application/json");
+    REQUIRE(res);
+    CHECK(res->status == 200);
+    CHECK(engine::loadMediaOptions(dir / "dance.mov").colorKey == std::optional<bool>(false));
+    res = cli.Get("/api/library");
+    REQUIRE(res);
+    CHECK(res->body.find("\"noColorKey\":true") != std::string::npos);  // the list shows it from now on
+
+    res = cli.Post("/api/movies/colorkey", R"({"id":"External/movies/ dance","colorKey":true})", "application/json");
+    REQUIRE(res);
+    CHECK(res->status == 200);
+    CHECK_FALSE(fs::exists(dir / "dance.reforce.txt"));
+    res = cli.Get("/api/library");
+    REQUIRE(res);
+    CHECK(res->body.find("noColorKey") == std::string::npos);
+
+    // Library movies only (never images or paths), and a well-formed body.
+    for (const char* bad : {R"({"id":"Abstract/Rose","colorKey":false})", R"({"id":"../../etc/passwd","colorKey":false})"}) {
+        res = cli.Post("/api/movies/colorkey", bad, "application/json");
+        REQUIRE(res);
+        CHECK(res->status == 404);
+    }
+    res = cli.Post("/api/movies/colorkey", R"({"id":"External/movies/ dance"})", "application/json");
+    REQUIRE(res);
+    CHECK(res->status == 400);
+    CHECK_FALSE(fs::exists(dir / "Rose.reforce.txt"));
+    CHECK(queue.drain().empty());
     server.stop();
     fs::remove_all(dir);
 }
