@@ -344,7 +344,9 @@ std::optional<MeshKind> parseMeshKind(std::string_view name) {
         {"fifteen", MeshKind::Fifteen},           {"labyrinth", MeshKind::Labyrinth},   {"knight", MeshKind::Knight},
         {"soma", MeshKind::Soma},                     {"jigsaw", MeshKind::Jigsaw},
         {"model", MeshKind::Model},                   {"rain", MeshKind::Rain},
-        {"fractal", MeshKind::Fractal}};
+        {"fractal", MeshKind::Fractal},               {"hanoi", MeshKind::Hanoi},
+        {"bubbles", MeshKind::Bubbles},
+        {"shatter", MeshKind::Shatter}};
     for (const auto& [n, k] : kNames)
         if (s == n) return k;
     return std::nullopt;
@@ -369,6 +371,9 @@ const char* meshKindName(MeshKind k) {
         case MeshKind::Model: return "model";
         case MeshKind::Rain: return "rain";
         case MeshKind::Fractal: return "fractal";
+        case MeshKind::Hanoi: return "hanoi";
+        case MeshKind::Bubbles: return "bubbles";
+        case MeshKind::Shatter: return "shatter";
     }
     return "?";
 }
@@ -389,7 +394,10 @@ Mesh makeMesh(MeshKind kind, int detail) {
         case MeshKind::Jigsaw:  // drawn by render/JigsawPipeline over the colorized frame: no mesh
         case MeshKind::Model:
         case MeshKind::Rain:
-        case MeshKind::Fractal: {
+        case MeshKind::Fractal:
+        case MeshKind::Hanoi:
+        case MeshKind::Bubbles:
+        case MeshKind::Shatter: {
             Mesh m;
             m.kind = kind;
             m.convex = false;

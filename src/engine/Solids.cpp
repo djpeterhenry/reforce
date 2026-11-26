@@ -51,6 +51,20 @@ SolidRun::SolidRun(std::shared_ptr<const scene::CompiledConfig> cfg, const scene
         traps_ = whole("TRAPS", 3, 0, labyrinth::kMaxTraps);
         labyrinth_ = std::make_unique<labyrinth::Player>(beats_);
     }
+    if (mesh_ == MeshKind::Hanoi) {
+        auto num = [&](const char* key, double fallback) {
+            const double v = inst_->loaded(key, fallback);
+            return std::isfinite(v) ? std::clamp(v, -1e6, 1e6) : fallback;
+        };
+        hanoi::Settings hs;
+        hs.discs = int(std::lround(num("DISC", 6)));
+        hs.each = num("EACH", 1);
+        hs.reset = num("RSET", 0) >= 0.5 ? 1 : 0;
+        const hanoi::Settings c = hanoi::clampSettings(hs);
+        // No Beats: one move slot for the reset (6 discs: 64 beats).
+        hs.beats = num("BEATS", (hanoi::moveCount(c.discs) + 1) * c.each);
+        hanoi_ = std::make_unique<hanoi::Plan>(hs);
+    }
     if (mesh_ == MeshKind::Model) {
         model_.file = inst_->literal("FILE");
         const double look = inst_->loaded("LOOK", 0.0);
@@ -96,6 +110,49 @@ SolidRun::SolidRun(std::shared_ptr<const scene::CompiledConfig> cfg, const scene
             if (std::isfinite(v)) seed = std::fabs(std::floor(std::clamp(v, -1e15, 1e15)));
         }
         rainSettings_.seed = std::uint64_t(seed);
+    }
+    if (mesh_ == MeshKind::Bubbles) {
+        auto num = [&](const char* key, double fb, double lo, double hi) {
+            const double v = inst_->loaded(key, fb);
+            return std::isfinite(v) ? std::clamp(v, lo, hi) : fb;
+        };
+        bubbleSettings_.source = bubbles::parseSource(inst_->literal("SRC")).value_or(bubbles::Source::Wand);
+        bubbleSettings_.maxBubbles = int(num("MAX", 40.0, 1.0, double(bubbles::kMaxBubbles)));
+        bubbleSettings_.cluster = num("CLST", 0.5, 0.0, 1.0);
+        // The seed: Seed when the scene sets it (evaluated once), else the object's own.
+        double seed = double(env.seed % 1000003u);
+        if (inst_->defines("SEED")) {
+            const double v = inst_->frameKey("SEED", seed);
+            if (std::isfinite(v)) seed = std::fabs(std::floor(std::clamp(v, -1e15, 1e15)));
+        }
+        bubbleSettings_.seed = std::uint64_t(seed);
+    }
+    if (mesh_ == MeshKind::Shatter) {
+        auto num = [&](const char* key, double fb, double lo, double hi) {
+            const double v = inst_->loaded(key, fb);
+            return std::isfinite(v) ? std::clamp(v, lo, hi) : fb;
+        };
+        shatter::Config& c = shatterConfig_;
+        c.impacts = int(std::lround(num("IMP", 1.0, 1.0, double(shatter::kMaxImpacts))));
+        c.cycle = num("CYCL", 64.0, 16.0, 256.0);
+        c.hit = num("HIT", 4.0, 0.0, 256.0);
+        c.spokes = num("SPK", 9.0, 5.0, 12.0);
+        c.rings = num("RNG", 0.5, 0.0, 1.0);
+        c.fork = num("FORK", 0.6, 0.0, 1.0);
+        c.cracked = num("CRK", 1.0, 0.0, 1.0);
+        {
+            const double v = inst_->frameKey("SIZE", 1.0);  // (a per-frame key for the rain: evaluated once here)
+            c.size = std::isfinite(v) ? std::clamp(v, 0.3, 3.0) : 1.0;
+        }
+        c.arrive = num("ARRV", 0.0, 0.0, 1.0) >= 0.5 ? 1 : 0;
+        shatterConfig_ = shatter::clampConfig(c);
+        // The seed: Seed when the scene sets it (evaluated once), else the object's own.
+        double seed = double(env.seed % 1000003u);
+        if (inst_->defines("SEED")) {
+            const double v = inst_->frameKey("SEED", seed);
+            if (std::isfinite(v)) seed = std::fabs(std::floor(std::clamp(v, -1e15, 1e15)));
+        }
+        shatterSeed_ = std::uint64_t(seed);
     }
     if (mesh_ == MeshKind::Fractal) {
         auto num = [&](const char* key, double fb, double lo, double hi) {
@@ -233,6 +290,69 @@ SolidSpec SolidRun::evaluate(double t, const SpriteAudio& audio) {
         rain_->step(t, c, clk);
         s.rain = rain_;
     }
+    if (mesh_ == MeshKind::Bubbles) {
+        auto key = [&](const char* k, double fb, double lo, double hi) {
+            const double v = inst_->frameKey(k, fb);
+            return std::isfinite(v) ? std::clamp(v, lo, hi) : fb;
+        };
+        bubbles::Controls c;
+        c.blow = key("BLOW", 6.0, 0.0, 64.0);
+        c.size = key("SIZE", 55.0, 4.0, 400.0);
+        c.pop = key("POP", 1.0, 0.0, 16.0);
+        c.life = key("LIFE", 32.0, 1.0, 4096.0);
+        c.air = key("AIR", 1.0, 0.0, 8.0);
+        c.rise = key("RISE", 1.0, -4.0, 8.0);
+        c.wind = key("WIND", 0.0, 0.0, 4.0);
+        bubbles::Look& l = s.bubbleLook;
+        l.film = float(key("FILM", 520.0, 0.0, 3000.0));
+        l.iris = float(key("IRIS", 1.0, 0.0, 3.0));
+        l.swirl = float(key("SWRL", 1.0, 0.0, 3.0));
+        l.drain = float(key("DRN", 1.0, 0.0, 4.0));
+        l.bend = float(key("BEND", 1.0, 0.0, 4.0));
+        l.spec = float(key("SPEC", 1.0, 0.0, 4.0));
+        l.rim = float(key("RIM", 1.0, 0.0, 3.0));
+        l.depth = float(key("DPTH", 0.3, 0.0, 4.0));
+        l.tint = float(key("TINT", 0.2, 0.0, 1.0));
+        l.opacity = float(std::clamp(in.fader, 0.0, 1.0));
+        l.opaque = !s.colorKey;
+        bubbles::Clock clk;
+        clk.on = audio.sync.on > 0.5;
+        clk.beat = audio.sync.beat;
+        clk.bar = audio.sync.bar;
+        clk.phrase = audio.sync.phrase;
+        clk.build = audio.sync.build;
+        clk.drop = audio.sync.drop;
+        if (!bubbles_) bubbles_ = std::make_shared<bubbles::Sim>(bubbleSettings_, aspect_, start_);
+        bubbles_->step(t, c, clk);
+        s.bubbles = bubbles_;
+    }
+    if (mesh_ == MeshKind::Shatter) {
+        auto key = [&](const char* k, double fb, double lo, double hi) {
+            const double v = inst_->frameKey(k, fb);
+            return std::isfinite(v) ? std::clamp(v, lo, hi) : fb;
+        };
+        shatter::Controls ctl;
+        ctl.burst = key("BRST", 1.0, 0.0, 1.0);
+        ctl.gravity = key("GRAV", 1.0, 0.0, 4.0);
+        ctl.tilt = key("TILT", 1.0, 0.0, 4.0);
+        shatter::Look& l = s.shatterLook;
+        l.depth = float(key("DPTH", 0.35, 0.0, 4.0));
+        l.spec = float(key("SPEC", 1.0, 0.0, 8.0));
+        l.line = float(key("LINE", 1.0, 0.0, 4.0));
+        l.sparkle = float(key("SPRK", 1.0, 0.0, 8.0));
+        l.sheen = float(key("GLS", 1.0, 0.0, 8.0));
+        l.thick = float(key("THCK", 1.0, 0.0, 4.0));
+        l.opacity = float(std::clamp(in.fader, 0.0, 1.0));
+        l.opaque = !s.colorKey;
+        shatter::Clock clk;
+        clk.on = audio.sync.on > 0.5;
+        clk.bar = audio.sync.bar;
+        clk.build = audio.sync.build;
+        clk.drop = audio.sync.drop;
+        if (!shatter_) shatter_ = std::make_shared<shatter::Player>(shatterSeed_, shatterConfig_, aspect_, start_);
+        shatter_->step(t, clk, ctl);
+        s.shatter = shatter_;
+    }
     if (mesh_ == MeshKind::Knight) {
         s.turn = finite(f.turn, 64.0);
         if (!inst_->hasTurn()) s.turn = 64.0;
@@ -254,6 +374,34 @@ SolidSpec SolidRun::evaluate(double t, const SpriteAudio& audio) {
         }
         s.floor = std::clamp(finite(inst_->frameKey("FLOOR", 0.55), 0.55), 0.0, 1.0);
         s.tiltGain = std::clamp(finite(inst_->frameKey("TILT", 1.0), 1.0), 0.0, 4.0);
+    }
+    if (hanoi_) {
+        // No Turn: solved. The style of a move (a drop's higher arc, its flips) is read when the move starts, so a value
+        // changing in flight never jumps the disc.
+        const double turn = inst_->hasTurn() ? finite(f.turn, hanoi_->settings().beats) : hanoi_->settings().beats;
+        const double seed = finite(f.seed, 0.0);
+        const int64_t run = hanoi::Plan::runOf(seed);
+        const int move = hanoi_->moveAt(turn);
+        if (run != hanoiRun_ || move != hanoiMove_) {
+            hanoiRun_ = run;
+            hanoiMove_ = move;
+            hanoiStyle_ = hanoi::makeStyle(inst_->frameKey("LIFT", 1.0), inst_->frameKey("FLIP", 0.0));
+        }
+        hanoi::Controls hc;
+        hc.hover = finite(inst_->frameKey("HOVR", 0.0), 0.0);
+        hc.style = hanoiStyle_;
+        s.turn = turn;
+        s.hanoi = hanoi_->frameAt(seed, turn, hc);
+        auto key = [&](const char* k, double fb, double lo, double hi) {
+            const double v = inst_->frameKey(k, fb);
+            return std::isfinite(v) ? std::clamp(v, lo, hi) : fb;
+        };
+        s.frost = key("FROS", 6.0, 0.0, 60.0);
+        s.tint = key("TINT", 0.5, 0.0, 1.0);
+        s.bend = key("BEND", 1.0, 0.0, 4.0);
+        s.depth = key("DPTH", 0.5, 0.0, 4.0);
+        s.spec = key("SPEC", 1.0, 0.0, 8.0);
+        s.mono = inst_->defines("MONO") ? key("MONO", -1.0, -1.0, 1.0) : -1.0;
     }
     if (mesh_ == MeshKind::Jigsaw) {
         auto loadedInt = [&](const char* key, double fallback, int lo, int hi) {

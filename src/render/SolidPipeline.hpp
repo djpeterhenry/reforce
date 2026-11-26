@@ -269,6 +269,11 @@ public:
     // halfSharp(), and that blurred (sigma `frost` px at 1080p, separable 13-tap Gaussian) into halfBlur().
     void encodeFrost(MTL::CommandBuffer* cmd, MTL::Texture* output, float frost);
     MTL::Texture* halfSharp() const { return halfSharp_; }
+    // The glass's last step, shared with render/HanoiPipeline: slot's target (premultiplied, the resolved MSAA pass)
+    // over `output` at `opacity`; `opaque` also raises the tracked alpha by its coverage. With a box (w, h >= 0) only
+    // the frame's box (x0, y0, w, h) is drawn, from the target's top-left corner (a pass drawn at the corner).
+    void encodeGlassComposite(MTL::CommandBuffer* cmd, MTL::Texture* output, int slot, float opacity, bool opaque,
+                              int x0 = 0, int y0 = 0, int w = -1, int h = -1);
     MTL::Texture* halfBlur() const { return halfBlur_; }
 
 private:

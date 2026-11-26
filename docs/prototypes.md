@@ -33,6 +33,7 @@ trail through the FlowField and take the ColorMap.
 | Pendulum Wave | pendulums | 15 bobs; the first swings once per bar, the rest a little faster each, so they drift apart and line up again on every phrase line |
 | Pendulum Wave (Side) | pendulums | 24 pendulums on strings from the top; lined up every 8 bars |
 | Pendulum Ring | pendulums | 40 bobs on a ring swinging in and out: flowers and stars; pulses on the beat |
+| Pendulum Double, Row, Trace | double | chaotic double pendulums released together on the phrase line, fanning out by bar 6, gathered back over the last bar |
 | Sunflower | phyllotaxis | a seed every 16th note at the golden angle |
 | Spiral Galaxy | phyllotaxis | its angle sweeps once per phrase, so the spiral arms wind up and fly apart |
 | Harmonograph / Rose | harmonograph | Lissajous figures in cycles per bar: they close on the bar |
@@ -51,9 +52,6 @@ The seven trees from earlier (Oak … Radial Bloom) are unchanged. In a scene:
 
 | Config | Group | What it does with the beat |
 |---|---|---|
-| Ripples Kick | Water | a stone dropped in still water on every beat, at a random spot; the rings spread and run off the frame |
-| Ripples Pond | Water | light rain and a big drop on every bar; the edges reflect; the rain thickens through a breakdown |
-| Ripples Ring | Water | drops on the 8th notes stepping round a ring every 2 bars, so the rings chase each other |
 | Julia Drift | Fractals | c travels once per phrase along the Mandelbrot set's edge: cauliflower, spirals, snowflakes |
 | Julia Pulse | Fractals | the "San Marco" set, swelling on every beat |
 | Julia Bands | Fractals | a spiral set drawn as bands that flow inward once per beat |
@@ -61,7 +59,7 @@ The seven trees from earlier (Oak … Radial Bloom) are unchanged. In a scene:
 These draw on the GPU (about 1 ms a frame), into their own texture, and trail like the rest.
 
 **Groups:** the Objects card's library now lists every organic under its group (Trees, Pendulums, Spirals, Curves,
-Cells, Water, Fractals). Pick a group in its dropdown to see only that group, and **▶ Play <group>** to switch to
+Cells, Overlay, Fractals). Pick a group in its dropdown to see only that group, and **▶ Play <group>** to switch to
 that group's theme (`Organics: Water` ...): the slideshow then grows only that group, one every ~30 s. Press it again
 (✓ Playing ...) to go back to the Organics theme. The group themes are also in the Theme menu at the top.
 
@@ -69,7 +67,7 @@ that group's theme (`Organics: Water` ...): the slideshow then grows only that g
 
 - Defaults stay: slideshow changes on the bar, kick zoom off, drop switch off.
 - No more drop tuning for now.
-- Organics grouped by theme (above); ripples and Julia sets built (above).
+- Organics grouped by theme (above); ripples and Julia sets built (above); the ripples removed 2026-11-26 (Peter prefers Rain Pool).
 - Keep every organic for now.
 
 ## Where things are
@@ -77,7 +75,7 @@ that group's theme (`Organics: Water` ...): the slideshow then grows only that g
 - Design and tuning notes: [rhythm-design.md](rhythm-design.md) (phrases, kick zoom, drops, new kinds),
   [organics-design.md](organics-design.md) (trees), keys in [scene-format.md](scene-format.md) §3.5 and §5.8.
 - Code: `src/sync/PhraseClock.*`, `src/sync/DropDetector.*`, `src/engine/OrganicKinds.*` (new kinds),
-  `src/render/FieldPipeline.*` (ripples, Julia), groups in `content/Categories/Object/` and `content/Themes/`,
+  `src/render/FieldPipeline.*` (Julia, Mandelbrot), groups in `content/Categories/Object/` and `content/Themes/`,
   `src/engine/Organics.*` (trees, pendulums), kick zoom in `src/render/ScenePipeline.cpp` (`kick_src`), Rhythm panel in
   `src/web/ui/`.
 - Tests: `tests/test_sync_phrase.cpp`, `tests/test_sync_drop.cpp`, `tests/test_engine_organics.cpp`,

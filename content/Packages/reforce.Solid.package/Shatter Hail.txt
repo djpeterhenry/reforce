@@ -1,0 +1,18 @@
+Vers=100
+Meta="reforce solid: a pane of glass in front of the visuals hit by hail (Shatter, five impacts). Every 8 bars a fresh pane: the first stone hits four beats after the line and the others land on later bar lines, each starting its own small web of radial and ring cracks that grows on the beats until the webs meet along wandering seams. On the next 8-bar line (or on a drop) the pane explodes into many small shards blown out from the impacts towards you; a fresh pane slides down. Drawn over the visuals, which keep running behind the glass."
+Mesh="shatter"
+// four panes of 8 bars, started on an 8-bar line
+PBar="32"
+SBar="8"
+Imp="5"
+Cycl="32"
+Hit="4"
+Spk="7"
+Rng=".35"
+Fork=".5"
+Size=".8"
+Crk="1"
+Brst="1"
+// thick shards (Peter 2026-11-26)
+Thck="1.5"
+Dpth=".4"

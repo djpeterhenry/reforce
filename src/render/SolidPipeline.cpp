@@ -357,10 +357,11 @@ fragment float4 glass_fs(GlassOut in [[stage_in]], constant GlassT& T [[buffer(0
 }
 
 // The resolved buttons (premultiplied by coverage) over the frame.
+// (P.yz: the target's top-left pixel holds the frame's pixel (P.y, P.z): a box drawn at the target's corner.)
 fragment float4 glass_composite_fs(FullOut in [[stage_in]], texture2d<float> src [[texture(0)]],
-                                   constant float& opacity [[buffer(0)]]) {
-    const float4 c = src.read(uint2(in.position.xy));
-    return c * opacity;
+                                   constant float4& P [[buffer(0)]]) {
+    const float4 c = src.read(uint2(max(in.position.xy - P.yz, float2(0.0f))));
+    return c * P.x;
 }
 
 // Text=1: the previous intensity frame's centered square crop into the frame tile. A full-screen triangle; crop =
@@ -452,7 +453,7 @@ struct FrameTileP {
     float texel[2];  // source pixels per tile pixel, in source UV
 };
 
-constexpr int kMeshKinds = int(engine::MeshKind::Fractal) + 1;  // Model, Rain, Fractal: empty (their own pipelines)
+constexpr int kMeshKinds = int(engine::MeshKind::Shatter) + 1;  // Model .. Shatter: empty (their own pipelines)
 
 // Right-handed rotation about `axis` (as engine::solidModel's).
 engine::Mat4 axisRotation(int axis, double a) {
@@ -1689,16 +1690,6 @@ void SolidPipeline::encodeKnight(MTL::RenderCommandEncoder* enc, const SolidDraw
 void SolidPipeline::encodeGlass(MTL::CommandBuffer* cmd, MTL::Texture* output, const GlassDraw& g, bool trackAlpha) {
     if (!output || !(g.opacity > 0)) return;
     const float W = float(output->width()), H = float(output->height());
-    auto pass = [&](MTL::Texture* target, MTL::LoadAction load, const char* label) {
-        MTL::RenderPassDescriptor* rp = MTL::RenderPassDescriptor::renderPassDescriptor();
-        auto* a = rp->colorAttachments()->object(0);
-        a->setTexture(target);
-        a->setLoadAction(load);
-        a->setStoreAction(MTL::StoreActionStore);
-        MTL::RenderCommandEncoder* enc = makeRenderEncoder(cmd, rp);
-        enc->setLabel(NS::String::string(label, NS::UTF8StringEncoding));
-        return enc;
-    };
     // 1. The frame at half size, sharp and frosted (encodeFrost).
     encodeFrost(cmd, output, g.frost);
     // 2. The buttons in 3D, 4x MSAA with depth, into the puzzle's slot target (cleared; resolved premultiplied).
@@ -1791,15 +1782,37 @@ void SolidPipeline::encodeGlass(MTL::CommandBuffer* cmd, MTL::Texture* output, c
         enc->endEncoding();
     }
     // 3. Over the frame.
-    {
-        MTL::RenderCommandEncoder* enc = pass(output, MTL::LoadActionLoad, "glass composite");
-        enc->setRenderPipelineState(trackAlpha && g.opaque ? glassCompositeOpaquePso_ : glassCompositePso_);
-        enc->setFragmentTexture(target, 0);
-        const float op = std::clamp(g.opacity, 0.0f, 1.0f);
-        enc->setFragmentBytes(&op, sizeof(op), 0);
-        enc->drawPrimitives(MTL::PrimitiveTypeTriangle, NS::UInteger(0), NS::UInteger(3));
-        enc->endEncoding();
+    encodeGlassComposite(cmd, output, g.slot, g.opacity, trackAlpha && g.opaque);
+}
+
+void SolidPipeline::encodeGlassComposite(MTL::CommandBuffer* cmd, MTL::Texture* output, int slot, float opacity,
+                                         bool opaque, int x0, int y0, int w, int h) {
+    if (!output || slot < 0 || slot >= maxLive()) return;
+    const int W = int(output->width()), H = int(output->height());
+    if (w < 0 || h < 0) {
+        x0 = y0 = 0;
+        w = W;
+        h = H;
     }
+    x0 = std::clamp(x0, 0, W);
+    y0 = std::clamp(y0, 0, H);
+    w = std::clamp(w, 0, W - x0);
+    h = std::clamp(h, 0, H - y0);
+    if (w == 0 || h == 0) return;
+    MTL::RenderPassDescriptor* rp = MTL::RenderPassDescriptor::renderPassDescriptor();
+    auto* a = rp->colorAttachments()->object(0);
+    a->setTexture(output);
+    a->setLoadAction(MTL::LoadActionLoad);
+    a->setStoreAction(MTL::StoreActionStore);
+    MTL::RenderCommandEncoder* enc = makeRenderEncoder(cmd, rp);
+    enc->setLabel(NS::String::string("glass composite", NS::UTF8StringEncoding));
+    enc->setRenderPipelineState(opaque ? glassCompositeOpaquePso_ : glassCompositePso_);
+    enc->setScissorRect(MTL::ScissorRect{NS::UInteger(x0), NS::UInteger(y0), NS::UInteger(w), NS::UInteger(h)});
+    enc->setFragmentTexture(slots_[std::size_t(slot)].tex, 0);
+    const float p[4] = {std::isfinite(opacity) ? std::clamp(opacity, 0.0f, 1.0f) : 0.0f, float(x0), float(y0), 0.0f};
+    enc->setFragmentBytes(p, sizeof(p), 0);
+    enc->drawPrimitives(MTL::PrimitiveTypeTriangle, NS::UInteger(0), NS::UInteger(3));
+    enc->endEncoding();
 }
 
 }  // namespace reforce::render

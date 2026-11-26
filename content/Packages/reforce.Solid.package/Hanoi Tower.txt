@@ -1,0 +1,38 @@
+Vers=100
+Meta="reforce solid: a glass Tower of Hanoi (6 discs) solved on the beat, one move a beat: 63 moves landing on beats 2..64, so the tower stands complete on every phrase line (bar lines from the phrase clock while the beat clock is locked, else 120 BPM from the start). On the line the solved tower springs open and shut, and the next solve carries it on from that peg (left to right, right to middle, middle to left). Clear glass laid over the visuals, which keep running behind it and show through it, refracted: the rims are lenses, the pegs rod lenses, frosted, strong lenses (every rim and peg flips and magnifies what is behind it), every part the same glass, tinted with one color from the ColorMap; the whole tower floats and turns slowly. A build makes the stacks float apart; a drop does nothing special. ColorKey 0 keeps the glass opaque in the Syphon alpha."
+Mesh="hanoi"
+Disc="6"
+Beats="64"
+Rset="0"
+ColorKey="0"
+// 4 solves (one per phrase), ending on a phrase line of the live clock; started on a 16-bar line
+PBar="64"
+SBar="16"
+B0="t - START_TIME"
+// beats: the beat clock when locked, else 2 per second
+B1="SYNC_ON * SYNC_BEAT + (1 - SYNC_ON) * 2 * B0"
+// beats into the 16-bar run (0..64) and the run number (the start peg)
+B2="SYNC_ON * 64 * wrap(SYNC_BAR / 16) + (1 - SYNC_ON) * 64 * wrap(B1 / 64)"
+B3="SYNC_ON * floor(SYNC_BAR / 16) + (1 - SYNC_ON) * floor(B1 / 64)"
+Turn="B2"
+Seed="B3"
+// a build: the stacks open up and bob (nothing special on a drop: Peter 2026-11-26)
+Hovr="SYNC_BUILD * (1 - SYNC_DROP)"
+// the glass (Peter 2026-11-26: the "Lens" look of three compared: frosted, strong lenses, all one color): blur in pixels at
+// 1080p of its frosted share, how deep the color is, how strongly it bends, how far behind it the visuals are (frame
+// heights), and Mono: every part one glass, the ColorMap's color at this intensity
+Fros="16"
+Tint=".45"
+Bend="2"
+Dpth=".85"
+Mono=".7"
+X=".1 * sin(.037 * B0) + .04 * sin(.091 * B0 + 1)"
+Y="-.08 + .05 * sin(.053 * B0 + 2) + .02 * sin(.13 * B0)"
+Z="0"
+Scal=".95"
+// floating and turning (Peter 2026-11-26: more): drifting side to side and bobbing, turning up to ~45 degrees each
+// way, rocking and tilting a little, on slow sines that never quite repeat; seen a little from above; a build tips it
+// towards the viewer
+RotX=".3 + .1 * sin(.061 * B0) + .12 * SYNC_BUILD"
+RotY=".6 * sin(.029 * B0) + .2 * sin(.083 * B0 + .5)"
+RotZ=".05 * sin(.071 * B0 + 1.3)"

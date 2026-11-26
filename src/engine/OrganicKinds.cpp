@@ -6,6 +6,7 @@
 #include <cstring>
 #include <map>
 
+#include "engine/DoublePendulum.hpp"
 #include "engine/Dragon.hpp"
 #include "engine/arcade/Arcade.hpp"
 
@@ -566,8 +567,8 @@ void OrganicCanvas::bitmap(const char* const* rows, int nRows, double cx, double
 
 const std::vector<std::string>& organicBodyKinds() {
     static const std::vector<std::string> k = {"phyllotaxis", "harmonograph", "automaton", "life", "lsystem",
-                                               "attractor", "dragon", "invaders", "hopper", "cycles", "rocks", "bricks",
-                                               "chase"};
+                                               "attractor", "dragon", "double", "invaders", "hopper", "cycles", "rocks",
+                                               "bricks", "chase"};
     return k;
 }
 
@@ -580,6 +581,7 @@ std::unique_ptr<OrganicBody> makeOrganicBody(const std::string& kind, scene::Org
     if (kind == "lsystem") return std::make_unique<LSystem>(inst);
     if (kind == "attractor") return std::make_unique<Attractor>(inst);
     if (kind == "dragon") return dragon::makeDragon(inst, seed);
+    if (kind == "double") return pendulum2::makeDoublePendulum(inst, seed);
     if (kind == "invaders") return arcade::makeInvaders(inst, seed);
     if (kind == "hopper") return arcade::makeHopper(inst, seed);
     if (kind == "cycles") return arcade::makeCycles(inst, seed);

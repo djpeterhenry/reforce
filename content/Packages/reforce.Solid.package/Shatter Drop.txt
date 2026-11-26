@@ -1,0 +1,20 @@
+Vers=100
+Meta="reforce solid: a pane of glass in front of the visuals that explodes on every phrase line (Shatter, explosive). One heavy impact a pane, a dense web of cracks with many rings that glint and catch the light; on the line (or on a drop, whenever it comes) the shards blow out from the impact towards you, spinning, so their refraction and highlights flash, and fly past; a fresh pane slides down. Drawn over the visuals, which keep running behind the glass."
+Mesh="shatter"
+PBar="64"
+SBar="16"
+Imp="1"
+Cycl="64"
+Hit="4"
+// eleven radial cracks, dense rings, a bigger crushed spot
+Spk="11"
+Rng=".8"
+Fork=".5"
+Size="1.4"
+Crk="1"
+// every shatter explodes; the fresh pane slides down
+Brst="1"
+Arrv="0"
+// thick shards (Peter 2026-11-26)
+Thck="1.5"
+Dpth=".4"

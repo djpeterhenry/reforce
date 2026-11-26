@@ -92,6 +92,70 @@ exactly on every cycle line; on the phrase clock's bars a 16-bar cycle lines up 
 above (a row of bobs and the "snake" through them), from the side (strings), a ring (swinging radially: flowers and
 stars). Content: Pendulum Wave, Pendulum Wave (Side), Pendulum Ring.
 
+## Pendulum Double (5O.10, Organics kind `double`, engine/DoublePendulum)
+
+Chaotic double pendulums that start in sync and drift apart over a phrase, then come back together and start again.
+`Num` double pendulums are released from one start pose (`Th1`, `Th2`: 120 and 150 degrees from straight down, both
+arms raised to one side), each a tiny angle apart in the upper arm. For the first bars they swing as one; then the
+chaos (the double pendulum's sensitivity to its start) fans them out into a bloom of diverging arms and tip traces;
+over the last bar they are gathered back to the start pose and released again exactly on the next phrase line.
+
+- **The physics.** The standard double pendulum (two point masses on massless rods; lower arm `LRat` x the upper,
+  lower bob `MRat` x the upper), integrated with RK4 in fixed steps of 1/48 beat from the cycle line (more substeps
+  when a pose or ratio makes the motion quick for that step). Every state is a function of the clock position alone:
+  a step is never split by the frame rate, and a frame between steps shows a partial step from the last whole one
+  (not kept). So 24, 60 and 144 fps draw exactly the same picture at the same beat, and runs repeat. Without kicks
+  the energy stays within about 1e-4 of its range over a 15-bar run.
+- **On the tempo.** Time is in beats; g (per beat^2, unit upper arm) is chosen at load so the first swing out and back
+  from the start pose (the upper arm's velocity changing sign twice) takes `Prd` beats (2). So the synchronized
+  pendulums' first swing lands on beat 2, and a tempo change just plays the same motion faster or slower. (A pose
+  balanced near the top would swing back very slowly; g is capped at a simple-pendulum period of `Prd` / 2.)
+- **The spread and when the fan opens.** How soon nearby pendulums part depends on the trajectory, so the spread at
+  the release is chosen at load: a tiny difference is followed along the reference motion (kicks included,
+  renormalized so it stays small, a Lyapunov-style growth) up to `Div` bars, and the spread is set so the outermost
+  pendulums' tips are 3 % of the reach from the middle one's by then. Pendulum Double: 1.1e-8 radians between
+  neighbors, the fan opening at about bar 5.8 of 16, wide open (tips across the whole reach) from bar 8 or 9.
+- **The cycle** (`Cyc` bars, 16; on the phrase-aligned bar clock, so cycles start on phrase lines): released at rest
+  from the pose on the line; free (with kicks) until the gather; over the last `Back` beats (4) each arm is eased
+  from its free motion to the pose plus the whole turns nearest where it was as the gather began (a smootherstep
+  blend, so it slows into place, no unwinding), arriving exactly, at rest, on the next line. The next cycle releases
+  from there, so the motion is continuous across the line. A clock jump, a deck start or a phrase re-alignment puts
+  it where it belongs on the next frames: a jump within a cycle or into another plays that cycle again from its line,
+  at most 12,000 pendulum-steps a frame (a fast-forward over a frame or two; a jump to beat 38 of a 16-pendulum cycle
+  catches up in two frames). Fading out from a cycle line (its `PBar` follows the live clock, as for the dragon) the
+  pendulums stay gathered at the pose instead of being released into the next cycle.
+- **Music.** Kicks (`Kick`, .25 rad / beat): on every beat line after the release, until the gather, each upper arm is
+  pushed along its own motion over an eighth of a beat (a smooth function of the state, so the synchronized pendulums
+  get the same push and stay together; in the bloom every arm twitches at once). The energy is held at its release
+  level (a pull along or against the arm's momentum in proportion to the difference), so the kicks never pump it up:
+  a beat after a kick every pendulum is back within .1 of its range. Drops (`SYNC_DROP` rising past .5, once a cycle,
+  before the gather): every upper arm is thrown along its motion by `Drop` (2.5 rad / beat) and the energy is held at
+  the new, higher level for the rest of the cycle (more chaos, wider arms); everything flashes with the drop. Builds
+  (`SYNC_BUILD`): with `BldG` (0..1; 0 by default since Peter 2026-11-26: gathered only in the last bar) the gather
+  lengthens to up to (1 + `BldG`) x `Back` (decided once a cycle, `2 Back` beats before the line), so through a
+  breakdown the pendulums are drawn together early and hang poised for the release on the line.
+- **Drawn** as line art through the OrganicCanvas into the feedback, so arms and tips trail and take the ColorMap:
+  each tip's trace over the last `Trl` beats (fading to its tail), the arms (`Arm`), an elbow dot, the tip bob. The
+  pendulums' intensities spread over 1 - `Shd` .. 1; layers drawn traces, arms, bobs, each dimmest first, so while
+  they swing as one the brightest is the one seen.
+- **Content** (Pendulums): **Pendulum Double** (16 from the center, 1.5-beat traces: one pendulum, a flower opening
+  around bar 4 (`Div` 4), a chaotic bloom, gathered back to one over the last bar), `PBar` 32 (two cycles) and `SBar`
+  16 (the slideshow starts it on a phrase line). Two comparisons, a denser fan of 28 and arms released nearly upright,
+  were tried and removed 2026-11-26 (Peter: the plain one as it is). Pendulum Double Row (a row of pivots) and
+  Pendulum Double Trace (four with long traces) were removed 2026-11-26 (Peter: the plain one is best).
+- **Cost** (Release, per step, at the busiest, in the chaos): Pendulum Double 1,175 segments, 0.015 ms average,
+  0.04 ms worst; Row 609 / 0.009 ms; Trace (5 x 8 beats) 1,837 / 0.017 ms; the maximum (32 pendulums, 16-beat traces)
+  23,339 segments, 0.21 ms. A jump far into a cycle: about 1.1 ms on each of its catch-up frames. Load (finding g and
+  the spread by simulation): about 0.6 ms. Offline at 1920 x 1080, a whole cycle of Pendulum Double, the whole frame:
+  CPU p99 0.09 ms, GPU p99 0.5 ms.
+
+Tests: tests/test_engine_double_pendulum.cpp (the small-swing normal modes against (2 -+ sqrt 2) g, energy without
+kicks over a whole cycle for three poses / ratios, the first swing taking `Prd` beats; the release at the pose, as one
+for three bars, the fan opening between bars 4 and 8.5 and wide open later, the pose exactly at rest on the next line,
+a smooth gather; kicks the same for all and holding the energy, a drop's push and its held level; the same frames at
+24 / 60 / 144 fps and at 120 / 128 BPM, a jump forward caught up, a jump back, into the next cycle; drops, builds,
+variants, junk keys, huge or broken clocks; fading out on the line; cost).
+
 ## Kick zoom (5O.3, render/ScenePipeline flow pass)
 
 On every beat the FlowField's source coordinates are scaled by (1 - zoom) and turned about the center (aspect-correct),
@@ -129,6 +193,7 @@ docs/scene-format.md §5.8.
 | `life` | Game of Life | one generation per beat, a fresh soup every 16 bars (phrase lines) |
 | `lsystem` | (none: Fern and Bush removed 2026-11-22; the kind stays) | one generation per 1-2 bars, each traced in over its first bar |
 | `attractor` | Clifford Attractor | parameters glide over 24-40 bars |
+| `double` | Pendulum Double | released on the phrase line, swinging as one, fanning out by bar 4, gathered over the last bar; the first swing takes 2 beats; a push along the swing on every beat |
 | `dragon` | Dragon Fold, Dragon Rounded | a fold every 2 beats, landing on the line; unfold, hold and refold every 8 bars (Peter 2026-11-23; Dragon Pinwheel, four dragons tail to tail, removed the same day: `Num` stays) |
 
 ## Dragon (5O.9, engine/Dragon)
@@ -206,13 +271,8 @@ Peter 2026-11-18: "build these". Not line segments: each live one draws into its
 (premultiplied luminance, alpha) that the sprite pass composites like a solid, so it gets Pen, `Flag`, the fade
 envelope and trails. Slots = `reforce.Object.MaxLive` + 1 (the spare for a crossfade), allocated at startup.
 
-- **ripples**: the wave equation on a 270-row grid (R32Float, three fields ping-ponged), substeps at <= .5 cells
-  each (stable), damping exp(-dt / Decy), absorbing (a sponge) or reflecting edges. A drop is a Gaussian bump added as
-  a displacement (added in one substep, taken back from the next, so it has no velocity; the first version pushed and
-  the water kept rising). Drops land on the beat lines (`Rate` per beat), at `DX`, `DY` or at random; `Rain` adds
-  small ones. Drawn: the crests plus a slope highlight from the top left, minus a floor (.15) so the old rings'
-  chatter stays dark. Content: Ripples Kick (a drop per beat), Ripples Pond (a big drop per bar, rain thickening
-  through a breakdown, reflecting walls), Ripples Ring (drops on the 8ths stepping round a ring every 2 bars).
+- **ripples** (removed 2026-11-26, Peter: he prefers Rain Pool, the rain object's floor of water): the wave
+  equation on a grid with a drop on the beat; the kind, its GPU passes and Ripples Kick / Pond / Ring are gone.
 - **julia**: one pass per frame, smooth escape-time shading; the set is dark. Content: Julia Drift (c runs once per
   phrase along the outside of the Mandelbrot set's main cardioid: always connected, so never dust), Julia Pulse
   (San Marco, swelling on every beat), Julia Bands (escape-count bands flowing in once per beat).

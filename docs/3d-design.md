@@ -495,7 +495,7 @@ BGRA8 and two frame-size cut maps (25 MB at 1080p), made at startup.
 Peter: "simulated raindrops landing on the screen and causing distortion and refraction of what's underneath ... the
 screen of the monitor becomes a glass window that is getting distorted by rain on it? Or maybe like it's a glass floor
 with rain falling on it? ... good modeling of the distortion will be key." Both are built, as `Rain = window | floor`
-(content's Rain Downpour, Rain Floor and Rain Pool, in the Water group; Rain Window, a sparser window, was removed 2026-11-23). Keys: scene-format §5.7.
+(content's Rain Downpour, Rain Floor and Rain Pool, in the Overlay group; Rain Window, a sparser window, was removed 2026-11-23). Keys: scene-format §5.7.
 
 Like the glass puzzle it is not drawn into the visuals: the Visualizer keeps a `RainDraw` per step and `colorize`
 calls `RainPipeline::encodeComposite` after the glass, so the visuals keep running under the water. One rain at a
@@ -580,6 +580,214 @@ the rain's first step, so poison mode reads nothing undefined.
 **Window or floor?** The window is the rain-on-glass look (the inverted world in every bead, runs, wiped streaks
 through fog): atmospheric, readable on any visuals, and calm enough to leave the visuals in charge. The floor is the
 more spectacular in motion: interfering ring trains bend the whole frame on every beat. Both are kept; Peter picks.
+## Bubbles (`Mesh="bubbles"`, Peter 2026-11-26)
+
+Soap bubbles drifting over the visuals, with thin-film iridescence, refracting and mirroring the visuals, popping on
+the beat. Content: Bubbles Drift, Bubbles Burst (Overlay group; Bubbles Giant, a few big ones inflating in place with Src air, removed 2026-11-26, Peter). Keys: scene-format §5.7.
+
+Like the rain and the glass puzzle they are not drawn into the visuals: the Visualizer keeps a `BubbleDraw` per step
+and `colorize` calls `BubblePipeline::encodeComposite` after the rain, so the visuals keep running underneath (and
+the bubbles mirror and shift the rain too). The pass keeps no state between frames (everything lives in the CPU sim),
+so several bubble objects may run at once.
+
+**Optics** (render/BubblePipeline, `bubble_fs`). A soap bubble is a thin shell, not a lens. Each bubble is one
+instanced quad drawn straight over the frame with framebuffer fetch (what is already there, other bubbles included,
+shows through it). Per pixel the unit sphere's point comes from the outline (the shape modes below), and the shell
+has two films, the front one and the back one seen through it:
+- **Thickness**: the bubble's mean (`Film`, thinning by up to 45 % as it ages) times a drainage profile (`Drn`: thin
+  at the top, thick at the bottom), times swirling 3D value noise on the sphere, plus finer streaks on bubbles big
+  enough to show them. The film flows (Peter 2026-11-26: it looked static on the big bubbles): each height circles
+  the bubble at its own speed (faster at the top, against the turn lower down), so the bands shear and wind into
+  swirls, and a two-level moving domain warp (the second warped by the first) curls them into eddies, the whole
+  pattern also draining downward; `Swrl` scales both the flow and the warp. A planned pop drains a
+  black film down from the top over the beat before it (thinner than a quarter wave reflects nothing: the black
+  film real bubbles show before they burst).
+- **Interference, computed physically**: the Airy reflectance of a symmetric soap film (n 1.33; the single-surface
+  Fresnel reflectance at the angle, s and p averaged; the phase 2 pi 2 n d cos(theta_t) / lambda with the half-wave
+  flip, so a vanishing film is black) at ten wavelengths 406..694 nm, weighted into linear RGB by the CIE 1931 color
+  matching functions (Wyman, Sloan and Shirley's multi-lobe Gaussian fit) and the sRGB matrix, normalized so a flat
+  spectrum is white. This gives the Newton series (black, silver-white, gold, magenta, blue, green, pink, ... washing
+  out to white past ~1.5 um) and the mirror at grazing incidence. `Iris` scales the saturation. A CPU copy
+  (`render::filmReflectance`) is tested.
+- **What the films reflect**: the front film is a convex mirror, the back film (seen from inside) a concave one, so its
+  reflections are upside down on the other side. A reflected ray running towards the screen meets the visuals `Dpth`
+  behind (sampled from a mipmapped copy of the frame, rays off the frame see a dark room); one running towards the
+  viewer sees the room: the visuals mirrored and soft (mip 4.5) and a sky brighter above. The space between the
+  bubbles and the visuals is lit a little, so the rims read over black. A soft, round light up and to the left
+  (`Spec`) gives the classic highlight pair (front upper left, back lower right), colored by the film like the rest
+  (a four-pane window until 2026-11-26: Peter was unsure about it).
+  The light is white, tinted a little towards the ColorMap's color at .8 (`Tint`), so they sit with the palette.
+- **Composition** (in linear light): `under (1 - Rf)(1 - Rb) + 2 (Rf L_front + .75 (1 - Rf) Rb L_back)`. The middle,
+  where the film's reflectance is lowest, stays nearly clear (the room's reflection also fades a little towards the
+  middle); the rim goes to a strong Fresnel reflection of the visuals behind (`Rim` widens that band: cos theta is
+  taken to the power 1 + .8 Rim).
+- **Through the shell** the visuals shift only slightly, most near the rim (`Bend`; q^4 R .045 px outward): the shift
+  is taken from the frame copy and added to what is under the pixel, so overlapping bubbles keep each other.
+
+**Shapes and walls.** The outline is r (1 + a2 cos 2t + b2 sin 2t + a3 cos 3t + b3 sin 3t) from the sim's shape modes.
+A cluster's shared wall: both bubbles are cut at the plane where their spheres meet (a = (d^2 + r1^2 - r2^2) / 2d from
+the first center, the wall's circle of radius sqrt(r1^2 - a^2)); the lower id draws the wall, a film seen edge-on: a
+bright line with its own interference color, along it varying; the other gives the wall its pixel. A wall ends where
+it meets the bubble's other walls (the planes of three bubbles meet in one line, so a cluster's walls meet at one
+point, as in real foam), and within .4 radii of a wall the outline is the plain sphere (the shape modes fade out), so
+both bubbles' edges meet the wall's ends at the same point (Peter 2026-11-26: the two sides did not match).
+
+**Popping.** The film tears from one seeded point on the face turned to us (a little more often higher up, where it
+is thinnest), so the hole opens in the face as a growing disc and races out over the sphere, the far side's film
+closing last as a small shrinking ring. The hole is the cap within an angle of the tear that grows to pi in
+kPopSeconds = 45 ms (about 3 frames at 60 fps), accelerating out of the tear, for both films. Its edge is ragged
+(noise round the tear, the tongues shrinking again as the last film closes); the retracting rim is a band of gathered
+liquid, thickening as it goes and faintly beaded; a ripple runs through the film just ahead of it. Real rims run at
+the Culick speed (~7 m/s for a 1 um film: a 3 cm bubble in ~4 ms); slowed so it can be seen. (Until 2026-11-26 the
+tear was near the top and the smooth cap took 75 ms: Peter saw it as a scroll down through the giant bubbles.) Each
+pop throws a spray (12-60 droplets from the shell, each appearing when the rim reaches its spot, flung along the
+rim's travel and outward, falling, fading over .3-.8 s), drawn as tiny lenses (the visuals upside down) with a glint.
+
+**Motion** (engine/Bubbles, 1/120 s substeps from the start, seeded):
+- Air: the curl of a seeded noise potential (two octaves, each a crossfade between noise layers 7 s and 3.7 s
+  apart), so the flow neither converges nor diverges (tested); `Air`. They rise gently (`Rise`) and relax to the air's
+  velocity with a time constant growing with size, so a wand's bubbles carry their blow for a second or two. `Wind`
+  adds a breeze whose heading and strength wander slowly (seeded sines over tens of seconds), so the drift goes every
+  way, not only up (Bubbles Drift: 1).
+- Soft walls at the sides and the bottom (the edge source's bubbles come up from below it); the top is open: they
+  drift out of the frame there unless they pop first.
+- Shape modes n = 2 and 3 (cos and sin each): damped oscillators (zeta .12, f2 = 2.6 Hz (55 px / r)^1.5, f3 = 2.24 f2)
+  driven by smooth noise (the air), a build's tremble and a coming pop, and squashed while two bubbles touch; a
+  wand's bubble starts stretched along its blow.
+- Contacts: two touching bubbles bounce softly (pushed apart by the overlap, losing most of the approach), or, once per
+  pair (seeded, `Clst`) when they meet gently, stick: a bond whose spring holds the centers sqrt(r1^2 + r2^2 - r1 r2)
+  apart, the distance at which three films meet at 120 degrees (equal radii: one radius apart), as in a real double
+  bubble. At most three walls per bubble; a bond breaks when the air pulls them apart or one pops.
+
+**Music** (the 16th grid of the beat clock, phrase-aligned `SYNC_*` while it is on, else 120 BPM from the start):
+- Blowing: on each bar line a puff of `Blow` bubbles joins a queue, released over the bar's first 16ths (a stream from
+  the wand); sizes lognormal around `Size`. The wand: each bar's puff from a new seeded spot anywhere in the frame,
+  aimed at a random point well inside it, swaying a little over the bar (until 2026-11-26 one spot near a lower corner,
+  aimed up at the middle).
+- Popping: every pop lands on a beat line. On beat line k the victims for line k + 4 are planned: `Pop` of them (fewer
+  while a build holds its breath), every bubble past `Life` beats, and the extras over `Max`, the oldest first with a
+  seeded jitter. Their film drains black from the top over that beat (and they tremble a little), and on line k + 4
+  they tear, in the substep the line is crossed. A plan far ahead of the clock (it jumped back) is re-planned.
+- A drop (`SYNC_DROP` rising past .5): on the next beat line 60 % of the bubbles pop at once (no warning) and a burst of
+  2 Blow + 4 is blown in, faster and wider (it may overfill `Max` by half; the extras pop on the next lines).
+- A build (`SYNC_BUILD`): blowing up to 3x (build^2) and trembling (the shape modes driven harder and faster); early in a
+  breakdown (calm = min(1, 4 build)(1 - build^2)) the air slows (to 40 %), they rise slower and come up to 60 % bigger.
+- Deterministic: lines and pops are a pure function of (seed, line index), physics runs on fixed substeps, and
+  without a clock the state is the same at any frame rate (tested at 30 / 60 / 144 fps for each source). A step
+  simulates at most 30 substeps and visits at most 16 lines; a clock that jumps re-bases; junk (NaN, inf, 1e300) is
+  clamped or read as no clock. At most 96 bubbles and 640 droplets, whatever the keys say.
+
+**Cost** (1920x1080, M-series, test_render_bubbles.cpp; other agents' GPU tests were running at the same time, so
+these are upper bounds): Bubbles Drift's crowd (40 bubbles of 55 px, popping and spraying) 0.5 ms GPU best, ~1.0 ms
+mean; 7 giants of 150 px (Src air) 0.4 / 0.5 ms (frame copy with mips, then the bubbles). Nothing is encoded while
+there are none. CPU ~0.02 ms per 60 fps step (worst 0.1 ms) with up to 60 bubbles. Resources at startup: the frame
+copy (BGRA8 + mips, 11 MB); 0 render allocations (tested).
+
+## Ferrofluid (removed)
+
+A pool of glossy ferrofluid over the visuals whose spikes rose on the beat and refracted the visuals like the
+rain (`Mesh="ferrofluid"`, built 2026-11-26): removed the same day (Peter: "I just don't like those"), with its
+engine, pipeline, tests and the three scenes (Ferrofluid Pool, Crown, Twins). It is in the git history.
+
+## Shatter (`Mesh="shatter"`, Peter 2026-11-26)
+
+The screen is a pane of glass a little in front of the visuals. Cracks spread across it on the kicks; on the phrase
+line it shatters into shards that fall away (or, on a drop, fly apart towards you), leaving the clean visuals; then a
+fresh pane slides down and the cycle repeats. Content's Shatter Drop and Shatter Hail (Overlay group; Shatter Web, one impact on a lighter web, removed 2026-11-26, Peter).
+Keys: scene-format §5.7.
+
+Like the rain and the glass puzzle it is not drawn into the visuals: the Visualizer keeps a `ShatterDraw` per step and
+`colorize` calls `ShatterPipeline::encode` after the rain and the color models, so the visuals keep running behind the
+glass. One pane at a time (its crack maps are shared): a newer shatter replaces an older one at once.
+
+**The fracture** (`engine/ShatterShape.inc`, one source compiled as C++ for the engine and the tests and stringified
+into the Metal crack-map shader, like the jigsaw's cut, so both break the pane into exactly the same shards):
+- `Imp` impacts per pane (one a little above the middle; several spread apart by rejection sampling). Each owns its
+  Voronoi cell; the boundary between two is their bisector with a gentle wander (up to .012 frame heights), the seam
+  where two webs meet.
+- Around an impact a spider web in polar coordinates: `Spk` ± 2 radial cracks, jittered in angle (.28 of a sector)
+  and kinked by a piecewise-linear wander in log radius (a kink every third of a log unit, .11 of a sector); forks: from
+  a ring about a third of the way out a radial crack may branch into its sector (`Fork`), leaving its parent where that
+  meets the ring and curving out to its share of the sector over a band (a Y), and two rings later each half may branch
+  again; ring cracks at radii r0 g^(j - 1) (r0 = .04 `Size`, .026 with several impacts; g = 1.95 - .5 `Rng`, at least
+  1.45), their ends on each spoke jittered by 10 % (so they kink at the spokes), nearly straight between the spokes
+  (from the arc towards the chord as far as the next ring's margin allows), with a little bow.
+- A shard is one sector of one band (`slot`); the jitters and the straightening are bounded so ring j + 1 stays outside
+  ring j everywhere and spokes never cross: every point has exactly one shard (tested on grids for one to six impacts,
+  and the owner along any ray steps out one band at a time). The crack between two shards is a **crack element**: a
+  shard's left spoke piece, its inner ring piece, or a bisector, with a position along it (outwards along a spoke,
+  across along a ring, from the middle along a bisector).
+- **The shard table** (engine `makePlan`, on the CPU, once per pane, no allocations): each sector's outline sampled
+  (spokes every .1 log units, rings in 6 steps), clipped to the frame and the impact's cell (Sutherland-Hodgman) for
+  its centroid, its quad (bounds + .012 margin; tested: every grid point lies in its own shard's quad) and its
+  boundary elements. At most 640 shards: a denser web is thinned deterministically (fewer forks, then fewer spokes).
+
+**The schedule** (`engine::shatter::Player`; beats on the phrase-aligned clock, 4 x `SYNC_BAR`, or 120 BPM from the
+start without it; a cycle of `Cycl` beats from one line to the next):
+- On the line the pane shatters. 2 beats later a fresh pane slides down over 1.5 beats (its thick bottom edge
+  refracting and catching the light; `Arrv=1` fades it in instead), its glass catching a little more light as it
+  settles.
+- `Hit` beats after the line (4) the first impact lands; the others on later bar lines over the pane's first three
+  quarters. On its beat the impact's inner cracks shoot out (the crushed spot, a flash); then on every beat up to the
+  one before the line more cracks grow: each impact's elements in order (spokes outwards band by band, rings a little
+  after the spokes around them, some jitter), a share per beat, so every kick adds or extends cracks. A spoke piece
+  starts after the piece below it (within a beat it continues its growth), a ring piece from the spoke that reached
+  it first. Each starts exactly on its beat line, grows in about a tenth of a beat (ease out) and flashes as it lands.
+  By the line `Crk` of the web shows; the rest are hidden cuts that show only as the pane breaks. The bisectors appear
+  well after both their impacts landed (60 % of the way to the line), from the middle out over a beat and a half.
+- The pieces a crack has cut loose (their boundary mostly grown) tilt a hair (.006-.016 rad x `Tilt`), so the visuals
+  shift by a few pixels across each crack.
+- A build (`SYNC_BUILD`): the cracks due in the next 4 beats creep ahead on the 16th lines (up to 40 %, never back),
+  glints tick along the cracks on the 16ths, and the loose pieces creak (their tilts jitter per 16th).
+- A drop (`SYNC_DROP` rising past .5) while a pane is up: it explodes on the next 16th line, and a fresh pane arrives 3
+  beats later and cracks over the beats left until the next line (at least 12; else it runs to the line after). A drop
+  within 2 beats after a gentle shatter blows the falling shards apart from that 16th line.
+- The shards' flight is closed-form in the beats since the shatter (no integration): a gentle collapse (`Brst` .3: a
+  little push out from the impact, pieces near it first, toppling forward about a mostly horizontal axis, gravity
+  1.4 `Grav` frame heights per beat²; gone in about 1.5 beats) or an explosion (a drop, or `Brst` 1: thrown out from
+  the impact and towards the camera, spinning about random axes; past the camera or off the frame in about 2 beats).
+  Each starts from the tilt it had in the pane, so the break is continuous. A shard is gone when it is below or beside
+  the frame or past the camera; the poses are sorted back to front.
+- Deterministic: plans are pure functions of (seed, config, aspect, the pane's beats); the frame is a function of the
+  beat and those, so it is the same at 30 / 60 / 144 fps (tested; only a drop's 16th line and a build's creep depend
+  on when they are seen). A clock that jumps back (more than a 16th) or ahead (more than 16 beats) re-bases: the pane
+  due at the new beat (one arriving on the next beat line when it is mid-cycle). Junk (NaN, inf, 1e300) is clamped or
+  read as no clock. Three plans are cached (the pane, the falling one, a spare).
+
+**Drawing** (`render/ShatterPipeline`):
+1. The frame is copied with mips (a blit), so the refraction samples it by the ray's derivatives.
+2. **The crack map** (RGBA16Uint, frame size: the shard, the nearest crack element, the position along it, the
+   distance to it in 1/32 px), rendered from the shared fracture code only when a plan is new; two kept (the pane's
+   and the falling shards'). Tested against the CPU: the same shard everywhere off the cracks.
+3. **The pane** (full screen): each pixel looks through the glass. Where the nearest crack has grown past it: a fine
+   silvery line (light scattered in the fracture face, its brightness wandering along it) with a darker fringe, so it
+   reads over black and white; the chipped edges lean into the crack (a narrow lens: the view ray refracts through
+   them, Snell with n 1.50 / 1.52 / 1.545, and runs `Dpth` frame heights to the visuals, as in the rain, so the visuals
+   bend and split into colors along every crack); glints twinkle along it (`Sprk`; more tick on the 16ths in a build),
+   and it flashes as it lands. Everywhere the shard's tilt shifts the view a little. Fresnel adds only what a tilt adds
+   over flat glass (the intact pane leaves the frame exactly as it is; tested), a highlight from the upper left on the
+   chipped edges; each impact's crushed spot (white, mottled) and its flash; a faint broad sheen (`Gls`).
+4. **The shards** (instanced quads, back to front, premultiplied over): each a quad in 3D (rotated, lifted towards a
+   camera 2.2 frame heights above the pane, so a shard thrown at it grows) whose pixels look up their home in the
+   crack map (coverage anti-aliased from the bilinear distance; the frame's edge cuts it without a bevel). They show
+   what lies behind them now: the visuals shifted sideways through the thick slab (.018 frame heights x `Thck`) as it
+   turns, bent and split by the beveled edges (3 + 6 `Thck` px at 1080p), a Fresnel reflection of the room (the frame,
+   blurred and mirrored) that flashes as a shard turns edge-on, a highlight from the upper left, the green of the
+   glass at the edges and through more of it as it turns, the lit edge and the shatter's flash. Flat at home a shard is
+   exactly the pane (tested: at the moment of breaking the frame shows through the shards unchanged off the cuts, so
+   there are no gaps and no overlaps).
+- **Alpha**: `ColorKey` 1 (default) leaves the Syphon alpha as the visuals keyed it; 0 raises it under the cracks and
+  the shards.
+
+**Cost** (1920x1080, M-series, test_render_shatter.cpp, nothing else running): the cracked pane 0.45 ms GPU (one impact;
+0.43 ms with five), the shards falling 0.34 ms (103 shards; 0.25 ms for 411 smaller ones), the crack map 2.7 ms once per
+pane (1.5 ms with five impacts), as the pane slides in. CPU: a plan about 1 ms (one impact; 4-5 ms with five)
+once per pane as it arrives, a frame a few microseconds. Resources at startup: the frame copy (BGRA8 + mips, 11 MB), two crack maps (RGBA16Uint, 33 MB), eight 150 KB
+shared state buffers (the crack and tilt arrays, the shard instances).
+
+**Peter's choices** (2026-11-26): every scene explodes on the line (`Brst` 1, now the default), the pane gets fully
+cracked (`Crk` 1, now the default), new panes slide down (`Arrv` 0); the collapse and the fade stay as options.
+
 ## Fractal zoom (`Mesh="fractal"`, Peter 2026-11-23)
 
 Peter: "Zooming in on one or more 3D fractals. I'm thinking maybe a 3D Sierpinski, where we can move the camera around
@@ -678,6 +886,96 @@ bar lines, drops, builds, determinism, junk inputs; the content scenes; unknown 
 test_render_fractals.cpp (GPU: the frame at the end of a step vs its start, mean |diff| under .01 of 255 for every
 path, the same frame twice identical, cost; `REFORCE_FRACTAL_PREVIEW=DIR` writes PNGs).
 
+## Tower of Hanoi (`Mesh="hanoi"`, Peter 2026-11-26)
+
+Peter: a Tower of Hanoi solved on the beat, one disc move per beat, finishing exactly on a phrase line, drawn as glass
+that refracts the visuals behind it, in the spirit of the glass 15 puzzle and the rain. Content's Hanoi Tower (6 discs,
+63 moves: a 16-bar phrase with one beat for the reset), group Puzzles. Keys: scene-format §5.7.
+
+Peter 2026-11-26: Hanoi Tower (springing open and carrying on round the pegs) over Hanoi Mini (removed); the glass well
+frosted, bending the visuals a decent amount, every part one color (`Mono` .7: discs, pegs and base all the ColorMap's
+color at .7, as deeply tinted); nothing special on drops (no `Lift` / `Flip` in the scenes; a build still opens the
+stacks). The frosted share now grows with `Fros` (.2 + .02 Fros, at most .85; it was a fixed .3, so more frost only
+blurred that 30 % and barely showed). Of three looks compared (`Fros` / `Bend` / `Dpth` / `Tint`: 22 / 1.4 / .65 / .4,
+a milky 34 / 1.15 / .55 / .3, and the "Lens" 16 / 2 / .85 / .45) Peter picked the Lens: Hanoi Tower now has it, clearer
+glass with every rim and peg a strong lens. He also wanted it to move more: it drifts side to side (X ~±.14) and bobs
+(Y ±.07), turns up to ~45 degrees each way (RotY), rocks (RotX ±.1) and tilts a little (RotZ ±.05), on slow sines of
+unrelated periods. `REFORCE_HANOI_PREVIEW` also writes the look (hanoi_look_tower.png).
+
+- **Solve** (`engine/Hanoi`, `Plan`): the minimal solve of `Disc` discs from peg 0 to peg 2, made once (an explicit
+  stack of sub-towers, no recursion) with the peg and level of every disc after every move (a table: the state after k
+  moves is a lookup). A run maps those pegs onto its own: with `Rset` 0 run r goes from peg 2r mod 3 to the next peg
+  round to the left (0 to 2, 2 to 1, 1 to 0), so each run starts where the last one ended and every run is a correct,
+  minimal solve; with `Rset` 1 every run goes left to right. Seeds are the clock's run count, so consecutive runs chain
+  across the line (tested for negative and large seeds).
+- **Timing**: a run of `Beats` beats; the first `lead = Beats - moves x Each` are the reset, then move k lands on
+  `lead + k x Each`, the last on the run's end. Everything is a pure function of (settings, run, beat), so a clock
+  jump, a mid-phrase start or a tempo change is just another lookup: nothing is planned ahead or simulated (the
+  labyrinth needs lazy planning for its physics; here the state is closed-form). The only state is the style of the
+  move in flight (`Lift`, `Flip`), which SolidRun reads when the move starts, so a value that changes mid-flight (a drop
+  arriving) never jumps the disc.
+- **A move** (`carry`): straight up the peg until the disc's bottom clears the peg tops (`kClear`), over a half
+  ellipse (vertical at both ends, so the path is smooth) whose height grows with the distance (.3 + .1 per peg, x
+  `Lift`), straight down onto the stack. Time along the path's arc length is eased in from rest and arrives at .9 x the
+  mean speed: the disc lands with a little speed exactly on the line (tested: a hair before it is above its place, on
+  the line it rests on it exactly, for 3..8 discs, Each .5 / 1 / 2, both resets, several runs). In flight it swings
+  (the leading edge up, then down; no more than the arc leaves room for) and, on a drop, tumbles forward `round(2 x
+  Flip)` half turns between .3 pi and .7 pi of the arc, whose height then grows by 1.25 radii so the turning disc clears
+  everything. On landing it squashes a few percent about its bottom and rings back (~.2 beats) and its rim flashes
+  (glint).
+- **Resets**: `Rset` 0: the solved tower springs open (each disc up .14 per level, the top the most, a parabola) and
+  shuts again, every disc landing on the reset's line; `Rset` 1: the whole stack is lifted off the right peg, carried
+  back over the pegs and dropped onto the left one, landing on the line. The reset is one beat (`Each` beats when
+  longer); with a longer lead the tower rests until the first move.
+- **No collisions** (tested over whole runs at 1/512 beat, every disc count and reset, with no lift, a drop's style and a
+  full build): the carried disc never cuts a peg (it rides threaded on its own peg until its bottom clears the tops) or
+  another disc (as a tilted box), and moves continuously.
+- **Music** (content): `Lift = 1 + 1.5 SYNC_DROP` (a drop flicks the discs higher), `Flip = SYNC_DROP > .6` (the moves
+  starting in a drop's first two beats flip right over), `Hovr = SYNC_BUILD (1 - SYNC_DROP)` (a build: the stacks open
+  up, .06 per level, and bob); a build also tips the tower towards the viewer (RotX). Timing is never touched.
+
+**Drawing** (`render/HanoiPipeline`; like the glass puzzle and the rain it is laid over the colorized frame by
+`colorize`, after the glass puzzle and before the rain, so the visuals keep running behind it):
+
+- **Geometry**: every part is a lathe around a short segment, made in the vertex shader from a profile (no vertex
+  buffers): a disc is a glass washer (an annulus from the hole, radius .17, to its outer radius .5..1, .26 high, with
+  half-round inner and outer rims), a peg a rod (radius .085) with a round top, the base a stadium slab (.22 thick, the
+  pegs' line +- 2.3 with round ends of 1.14) with rounded edges. 4x MSAA and depth into the object's slot target
+  (resolved premultiplied), then over the frame by `SolidPipeline::encodeGlassComposite` (the glass puzzle's last
+  step, factored out of `encodeGlass` and now able to cover a box). The pass and the composite cover only the tower's
+  screen box (the parts' bounding boxes projected; clip space shifted so the box sits at the target's corner, as the
+  solid pass does).
+- **Optics** (`hanoi_fs`): each part also has its exact distance field (the same shape). The mesh's point is moved
+  onto the true surface along the field's analytic normal; the view ray refracts in (Snell, n = 1 + .5 `Bend`), runs
+  through the glass and refracts out, then on to the visuals, a plane `Dpth` frame heights behind the tower; that point
+  is projected back onto the screen and sampled, so a straight ray samples exactly the pixel behind it. Where the ray
+  leaves through a flat face of a disc or the base (the path staying in their solid core) or anywhere on a peg (a
+  capsule) the exit is analytic; the rims are traced (sphere tracing inside the field, which never steps past the
+  surface, then bisected). A total internal reflection bounces once more (followed only when it then leaves
+  analytically). Dispersion: red and blue refract with n -+ .018 `Bend`. So a rim is a strong lens (the visuals behind
+  it minified and flipped), the flat tops shift them a little, a peg is a rod lens (render test: over a frame bright
+  left / dark right of the peg, the peg shows dark on its left and bright on its right).
+- **Sampling**: from a mipmapped half-size copy of the frame (its own downsample pass + mips), at the ray's screen
+  footprint (no shimmer where the glass minifies), with 30% of it frosted (a coarser level of the same copy, about a
+  Gaussian of `Fros` px). The first version cost 2.2 ms: the full-frame passes and composite (the box: -.2 ms), the
+  Gaussian frost of `encodeFrost` (-.4 ms), traced exits everywhere with a traced entry and numeric normals (analytic
+  ones: -.8 ms); a separate pass for the base and pegs, so the discs could see them, was dropped (no visible gain).
+- **Look**: colored glass absorbs along the path (`Tint`; the tint to the power `Tint x path / disc height`, so the
+  rims are deeper); Fresnel (Schlick, F0 from n) reflects a dim room, lighter above, tinged with the glass's color; a
+  soft highlight from the upper left (`Spec`); the transmitted light darkens a little towards the rims and a sheen runs
+  along them, so the glass reads over white (darker rims, colored discs) and over black (lit rims, highlights); rays
+  that leave the frame see the dark room; a landing's glint lights the rim. Each part sees the frame behind the tower,
+  not the other parts (as the glass puzzle's buttons).
+- **Colors**: the discs take the soma's seven piece colors (`engine::PiecePicker`: clearly different, light enough),
+  sorted in ColorMap order and spread over the discs (the smallest the first); the pegs and base a faint neutral glass.
+- **Cost** (1920x1080, M-series, test_render_hanoi.cpp, 6 discs, a move in flight, Scal .9): .72 ms GPU (downsample and
+  mips, the glass pass, the composite); 2.8 MB for the half-size copy, the solids' MSAA color, depth and slot target
+  shared. CPU per frame: a lookup and one path (~32 arc samples), negligible.
+- Tests: test_engine_hanoi.cpp (the minimal legal solve, landings exactly on the beat lines, solved on the run's end,
+  runs chaining, no collisions and continuous motion, a drop's style, determinism, jumps, junk, the content scenes at
+  two tempos and a drop arriving mid-flight), test_render_hanoi.cpp (the rod lens, readable over white and black,
+  opacity 0, the cost; `REFORCE_HANOI_PREVIEW=<dir>` writes frames to look at).
+
 ## New variables, for all scene types (Peter)
 
 `SYNC_BEAT`, `SYNC_BPM`, `SYNC_LOCK` and `SYNC_ON` come from `sync::BeatClock`: Link when a session runs, else the
@@ -711,6 +1009,7 @@ values. G-Force scenes don't reference them, so nothing changes for them (scene-
 | Measured (phase 2, 1080p, M-series) | solid pass 0.03 ms, with the composite 0.10 ms GPU per solid |
 | Measured (phase 3, 1080p, tile 512) | WaveShape tile (4096 segments + mips) 0.055 ms, frame tile 0.058 ms; tile + a Text=0 icosahedron composited 0.13 ms GPU |
 | Measured (fractal zoom, 1080p, Res .5, Detl 2.5) | 1.4–1.9 ms GPU mean (peaks 2.3 ms), every path; 0 render allocations |
+| Measured (Tower of Hanoi, 1080p, 6 discs) | .72 ms GPU (half-size copy, glass pass, composite over the tower's box) |
 
 - Pipeline states are created in the constructor (or prewarmed on a worker), so there are no render-thread
   allocations (`perf::renderAllocs() == 0`).

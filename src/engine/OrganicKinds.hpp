@@ -13,6 +13,7 @@
 //                 traced over its first bar
 //   attractor     a Clifford attractor (PA, PB, PC, PD per frame): Num points per frame as dots
 //   dragon        the paper-folding dragon unfolding one generation per fold line (engine/Dragon.hpp)
+//   double        chaotic double pendulums released together on the phrase line (engine/DoublePendulum.hpp)
 //   invaders, hopper, cycles, rocks, bricks, chase   arcade games (engine/arcade, docs/arcade-design.md)
 
 #include <memory>

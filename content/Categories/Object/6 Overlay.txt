@@ -1,0 +1,10 @@
+CategoryTitle = "Overlay"
+Include.List = "
+Bubbles Burst
+Bubbles Drift
+Rain Downpour
+Rain Floor
+Rain Pool
+Shatter Drop
+Shatter Hail
+"

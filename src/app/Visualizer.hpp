@@ -55,6 +55,9 @@
 #include "render/JigsawPipeline.hpp"
 #include "render/ModelPipeline.hpp"
 #include "render/RainPipeline.hpp"
+#include "render/HanoiPipeline.hpp"
+#include "render/BubblePipeline.hpp"
+#include "render/ShatterPipeline.hpp"
 #include "render/FractalPipeline.hpp"
 #include "app/ModelLoader.hpp"
 #include "render/VideoMips.hpp"
@@ -428,6 +431,26 @@ private:
         render::RainLook look;
     };
     std::vector<RainDraw> rainDraws_;
+    // The glass Tower of Hanoi (Mesh="hanoi", docs/3d-design.md "Tower of Hanoi"): laid over the colorized frame after
+    // the glass puzzle, before the rain.
+    std::unique_ptr<render::HanoiPipeline> hanoi_;
+    std::vector<render::HanoiDraw> hanoiDraws_;
+    // Soap bubbles (Mesh="bubbles", docs/3d-design.md "Bubbles"; not the dancers' speech bubbles_): stepped with the
+    // solids, laid over the colorized frame after the rain (encodeComposite). The pass keeps no state between frames,
+    // so several may run at once.
+    std::unique_ptr<render::BubblePipeline> soap_;
+    struct BubbleDraw {
+        std::shared_ptr<const engine::bubbles::Sim> sim;
+        render::BubbleLook look;
+    };
+    std::vector<BubbleDraw> soapDraws_;
+    // Shatter (Mesh="shatter", docs/3d-design.md "Shatter"): the glass pane over the colorized frame, after the rain.
+    std::unique_ptr<render::ShatterPipeline> shatter_;
+    struct ShatterDraw {
+        std::shared_ptr<const engine::shatter::Player> player;
+        engine::shatter::Look look;
+    };
+    std::vector<ShatterDraw> shatterDraws_;
     std::vector<render::ModelDraw> modelColorDraws_;  // this step's look-B models (encodeColor after colorize)
     // The jigsaw (docs/3d-design.md "Jigsaw"): its pass over the colorized frame and this step's draws.
     std::unique_ptr<render::JigsawPipeline> jigsaws_;
@@ -554,7 +577,7 @@ private:
     void encodeNameTags(MTL::CommandBuffer* cmd, MTL::Texture* output);
     engine::dance::MusicState danceMusic(double t, const audio::AudioFrame* audio);
     void stepDancers(double t, const audio::AudioFrame* audio);
-    // GPU organics (PLAN 5O.6: ripples, julia): drawn into fields_ slots, composited like solids. Null when it could
+    // GPU organics (PLAN 5O.6: julia, mandel): drawn into fields_ slots, composited like solids. Null when it could
     // not be created (those kinds then do not start).
     std::unique_ptr<render::FieldPipeline> fields_;
     std::vector<render::SpriteQuad> fieldFeedback_, fieldDisplay_;

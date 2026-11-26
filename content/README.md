@@ -16,14 +16,14 @@ reforce's own scene content, laid out like a G-Force scene root (`Packages/`, `T
   ~30 s, `Objects: <group>` one from that group only, `Dance Party` a dancer every ~15 s.
 - `Controllers/`: DJ controller MIDI maps (faders, crossfader, assign switches, hot cue pads) for deck starts
   (docs/rhythm-design.md; format in src/sync/ControllerMap.hpp).
-- `Categories/Object/`: the object groups (Trees, Pendulums, Curves, Cells, Water, Fractals, Arcade, Solids,
+- `Categories/Object/`: the object groups (Trees, Pendulums, Curves, Cells, Overlay, Fractals, Arcade, Solids,
   Puzzles), which the Objects card browses and the group themes select.
 
 ## Naming scenes
 
 When an object has more than one scene, every scene's name starts with the object's common type name, then what makes
 that one different, so they sort together in the lists (Peter 2026-11-23): Dragon Fold / Dragon Rounded, Rain Downpour
-/ Rain Floor / Rain Pool, Ripples Kick / Ripples Pond / Ripples Ring, Julia Drift / Julia Pulse / Julia Bands. A name
+/ Rain Floor / Rain Pool, Bubbles Drift / Bubbles Burst, Julia Drift / Julia Pulse / Julia Bands. A name
 that describes the scene but starts elsewhere ("Four Dragons", "Downpour", "Hairpin Alley") hides it from its
 siblings. A one-scene object just uses its type name (Tilt Maze).
 

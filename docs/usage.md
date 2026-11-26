@@ -337,7 +337,7 @@ command `videoset:spritecolor:over|off`.
 ## Objects: 3D solids and organics (one layer)
 
 Since 2026-11-22 (Peter) the 3D solids and the organics are one layer, **Objects**: one control panel card, one
-library browsed by group (Trees, Pendulums, Curves, Cells, Water, Fractals, Arcade, Solids, Puzzles;
+library browsed by group (Trees, Pendulums, Curves, Cells, Overlay, Fractals, Arcade, Solids, Puzzles;
 `content/Categories/Object/`), one slideshow timer, one duration and one "at a time" count. Underneath each scene file
 is still a solid (`reforce.Solid.package`, drawn by the 3D solid pipeline, can sit on top with `Over` / `Glas` /
 EPen) or an organic (`reforce.Organic.package`, drawn into the feedback); the two sections below describe them.
@@ -345,7 +345,7 @@ EPen) or an organic (`reforce.Organic.package`, drawn into the feedback); the tw
 - **Control panel:** the **Objects** card: `Interval`, `Duration`, Start next / Clear, the alive list, the library
   with group headings, ★ favorites, and **▶ Play <group>** (switches to that group's theme, e.g. `Objects: Arcade`;
   press again to go back to `Objects`). Not in the default slideshow (Interval 0) unless a theme or the card sets it.
-- **♩ (beat-synced):** the Object moves, grows or plays on the beat clock: by its kind (arcade games, ripples, the
+- **♩ (beat-synced):** the Object moves, grows or plays on the beat clock: by its kind (arcade games, the
   Mandelbrot dive, seeds and cell automata; pendulums and Julia sets unless `Phas` sets their phase; trees with
   beat features such as `s`, `SwyB`, `Vib`, `Puls`; model scenes with `MBar` or `Move="cuts"`) or because its
   expressions read `BEAT`, `TEMPO`, `LINK_*` or `SYNC_*` (engine/ObjectBeat). Its hold in bars (`PBar`) doesn't count.
@@ -391,18 +391,23 @@ lock; also in WaveShapes, Particles and Sprites). Ours are committed in `content
 | Rain Downpour | rain on glass over the visuals: the frame is a window pane, the visuals a little behind it. Drops land on the beat (a cluster on every bar line, a drizzle on the 16ths), sit as beads that show the visuals upside down and small (each is a little lens), merge and, once big, run down with stick-slip motion, leaving droplets and a clear streak through the condensation fog; on phrase lines the big drops let go together. Downpour: twice the rain, thicker fog |
 | Rain Floor | rain on a glass floor seen from above, the visuals below: drops strike puddles on the beat, rings spread, cross and interfere (a damped wave equation with capillary dispersion) and bend the visuals; beads on the dry glass between the puddles; the puddles show (a bright edge, a dark contact line, deeper inside) and their ripples bounce off the edges |
 | Rain Pool | the same floor all under water (Wet 1): every drop strikes the water and throws a crown; the rings spread, cross and interfere over the whole frame, no beads |
+| Bubbles Drift | soap bubbles over the visuals: every bar a wand at a new random spot blows a puff of bubbles in a random direction; they drift every way on slow air currents and a wandering breeze, wobble, bounce off each other or stick in clusters with a flat shared wall. Rainbow interference bands swirl and drain down each film; the middle stays clear, the rims mirror the visuals. Pops land on the beat (planned a beat ahead: the film drains black from the top, then tears and the rim runs round in a few frames, throwing a faint spray). A build blows more in and they tremble, a breakdown makes them slow and big, a drop pops many at once and sends a burst |
+| Bubbles Burst | a busy stream of small bubbles rising from the bottom edge; every kick pops a few, so the screen fizzes in time; a drop pops most of them and sends a burst racing up |
+| Shatter Drop | a pane of glass in front of the visuals (docs/3d-design.md "Shatter"): four beats after the phrase line one heavy stone hits it and a dense spider web of cracks grows on every beat, glinting and bending the visuals along each crack, exploding on every phrase line (and on a drop): the shards fly out towards you, spinning, so their refraction and highlights flash; a fresh pane slides down |
+| Shatter Hail | five impacts on bar lines, every 8 bars: five small webs grow until they meet along wandering seams, then the pane explodes into many small shards |
 | Rubik Cube | solved on every 8-bar line: scrambles itself in two beats (30 turns), then undoes one turn per beat so the last lands on the next 8-bar line. Sticker colors are picked from the current ColorMap; `ColorKey=0` keeps the whole cube opaque over the camera |
 | Tilt Maze | a wooden tilt maze (11 x 11, one maze per 16-bar phrase, turning slowly) with a steel ball that rolls for real: the board tilts on the beats, the ball clacks into the walls on the beats and drops into the goal hole exactly on the next 8-bar line; then the maze sinks, a new one rises and the ball pops up out of the start. Board, walls and ball take three ColorMap colors; the board is half see-through |
 | Soma Cube | the seven Soma pieces build the 3 x 3 x 3 cube on the beat: one flies in every two beats and locks on the beat, the last on the 8-bar line; the cube stands for two bars, bursts into a ring of hovering pieces and builds again; no two pieces ever pass through each other (a different solution each round). Seven piece colors picked from the current ColorMap |
 | Jigsaw | a jigsaw of the live frame, solved on every 8-bar line: on beat 4 the finished picture breaks apart into 32 pieces that scatter, turned, over the empty table (the frame frosted and dimmed); they fly home corners and border first, each snapping in on a beat (two per beat at first), the last on the next 8-bar line. Every piece keeps showing the visuals from its home place. A drop pops the picture apart; a build makes the pile tremble |
 | Jigsaw Mini | the same with 12 big pieces growing from a corner, over a gray table, breaking apart on beat 8 |
+| Hanoi Tower | a glass Tower of Hanoi (6 discs) solved on the beat: one disc a beat lifts, swings over and lands on the beat, 63 moves, so the tower stands complete on every phrase line; then it springs open and shut on the first beat and the next solve carries it on from that peg. The glass refracts the visuals behind it (the rims are lenses, the pegs rod lenses), frosted, with strong lenses, every part the same glass tinted with one ColorMap color; the whole tower floats and turns slowly; a build makes the stacks float apart |
 | Sierpinski Apex | an endless zoom onto the tip of a Sierpinski pyramid from outside: every 2 bars twice as close and a third of the way round, which is exactly where it started, so it loops on the bar line with no seam (docs/3d-design.md "Fractal zoom"). Surges after each bar line, glows on the beats, rushes in at a drop, slows in a build |
 | Sierpinski Vortex | the same kind of endless zoom, spiralling into the gaps of a Sierpinski tetrahedron: every 4 bars four times as close and a third of a turn |
 | Menger Tunnels | an endless flight down the tunnels of a Menger sponge: every 4 bars nine times as close |
 
 **Starting them:** as Objects (above): the **Objects** card, `switch:object:NAME`, or the `Objects: Solids` /
-`Objects: Puzzles` themes, which start one every ~30 s (the rain scenes are in the Water group, `Objects: Water`; the three fractal zooms in the
-Fractals group, `Objects: Fractals`).
+`Objects: Puzzles` themes, which start one every ~30 s (the rain, bubble and shatter scenes are in the Overlay group, `Objects: Overlay`; the three
+fractal zooms in the Fractals group, `Objects: Fractals`).
 
 ```sh
 curl -s -X POST -H 'Content-Type: application/json' localhost:8411/api/command -d '{"layer":"object","action":"switch","config":"Icosahedron Drift"}'
@@ -483,12 +488,12 @@ committed in `content/Packages/reforce.Organic.package/`:
 | Kelp Forest | seven stalks rise from the sea floor and wave in the current |
 | Radial Bloom | branches out in every direction from the center, slowly turning, shivering outwards on every beat (harder on the bar line and a drop); buds on the bar line |
 | Pendulum Wave / (Side) / Ring | a pendulum wave (from above, from the side, on a ring) that lines up again on every phrase line |
+| Pendulum Double | chaotic double pendulums released together on the phrase line, each a hair's breadth apart: they swing as one for the first bars, then fan out around bar 4 into a bloom of arms and tip traces, pushed along on every beat, gathered back over the last bar and released again on the next phrase line; a drop throws them out harder |
 | Spiral Galaxy | phyllotaxis: a seed per 16th note at the golden angle; the galaxy sweeps its angle once per phrase |
 | Harmonograph, Harmonograph Rose | Lissajous figures in cycles per bar, closing on the bar |
 | Rule 30 | a 1D cellular automaton, a row per 8th, scrolling up |
 | Game of Life | a generation per beat, a fresh soup every phrase |
 | Clifford Attractor | a strange attractor whose parameters glide over 24-40 bars |
-| Ripples Kick, Ripples Pond, Ripples Ring | water (GPU wave equation): a drop on every beat / bar / 8th note, rings that spread, cross and fade |
 | Julia Drift, Julia Pulse, Julia Bands | Julia sets (GPU): morphing once per phrase, swelling on the beat, bands flowing on the beat |
 | Dragon Fold, Dragon Rounded | the paper-folding dragon: every 2 beats the whole curve gets a copy that swings open 90 degrees about its end and snaps flat on the line, up to 4096 segments, then folds back up by the 8-bar line; rounded corners with a band running along it; a drop bursts it open |
 | Mandelbrot Dive | a Mandelbrot zoom (GPU): one slow dive of `Dive` bars (32; its length, the zoom is paced to fill it) toward one of 14 endings of four kinds taking turns (seahorse spirals with 2-5 arms, elephant lace, a mini-Mandelbrot standing upright, the ring of decorations around a mini), up to 2^32 deep, then 4 bars rushing back out; from the slideshow on a phrase line, by hand at once (catching up from the whole set); bands flow in on the beat, kicks push the zoom, a drop pulls it out |

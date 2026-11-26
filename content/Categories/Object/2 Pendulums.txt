@@ -3,4 +3,5 @@ Include.List = "
 Pendulum Wave
 Pendulum Wave (Side)
 Pendulum Ring
+Pendulum Double
 "

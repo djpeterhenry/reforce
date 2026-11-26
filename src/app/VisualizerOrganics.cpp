@@ -43,11 +43,11 @@ bool Visualizer::startOrganic(std::shared_ptr<const scene::CompiledConfig> cfg, 
     const auto kind = engine::organicKind(*cfg, &written);
     if (!kind) {
         rlog("[reforce] Organic \"%s\": unknown Kind \"%s\" (tree, pendulums, phyllotaxis, harmonograph, automaton, "
-             "life, lsystem, attractor, dragon, ripples, julia)\n", label.c_str(), written.c_str());
+             "life, lsystem, attractor, dragon, double, julia, mandel)\n", label.c_str(), written.c_str());
         return false;
     }
     if (*kind == engine::OrganicKind::Field && !fields_) {
-        rlog("[reforce] Organic \"%s\": ripples / Julia / Mandelbrot sets are unavailable\n", label.c_str());
+        rlog("[reforce] Organic \"%s\": Julia / Mandelbrot sets are unavailable\n", label.c_str());
         return false;
     }
     makeRoomForObject(t, fade.fade, label);

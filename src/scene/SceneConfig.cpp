@@ -115,6 +115,7 @@ bool isSolidLiteral(const std::string& key) {
     if (key == "FILE" || key == "MOVE" || key == "FRONT" || key == "UP") return true;
     if (key == "FIGS") return true;  // soma: the figures, by name (engine/Soma.hpp)
     if (key == "RAIN") return true;  // rain: window | floor
+    if (key == "SRC") return true;   // bubbles: wand | edge | air
     // Camera path keyframes and options (engine/CameraMoves.hpp): K1, K2, ..., Ease, Step, Rand, Push.
     if (key == "EASE" || key == "STEP" || key == "RAND" || key == "PUSH") return true;
     // Fractal solids (docs/3d-design.md "Fractal zoom"): the fractal and its zoom path.
@@ -179,7 +180,7 @@ Tier tierFor(SceneType type, const std::string& key, int& family, int& index, bo
         if (key == "X" || key == "Y" || key == "Z" || key == "SCAL" || key == "ROTX" || key == "ROTY" ||
             key == "ROTZ" || key == "FILL" || key == "SHAD" || key == "EDGE" || key == "PEN" || key == "EPEN" ||
             key == "TURN" || key == "SEED" || key == "SHUF" ||
-            key == "FROS" || key == "TINT" || key == "BEND" || key == "EXPL" || key == "TENS")
+            key == "FROS" || key == "TINT" || key == "BEND" || key == "EXPL" || key == "TENS" || key == "MONO")
             return Tier::FrameOutput;
         // The knight's tour (docs/3d-design.md "Knight's tour"): Sym and Brd are Pre.
         if (key == "ORBT" || key == "FOLW" || key == "FLSH" || key == "HOVR") return Tier::FrameOutput;
@@ -195,6 +196,17 @@ Tier tierFor(SceneType type, const std::string& key, int& family, int& index, bo
         if (key == "DENS" || key == "SIZE" || key == "DRZ" || key == "CLUS" || key == "WET" || key == "FOG" ||
             key == "REFG" || key == "DPTH" || key == "SPEC" || key == "RIM" || key == "SPD" || key == "DCAY" ||
             key == "PUDL" || key == "FLOW")
+            return Tier::FrameOutput;
+        // The Tower of Hanoi (docs/3d-design.md "Tower of Hanoi"): a drop's higher arc and flips (Hovr, Fros, Tint, Bend,
+        // Dpth and Spec are above).
+        if (key == "LIFT" || key == "FLIP") return Tier::FrameOutput;
+        // Bubbles (docs/3d-design.md "Bubbles"): the bubbles and the film, per frame (Src is a literal; Max, Clst load).
+        if (key == "BLOW" || key == "POP" || key == "LIFE" || key == "AIR" || key == "RISE" || key == "WIND" || key == "FILM" ||
+            key == "IRIS" || key == "SWRL" || key == "DRN")
+            return Tier::FrameOutput;
+        // Shatter (docs/3d-design.md "Shatter"): the burst, gravity, tilt and the look, per frame (Dpth and Spec above).
+        if (key == "BRST" || key == "GRAV" || key == "TILT" || key == "LINE" || key == "SPRK" || key == "GLS" ||
+            key == "THCK")
             return Tier::FrameOutput;
         // Fractal solids (docs/3d-design.md "Fractal zoom"): the zoom position, the camera's sway, the fog.
         if (key == "ZOOM" || key == "ORBT" || key == "LKX" || key == "LKY" || key == "FOG") return Tier::FrameOutput;

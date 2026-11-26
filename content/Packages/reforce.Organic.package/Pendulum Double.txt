@@ -1,0 +1,10 @@
+Vers=100
+Meta="reforce organic: sixteen double pendulums hung from one point and released together on the phrase line, each a hair's breadth apart. For the first bars they swing as one; then, around bar 4, chaos fans them out into a bloom of arms and tip traces, every arm pushed along on the beat. Over the last bar they are gathered back to the start, and released again exactly on the next phrase line. A drop throws them out harder."
+Kind="double"
+PBar="32"
+SBar="16"
+Num="16"
+Cyc="16"
+// the fan opens around bar 4 (of 16); gathered back only over the last bar (Back 4 beats; a build does not stretch it)
+Div="4"
+Back="4"

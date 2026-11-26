@@ -34,15 +34,17 @@ bool objectFollowsBeat(scene::SceneType type, const scene::CompiledConfig& cfg) 
         const auto mesh = solidMesh(cfg);
         // Fractal zooms step on the bar lines (unless a scene's own Zoom expression drives them, which usesBeat sees).
         if (mesh == MeshKind::Fractal) return !cfg.defines("ZOOM");
-        if (mesh == MeshKind::Rain) return true;  // drops land on the beat grid
+        if (mesh == MeshKind::Rain) return true;     // drops land on the beat grid
+        if (mesh == MeshKind::Bubbles) return true;  // blown in on bar lines, popped on beat lines
+        if (mesh == MeshKind::Shatter) return true;  // cracks land on the beats, the pane shatters on the line
         if (mesh != MeshKind::Model) return false;
         // Moves timed in bars, beat cuts (the cuts preset, or Step keyframes in the scene).
         return cfg.defines("MBAR") || literal(cfg, "MOVE") == "cuts" || (literal(cfg, "STEP") != "" && literal(cfg, "STEP") != "0");
     }
     if (type != scene::SceneType::Organic) return false;
     const std::string kind = literal(cfg, "KIND");
-    static const char* kAlways[] = {"ripples", "mandel", "mandelbrot", "phyllotaxis", "automaton", "life", "dragon",
-                                    "invaders", "hopper", "cycles", "rocks", "bricks", "chase"};
+    static const char* kAlways[] = {"mandel", "mandelbrot", "phyllotaxis", "automaton", "life", "dragon",
+                                    "double", "invaders", "hopper", "cycles", "rocks", "bricks", "chase"};
     for (const char* k : kAlways)
         if (kind == k) return true;
     if (kind == "pendulums" || kind == "pendulum" || kind == "julia") return !cfg.defines("PHAS");

@@ -204,4 +204,5 @@ p99 0.27 ms for the whole step, GPU 0.17 ms average (the line pass).
 
 Physarum, reaction–diffusion, Lenia and domain-warped noise as further `Kind`s (GPU compute, drawn through the sprite
 pass like solids); L-system ferns; a 3D tree in the Solids camera.
-Kinds beyond trees (pendulums, phyllotaxis, harmonograph, automata, Game of Life, L-systems, attractor, dragon): docs/rhythm-design.md, keys in docs/scene-format.md §5.8.
+Kinds beyond trees (pendulums, double pendulums, phyllotaxis, harmonograph, automata, Game of Life, L-systems, attractor,
+dragon): docs/rhythm-design.md, keys in docs/scene-format.md §5.8.

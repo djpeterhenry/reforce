@@ -70,7 +70,7 @@ plus Syphon for OBS.
     table (`Gap` 0 frosted / 1 gray / 2 dark / 3 ghost), the break beat (`Brk` 4: whole for a bar after the line; 0
     on the line), 32 pieces (two a beat at first) vs 27 (exactly one a beat), the completion flash over black, the
     drop pop (bigger / smaller / pile only).
-23. **5L.12 rain on glass** (built 2026-11-23): start **Rain Downpour**, **Rain Floor** and **Rain Pool** (group Water). Rain Floor vs Rain Pool (2026-11-23, Peter found the floor confusing: glass with beads, yet splashes like water): Rain Floor now shows its puddles (`Pudl`: a bright edge, a dark contact line, deeper inside) and its ripples bounce off the puddle edges; Rain Pool is all water (`Wet` 1). Keep one or both?
+23. **5L.12 rain on glass** (built 2026-11-23): start **Rain Downpour**, **Rain Floor** and **Rain Pool** (group Overlay). Rain Floor vs Rain Pool (2026-11-23, Peter found the floor confusing: glass with beads, yet splashes like water): Rain Floor now shows its puddles (`Pudl`: a bright edge, a dark contact line, deeper inside) and its ripples bounce off the puddle edges; Rain Pool is all water (`Wet` 1). Keep one or both?
     Taste calls: window or floor as the one to feature (or keep both), the fog (`Fog` .8, `Fros` 16), drop size /
     density (`Size`, `Dens`), how strongly drops bend (`Dpth`), the floor's ripples and puddles (`Wet` .65), the
     phrase-line cascade (`Wipe`), highlight / rim (`Spec`, `Rim`), and whether rain joins other slideshow themes.
@@ -84,6 +84,16 @@ plus Syphon for OBS.
     - Done 2026-11-23 (Peter saw Knight's Tour end mid-tour): solids' PBar follows the live clock too
       (engine::BarHold, shared with organics), and the puzzles, the knight's tour, the tilt maze and the fractal zooms
       have PBar (whole cycles) and SBar instead of a PDur in seconds.
+26. **5L.15 Tower of Hanoi**: settled 2026-11-26 (Hanoi Tower only, the "Lens" look: frosted, strong lenses, one glass
+    color, nothing on drops; floating and turning more). Look at the new motion live.
+27. **5L.16 Bubbles** (settled 2026-11-26: "these are great"): Bubbles Drift and
+    Bubbles Burst (group Overlay) stay; Bubbles Giant removed. Done after his notes: walls that meet cleanly, a soft
+    round highlight (no window), a flowing, swirling film, Drift's wand at a new random spot each bar with a
+    wandering breeze (`Wind`), natural pops (a ragged hole opening in the face, 45 ms).
+28. **5L.17 Ferrofluid**: removed 2026-11-26 (Peter: "I just don't like those").
+29. **5L.18 Shatter**: settled 2026-11-26 (explode, fully cracked, slide down, thick shards; no afterglow).
+30. **5O.10 Pendulum Double**: settled 2026-11-26 (the plain one as it is: the fan opening around bar 4, gathered
+    over the last bar; Row, Trace and the Dense / High comparisons removed).
 ---
 
 ## Ground rules
@@ -753,7 +763,7 @@ Peter's decisions:
   cascade on phrase lines. Floor: impulses into a GPU wave equation with capillary dispersion and viscosity
   (render/RainPipeline), crowns of droplets, puddles (`Wet`) with beads on the dry glass. Optics: Snell refraction
   through the height field to the visuals `Dpth` behind (beads invert), Fresnel, highlight, dark contact line + halo
-  (`Rim`), mipmapped frame copy. Content: Rain Floor, Rain Downpour (Water group; Rain Window, the sparser window, removed 2026-11-23: Peter strictly preferred Rain Downpour). Tests:
+  (`Rim`), mipmapped frame copy. Content: Rain Floor, Rain Downpour (Overlay group; Rain Window, the sparser window, removed 2026-11-23: Peter strictly preferred Rain Downpour). Tests:
   test_engine_rain.cpp, test_render_rain.cpp, solid_render.cmake (determinism). docs/3d-design.md "Rain on glass".
   Peter to choose: window or floor as the one to keep / feature (both kept for now).
 - [x] 5L.14 Fractal zoom (Peter, 2026-11-23: "zooming in on one or more 3D fractals ... loop exactly when we've zoomed
@@ -765,6 +775,60 @@ Peter's decisions:
   glow, drops rush `Drop` steps in, builds slow it (`Hovr`). Content's Sierpinski Apex, Sierpinski Vortex, Menger
   Tunnels (group Fractals). engine/FractalZoom, render/FractalPipeline; tests test_engine_fractals.cpp,
   test_render_fractals.cpp; docs/3d-design.md "Fractal zoom".
+- [x] 5L.15 Tower of Hanoi (Peter, 2026-11-26: a Tower of Hanoi solved on the beat, in glass that refracts the
+  visuals behind it): `Mesh="hanoi"` with `Disc` / `Beats` / `Each` / `Rset` / `Lift` / `Flip` / `Hovr` and the glass's
+  `Fros` / `Tint` / `Bend` / `Dpth` / `Spec`. engine/Hanoi: the minimal solve as a table, a run = the reset then one
+  move every `Each` beats, each landing exactly on its beat line and the last on the run's end; runs chain round the
+  pegs (`Rset` 0, the tower springs open and shut on the line) or the stack is carried back (`Rset` 1); a pure
+  function of the beat (jumps and tempo changes are lookups), the drop's style latched per move. render/HanoiPipeline:
+  glass washers, rod pegs and a stadium base lathed in the vertex shader, over the colorized frame after the glass
+  puzzle; per pixel the exact distance field, Snell in and out (analytic exits through flat faces and the pegs, traced
+  through the rims, one internal reflection), dispersion, the ray on to the visuals `Dpth` behind and projected back,
+  a mipmapped half-size copy with a frosted share, tinted absorption, Fresnel, highlight, rim sheen, landing glint; disc
+  colors from the soma's PiecePicker. .72 ms GPU at 1080p. Content's Hanoi Tower (6 discs, a phrase) and Hanoi Mini (4
+  discs, 4 bars), group Puzzles. Tests: test_engine_hanoi.cpp, test_render_hanoi.cpp. docs/3d-design.md "Tower of Hanoi".
+  - [x] Peter (2026-11-26): Hanoi Tower (Mini removed); well frosted (the frosted share now grows with `Fros`),
+    bending a decent amount, every part one glass (`Mono`); nothing on drops.
+  - [x] Peter (2026-11-26): the Lens look (Fros 16, Bend 2, Dpth .85, Tint .45) is Hanoi Tower; the comparisons
+    removed; the tower floats and turns more.
+- [x] 5L.16 Bubbles (Peter, 2026-11-26: soap bubbles drifting over the visuals, iridescent, refracting them like the
+  rain, popping on the beat): `Mesh="bubbles"`, over the colorized frame after the rain (render/BubblePipeline,
+  engine/Bubbles). Each bubble a thin shell with a front and a back film: thin-film interference computed physically
+  (Airy reflectance at ten wavelengths, CIE-weighted to RGB) on a swirling, draining thickness field; the films mirror
+  the visuals behind (rims) and the room (the visuals mirrored, a sky, a four-pane window); the visuals shift a little
+  through the rim. CPU sim on 1/120 s substeps, seeded: curl-noise air, rising, n = 2 / 3 shape modes, soft bounces or
+  clusters with flat shared walls (bonds at the 120-degree distance). Blown in on bar lines (`Src` wand | edge | air);
+  pops always on beat lines, planned a beat ahead (the film drains black from the top first), the film tearing from
+  one point in 75 ms with a spray; a drop pops 60 % and blows a burst; a build blows more and trembles; a breakdown's
+  start is slow and big. Content: Bubbles Drift, Bubbles Burst (Overlay group; Bubbles Giant removed 2026-11-26, Peter). 1080p GPU ~0.5-1.0 ms
+  (40 bubbles), ~0.4-0.5 ms (7 giants). Tests: test_engine_bubbles.cpp, test_render_bubbles.cpp, solid_render.cmake.
+  docs/3d-design.md "Bubbles".
+  - [ ] Peter to try (Objects card, group Overlay): see Waiting on Peter 27.
+- [-] 5L.17 Ferrofluid (Peter, 2026-11-26: a pool of ferrofluid whose spikes rise on the beat, refracting the visuals
+  like the rain): built (engine/Ferro, render/FerroPipeline, Ferrofluid Pool / Crown / Twins), then removed the same
+  day (Peter: "I just don't like those"); in the git history.
+- [x] 5L.18 Shatter (2026-11-26): `Mesh="shatter"`, a pane of glass in front of the visuals that cracks on the kicks and
+  shatters on the line, over the colorized frame like the rain. Fracture from our own generator
+  (engine/ShatterShape.inc, shared by the engine and the crack-map shader): per impact (`Imp`) a spider web of kinked
+  radial cracks that fork (`Spk`, `Fork`) and nearly straight ring cracks (`Rng`), impacts meeting along wandering
+  bisectors; a shard is one sector of one band, so the shards tile the pane exactly. Cracks land on beat lines (every
+  beat from the first impact on `Hit` to the line grows or extends some; spokes outwards, rings after their spokes),
+  grow in a tenth of a beat with a flash, glint, and bend the visuals along them (Snell through the chipped edges,
+  `Dpth`, as in the rain); the pieces cut loose tilt a hair; a build makes the next cracks creep on the 16ths. On the
+  line (`Cycl`) the pane collapses (`Brst`) or, on a drop, explodes towards the camera; thick beveled shards refract
+  the visuals as they tumble (slab shift, bevels, Fresnel, highlight); a fresh pane slides down (`Arrv`). Closed-form
+  flight, same frames at any frame rate, jumps re-base, at most 640 shards. Content's Shatter Drop,
+  Shatter Hail (Objects: Solids). render/ShatterPipeline (1080p: the cracked pane 0.45 ms GPU, the shards 0.34 ms, the
+  crack map 2.7 ms once per pane). Tests: test_engine_shatter.cpp (exact tiling for one to six impacts, cracks on the
+  beat lines, the shatter on the line with every shard at home, drop / build, determinism at 30 / 60 / 144 fps, jumps,
+  junk, keys and content), test_render_shatter.cpp (GPU map = CPU fracture, intact pane = the frame, crack lines,
+  a loose piece shifts the visuals, a turned shard refracts them, the shards at the break = the pane, cost, no
+  render-thread allocations), solid_render.cmake (deterministic offline). docs/3d-design.md "Shatter".
+  - [x] Peter (2026-11-26): explode in every scene (`Brst` 1, now the default), fully cracked (`Crk` 1, now the
+    default), slide down (`Arrv` 0; Shatter Drop faded before). Shatter Web removed (Peter 2026-11-26). The Water group renamed Overlay (theme `Objects: Overlay`) and the shatter scenes moved
+    into it from Solids (Peter 2026-11-26).
+  - [ ] Peter to try (Waiting on Peter 29): look at Shatter Drop / Shatter Hail live (Objects card);
+    whether the shatter should also flash into the feedback (not built).
 
 ### 5M. Syphon stream flicker  (Peter, 2026-11-15)  `[-]` dropped (Peter could no longer find a flicker frame)
 Reported: black flicker (or tearing) in an OBS -> YouTube recording of reforce's Syphon output (stream of
@@ -820,7 +884,8 @@ card. Peter away while built: **all of it waits for Peter to try**.
   no more drop tuning for now.
 - [x] 5O.6 GPU kinds (render/FieldPipeline, Peter 2026-11-18 "build these"): `ripples` (wave equation, a drop on the
   beat) and `julia` (Julia sets); content Ripples Kick, Ripples Pond, Ripples Ring, Julia Drift, Julia Pulse, Julia
-  Bands. Drawn into their own texture and composited like solids.
+  Bands. Drawn into their own texture and composited like solids. Ripples removed 2026-11-26 (Peter: Rain Pool is
+  better than any of them): the kind, its wave-equation passes and the three scenes.
 - [x] Peter (2026-11-22, "a mandelbrot somehow cool ... zooming in"): GPU kind `mandel` (engine/MandelDive): a
   phrase-long dive per target (ten Misiurewicz points), a doubling every 2 beats, a rush back out on the line, bands
   on the beat, kick surges, drops pull out; float32 shallow, perturbation deep (double-float kept as an option);
@@ -845,6 +910,17 @@ card. Peter away while built: **all of it waits for Peter to try**.
   Dragon Rounded (Fractals; Dragon Pinwheel, four dragons tail to tail, removed 2026-11-23, Peter). tests/test_engine_dragon.cpp. docs/rhythm-design.md "Dragon".
   Peter tried it 2026-11-23: all content on 8-bar cycles with a fold every 2 beats; Dragon Fold and Dragon Rounded
   "look good as is".
+- [x] 5O.10 Pendulum Double (2026-11-26): Organics kind `double` (engine/DoublePendulum): chaotic double pendulums
+  released together on the phrase line, each a tiny angle apart; they swing as one for the first bars, then fan out
+  into a bloom of arms and tip traces, and are gathered back to the start pose over the last bar, at rest exactly on
+  the next phrase line. Real physics (RK4 in 1/48-beat steps from the cycle line, so frame-rate independent and
+  deterministic); g chosen so the first swing takes 2 beats (`Prd`), the spread chosen so the fan opens about bar 6
+  (`Div`). A push along each arm's swing on every beat (energy held at the release level), a drop throws them out
+  harder, a build may lengthen the gather (`BldG`, off). Content Pendulum Double (Pendulums).
+  tests/test_engine_double_pendulum.cpp. docs/rhythm-design.md "Pendulum Double".
+  - [x] Peter (2026-11-26): the plain Pendulum Double is best (Row and Trace removed); the fan opens around bar 4
+    (`Div` 4), gathered only over the last bar (a build no longer stretches it: `BldG` 0).
+  - [x] Peter (2026-11-26): Pendulum Double as it is; the comparisons (Dense, High) removed.
 - Later: tempo-scaled time.
 
 ### 5P. Dancers: 3D cartoon characters dancing to the beat  (Peter, 2026-11-18)  `[~]`

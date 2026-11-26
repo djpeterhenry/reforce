@@ -44,11 +44,17 @@ namespace reforce::engine {
 // solid pass also draws the sphere (the ball) and makeFlatRing discs / rings (the holes, the start).
 // Fractal: a self-similar zoom into a 3D fractal (engine/FractalZoom, render/FractalPipeline; docs/3d-design.md
 // "Fractal zoom"), raymarched: makeMesh gives an empty mesh.
+// Bubbles: soap bubbles over the frame (engine/Bubbles, render/BubblePipeline; docs/3d-design.md "Bubbles"). makeMesh
+// gives an empty mesh.
 // Knight: the chess knight of the knight's-tour solid (engine/Knight.hpp makePiece): z up, facing +x, base on z = 0.
 // Jigsaw: the jigsaw of the live frame (engine/Jigsaw.hpp, render/JigsawPipeline over the colorized frame): no mesh.
+// Hanoi: the glass Tower of Hanoi (engine/Hanoi.hpp, render/HanoiPipeline over the colorized frame; docs/3d-design.md
+// "Tower of Hanoi"): its discs, pegs and base are lathed in the vertex shader, so makeMesh gives an empty mesh.
+// Shatter: a glass pane over the frame that cracks and shatters (engine/Shatter, render/ShatterPipeline; docs/3d-design.md
+// "Shatter"): no mesh.
 enum class MeshKind {
     Tetrahedron, Cube, Octahedron, Dodecahedron, Icosahedron, Sphere, Torus, Prism, Rubik, Fifteen, Labyrinth, Knight,
-    Soma, Jigsaw, Model, Rain, Fractal
+    Soma, Jigsaw, Model, Rain, Fractal, Hanoi, Bubbles, Shatter
 };
 // The puzzles (rubik, fifteen, labyrinth, soma): drawn in their own colors (engine/StickerColors, engine/PieceColors,
 // the colorize pass's color overlay).

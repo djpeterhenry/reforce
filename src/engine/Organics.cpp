@@ -39,7 +39,7 @@ const char* organicKindName(OrganicKind k) {
 }
 
 const char* organicFieldKindName(OrganicField::Kind k) {
-    return k == OrganicField::Kind::Julia ? "julia" : k == OrganicField::Kind::Mandel ? "mandel" : "ripples";
+    return k == OrganicField::Kind::Julia ? "julia" : "mandel";
 }
 
 std::optional<OrganicKind> organicKind(const scene::CompiledConfig& cfg, std::string* written) {
@@ -51,7 +51,7 @@ std::optional<OrganicKind> organicKind(const scene::CompiledConfig& cfg, std::st
     if (kind == "pendulums" || kind == "pendulum") return OrganicKind::Pendulums;
     for (const auto& k : organicBodyKinds())
         if (kind == k) return OrganicKind::Body;
-    if (kind == "ripples" || kind == "julia") return OrganicKind::Field;
+    if (kind == "julia") return OrganicKind::Field;
     if (kind == "mandel" || kind == "mandelbrot") return OrganicKind::Field;
     return std::nullopt;
 }
@@ -98,12 +98,11 @@ OrganicRun::OrganicRun(std::shared_ptr<const scene::CompiledConfig> cfg, const s
     };
     if (kind_ == OrganicKind::Field) {
         wither_ = false;
-        rng_ = env.seed ^ 0xd209ULL;
         field_.flags = unsigned(num("FLAG", 0, 0, 1e9));
         if (kindName_ == "julia") {
             field_.kind = OrganicField::Kind::Julia;
             field_.iter = count("ITER", 120, 8, 1000);
-        } else if (kindName_ == "mandel" || kindName_ == "mandelbrot") {
+        } else {  // mandel / mandelbrot (organicKind admits no other field kind)
             field_.kind = OrganicField::Kind::Mandel;
             MandelDiveParams mp;
             mp.diveBars = num("DIVE", 16, 0.25, 1024);
@@ -123,13 +122,6 @@ OrganicRun::OrganicRun(std::shared_ptr<const scene::CompiledConfig> cfg, const s
             mandel_ = MandelDive(mp, env.seed);
             mandelPrec_ = count("PREC", 0, 0, 3);
             field_.res = num("RES", 1, 0.25, 1);
-        } else {
-            field_.kind = OrganicField::Kind::Ripples;
-            dropRate_ = num("RATE", 1, 0, 64);
-            dropRadius_ = num("RAD", 0.03, 0.002, 0.5);
-            field_.speed = num("SPD", 0.4, 0.01, 4);
-            field_.decay = num("DECY", 2.5, 0.05, 600);
-            field_.reflect = num("EDGE", 0, 0, 1) >= 0.5;
         }
         return;
     }
@@ -378,12 +370,9 @@ std::string OrganicRun::summary() const {
         else if (field_.kind == OrganicField::Kind::Mandel && mandel_.params().dbl > 0)
             std::snprintf(b, sizeof b, "dives of %g bars to 2^%g, a doubling per %g beat(s)", mandel_.params().diveBars,
                           mandel_.params().deep, mandel_.params().dbl);
-        else if (field_.kind == OrganicField::Kind::Mandel)
+        else
             std::snprintf(b, sizeof b, "dives of %g bars to 2^%g, paced to the dive", mandel_.params().diveBars,
                           mandel_.params().deep);
-        else
-            std::snprintf(b, sizeof b, "%g drop(s) per beat, speed %g, decay %g s%s", dropRate_, field_.speed,
-                          field_.decay, field_.reflect ? ", reflecting edges" : "");
         return b;
     }
     if (kind_ == OrganicKind::Pendulums)
@@ -467,13 +456,8 @@ void OrganicRun::stepPendulums(double t, const scene::OrganicFrame& f, double pe
 void OrganicRun::stepField(double t, double dtSim, const scene::OrganicFrame& f, double fader,
                            const SpriteAudio& audio, const FrameMapping& map) {
     OrganicField& o = field_;
-    o.reset = !fieldStarted_;
-    fieldStarted_ = true;
-    o.dt = dtSim;
     o.pen = std::clamp(finiteOr(f.pen, 0.0), 0.0, 1.0);
     o.opacity = std::clamp(fader, 0.0, 1.0);
-    o.drops.clear();
-    const double aspect = map.xExtent > 0 ? map.xExtent : 1.0;
     if (o.kind == OrganicField::Kind::Julia) {
         o.cre = finiteOr(inst_->frameKey("CRE", -0.8), -0.8);
         o.cim = finiteOr(inst_->frameKey("CIM", 0.156), 0.156);
@@ -523,37 +507,6 @@ void OrganicRun::stepField(double t, double dtSim, const scene::OrganicFrame& f,
         fieldOn_ = o.pen > 0 && o.opacity > 0;
         return;
     }
-    // Ripples: drops on the beat lines (1 / Rate beats apart; 2 beats per second of age without a beat clock).
-    o.gain = std::clamp(finiteOr(inst_->frameKey("GAIN", 3.0), 3.0), 0.0, 100.0);
-    const double amp = std::clamp(finiteOr(f.amp, 1.0), -100.0, 100.0);
-    auto uniform = [&] {
-        rng_ = rng_ * 6364136223846793005ULL + 1442695040888963407ULL;
-        return double(rng_ >> 11) * (1.0 / 9007199254740992.0);
-    };
-    const bool hasDx = inst_->defines("DX"), hasDy = inst_->defines("DY");
-    const double dx = hasDx ? finiteOr(inst_->frameKey("DX", 0.0), 0.0) : 0.0;
-    const double dy = hasDy ? finiteOr(inst_->frameKey("DY", 0.0), 0.0) : 0.0;
-    // x, y in tree units (x = +-aspect at the frame's sides, y = +-1 at the top / bottom) -> frame UV.
-    auto drop = [&](double radius, double a, bool keyed) {
-        const double x = keyed && hasDx ? dx : (uniform() * 2 - 1) * 0.8 * aspect;
-        const double y = keyed && hasDy ? dy : (uniform() * 2 - 1) * 0.8;
-        o.drops.push_back({0.5 + 0.5 * x / aspect, 0.5 - 0.5 * y, radius, a});
-    };
-    if (dropRate_ > 0) {
-        const double beat = audio.sync.on > 0 ? audio.sync.beat : 2.0 * (t - start_);
-        const long long idx = (long long)std::floor(beat * dropRate_ + 1e-9);
-        if (!haveDrop_) {
-            lastDrop_ = idx - 1;  // the first drop at once
-            haveDrop_ = true;
-        }
-        if (idx < lastDrop_) lastDrop_ = idx;  // the clock jumped back
-        if (idx - lastDrop_ > 4) lastDrop_ = idx - 1;
-        for (; lastDrop_ < idx; ++lastDrop_) drop(dropRadius_, amp, true);
-    }
-    const double rain = std::clamp(finiteOr(inst_->frameKey("RAIN", 0.0), 0.0), 0.0, 200.0);
-    rainAcc_ = std::min(rainAcc_ + rain * dtSim, 8.0);
-    for (; rainAcc_ >= 1.0; rainAcc_ -= 1.0) drop(dropRadius_ * 0.6, amp * (0.25 + 0.2 * uniform()), false);
-    fieldOn_ = true;  // the water keeps moving while it is invisible
 }
 
 void OrganicRun::step(double t, const SpriteAudio& audio, const FrameMapping& map, const LineStyle& style,

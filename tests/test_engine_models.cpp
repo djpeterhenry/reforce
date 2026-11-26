@@ -404,7 +404,7 @@ TEST_CASE("objects: the green note (objectFollowsBeat) by kind, for content and 
     CHECK_FALSE(flag(SceneType::Solid, "Mesh=\"model\"\nFile=\"m.glb\"\nMDur=\"20\"\n"));
     CHECK(flag(SceneType::Solid, "Mesh=\"model\"\nFile=\"m.glb\"\nGlow=\"1 + BEAT\"\n"));
     // Organics by kind.
-    CHECK(flag(SceneType::Organic, "Kind=\"ripples\"\n"));
+    CHECK(flag(SceneType::Organic, "Kind=\"mandel\"\n"));
     CHECK(flag(SceneType::Organic, "Kind=\"invaders\"\n"));
     CHECK(flag(SceneType::Organic, "Kind=\"pendulums\"\n"));
     CHECK_FALSE(flag(SceneType::Organic, "Kind=\"pendulums\"\nPhas=\".3 * t\"\n"));

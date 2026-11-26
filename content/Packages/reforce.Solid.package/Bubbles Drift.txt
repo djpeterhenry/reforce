@@ -1,0 +1,20 @@
+Vers=100
+Meta="reforce solid: soap bubbles drifting over the visuals (Bubbles, from a wand). Every bar a wand at a new random spot blows a puff of bubbles (Blow) in a random direction into the frame; they drift on slow air currents and a wandering breeze (Air, Wind), rising a little (Rise), wobble, bounce softly off each other or stick together in clusters with a flat shared wall (Clst). Each film swirls with rainbow interference bands that drain downward over its life (Film, Swrl, Drn); the visuals show through the clear middle and the rims mirror them. Pops land on the beat (Pop a beat line, planned a beat ahead: the film drains black from the top, then tears open in its face, the ragged hole racing out over the sphere in a few frames, throwing a spray). A build blows in more and they tremble; a breakdown makes them slow and big; a drop pops many at once and sends a burst. Drawn over the visuals, which keep running underneath."
+Mesh="bubbles"
+Src="wand"
+PBar="32"
+// bubbles blown in per bar, their mean radius (px at 1080p), pops per beat line, beats a bubble lives at most
+Blow="6"
+Size="55"
+Pop="1"
+Life="32"
+// at most this many at once; the chance that two meeting bubbles stick together
+Max="40"
+Clst=".5"
+// a breeze whose heading and strength wander slowly, so they drift every way, not just up
+Wind="1"
+// the film: mean thickness (nm), interference strength, swirl, drainage
+Film="520"
+Iris="1"
+Swrl="1"
+Drn="1"

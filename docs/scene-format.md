@@ -698,7 +698,7 @@ folder `reforce.Solid.Dir`). Solids are Objects, a spawn layer like Particles: `
 
 | Key | Tier | Meaning |
 |---|---|---|
-| `Mesh` | literal | `tetrahedron`, `cube`, `octahedron`, `dodecahedron`, `icosahedron` (default), `sphere`, `torus`, `prism`, `rubik` (a Rubik's cube: see below), `fifteen` (a 15 puzzle: see below), `labyrinth` (a tilt maze: see below), `knight` (a knight's tour: see below), `soma` (the Soma cube: see below), `jigsaw` (a jigsaw of the live frame: see below), `rain` (rain on glass: see below), `model` (your own 3D model: see below), `fractal` (an endless zoom into a 3D fractal: see below). A name, not an expression; unknown names refuse to start. |
+| `Mesh` | literal | `tetrahedron`, `cube`, `octahedron`, `dodecahedron`, `icosahedron` (default), `sphere`, `torus`, `prism`, `rubik` (a Rubik's cube: see below), `fifteen` (a 15 puzzle: see below), `labyrinth` (a tilt maze: see below), `knight` (a knight's tour: see below), `soma` (the Soma cube: see below), `jigsaw` (a jigsaw of the live frame: see below), `rain` (rain on glass: see below), `hanoi` (a glass Tower of Hanoi: see below), `bubbles` (soap bubbles: see below), `shatter` (a glass pane that cracks and shatters: see below), `model` (your own 3D model: see below), `fractal` (an endless zoom into a 3D fractal: see below). A name, not an expression; unknown names refuse to start. |
 | `Text` | Pre | Face texture: `0` the current WaveShape (default), `1` the previous frame (Droste), `2` flat. |
 | `Pers` | Pre | `1` perspective (default; 40° vertical field of view, camera at z ≈ 2.75), `0` orthographic. |
 | `Flag` | Pre | Sprite blend flags (§5.6); absent = 0, a keyed copy. |
@@ -770,6 +770,104 @@ at a time: a newer one replaces an older one at once.
 Mesh="rain"  Rain="window"  PBar="32"
 Dens="4"  Size="11"  Drz="1"  Clus="1"  Slid="17"
 Fog=".8"  Refg="25"  Fros="18"  Dpth=".5"
+```
+
+**Tower of Hanoi** (`Mesh="hanoi"`, engine/Hanoi.hpp, docs/3d-design.md "Tower of Hanoi"): a glass Tower of Hanoi
+over the colorized frame (not into the visuals), solved on the beat: a run of `Beats` beats starts with the reset, then
+one disc move every `Each` beats, move k landing exactly on `Beats - (moves - k) x Each`, so the last lands on `Turn =
+Beats` (6 discs: 63 moves; with `Each` 1 and `Beats` 64 a 16-bar phrase with one beat for the reset). Every run is the
+minimal solve (2^n - 1 moves) from its start peg to its target peg. The frame is a pure function of `Turn` and `Seed`
+(plus `Lift` / `Flip`, read when each move starts), so a jump of the clock shows the right tower and a tempo change
+needs nothing. `Scal` is half the base's length; `RotX` ~.3 looks at it a little from above. `Text`, `Fill`, `Shad`,
+`Edge`, `Pen`, `EPen`, `Flag` and `Over` don't apply; `ColorKey` 0 keeps the glass opaque in the Syphon alpha.
+
+| Key | Tier | Meaning |
+|---|---|---|
+| `Disc` | Pre | Discs, 3..8 (6). |
+| `Beats` | Pre | One run's length in beats (default: moves x `Each` + `Each`, 64 for 6 discs); at least moves x `Each` + .25 (raised to fit). The beats before the first move are the reset. |
+| `Each` | Pre | Beats per move, .25..16 (1). |
+| `Rset` | Pre | `0` (default): the tower carries on from the peg it was solved on (run r goes from peg 2r mod 3 to the next peg round to the left: 0 to 2, 2 to 1, 1 to 0), and the reset is the solved tower springing open and shut, landing on its line; `1`: every run goes from the left peg to the right one, and the reset lifts the whole stack off the right peg, carries it back and drops it onto the left one. The reset takes the first beat (`Each` beats when longer). |
+| `Turn` | FrameOutput | Beats into the run, `0` .. `Beats`; absent: the end (solved). |
+| `Seed` | FrameOutput | The run (its whole part): picks the start and target pegs, so consecutive runs chain. |
+| `Lift` | FrameOutput | The carried disc's arc height x this, 0..3 (1; content `1 + 1.5 * SYNC_DROP`). Read when a move starts. |
+| `Flip` | FrameOutput | 0..1: the carried disc tumbles over in flight, `round(2 x Flip)` half turns (0; content `SYNC_DROP > .6`: the moves starting in a drop's first two beats flip right over). Read when a move starts. |
+| `Hovr` | FrameOutput | 0..1: the stacks open up and bob (a build; content `SYNC_BUILD * (1 - SYNC_DROP)`). |
+| `Fros` | FrameOutput | Frost, 0 clear .. 60 (6): the blur in pixels at 1080p of the frosted share, which grows with it (.2 + .02 Fros, at most .85). |
+| `Tint` | FrameOutput | How deep the discs' colors are, 0 clear .. 1 (.5): absorbed along the path through the glass, so thick parts are deeper. The colors are the soma's seven piece colors for the current ColorMap, in ColorMap order, the smallest disc the first. |
+| `Bend` | FrameOutput | Refraction, 0..4 (1: index 1.5, a touch of dispersion). |
+| `Dpth` | FrameOutput | How far behind the tower the visuals are, in frame heights (.5): further = stronger lenses. |
+| `Spec` | FrameOutput | Highlight strength (1). |
+| `Mono` | FrameOutput | -1 (default): each disc its own ColorMap color, the pegs and base nearly clear; 0..1: every part one glass, the ColorMap's color at that intensity, as deeply tinted. |
+
+```
+Mesh="hanoi"  Disc="6"  Beats="64"  Rset="0"  ColorKey="0"  PBar="64"  SBar="16"
+B2="SYNC_ON * 64 * wrap(SYNC_BAR / 16) + (1 - SYNC_ON) * 64 * wrap(B1 / 64)"   // beats into the 16-bar run
+Turn="B2"  Seed="SYNC_ON * floor(SYNC_BAR / 16) + (1 - SYNC_ON) * floor(B1 / 64)"
+Hovr="SYNC_BUILD * (1 - SYNC_DROP)"  Fros="22"  Tint=".4"  Bend="1.4"  Dpth=".65"  Mono=".7"
+```
+
+**Bubbles** (`Mesh="bubbles"`, docs/3d-design.md "Bubbles"): soap bubbles over the colorized frame (not into the
+visuals), with thin-film interference, the visuals shifting a little through their rims and mirrored in them. `X Y Z
+Scal Rot* Text Fill Shad Edge Pen EPen Flag Over` don't apply; `PDur`, `PBar`, `ColorKey` (0: the bubbles raise the
+Syphon alpha) and `Seed` (load: the bubbles' seed; default the object's own) do. Pops always land on beat lines
+(planned a beat ahead); a drop (`SYNC_DROP`) pops many at once on the next beat line and blows a burst in, a build
+(`SYNC_BUILD`) blows more in and makes them tremble, early in a breakdown they come slow and big; without the beat
+clock, 120 BPM from the start.
+
+| Key | Tier | Meaning |
+|---|---|---|
+| `Src` | literal | Where they come from: `wand` (default; each bar's puff from a new seeded spot anywhere in the frame, blown towards a random point inside it), `edge` (rising in from the bottom edge), `air` (inflating in place, where there is room). |
+| `Blow` | FrameOutput | Bubbles blown in per bar (6), released over the bar's first 16ths; a build up to 3x. |
+| `Size` | FrameOutput | Mean radius in pixels at 1080p (55; lognormal spread). |
+| `Pop` | FrameOutput | Bubbles popped per beat line (1, expected; each planned a beat ahead, the oldest first). A build holds them back (down to 40 %). |
+| `Life` | FrameOutput | Beats a bubble lives at most before its pop is planned (32). |
+| `Max` | Pre | Bubbles alive at most (40, up to 96); blowing stops there; a drop's burst may overfill it by half for a moment, and the extras pop on the next beat lines. |
+| `Clst` | Pre | The chance (0..1, .5) that two bubbles meeting gently stick together in a cluster with a flat shared wall (at most three walls each); otherwise they bounce softly. |
+| `Air`, `Rise` | FrameOutput | How strongly the air currents carry them (1) and how fast they rise (1; negative: they sink). |
+| `Wind` | FrameOutput | A breeze whose heading and strength wander slowly, 0 none .. 4 (0): the drift goes every way, not only up. |
+| `Film` | FrameOutput | Mean film thickness in nm (520): the interference colors' order (250-400 vivid first orders, 500-700 the classic swirls, 1000+ pastel); the film thins as a bubble ages, drains thin at the top and thick at the bottom. |
+| `Iris` | FrameOutput | Strength (saturation) of the interference colors, 0 gray reflections .. 3 (1). |
+| `Swrl`, `Drn` | FrameOutput | How much the film flows and swirls, 0 still, smooth bands .. 3 (1); how fast the bands flow down and the top thins, 0 still .. 4 (1). |
+| `Bend` | FrameOutput | How much the visuals shift through the shell, strongest at the rim, 0 .. 4 (1). |
+| `Spec`, `Rim` | FrameOutput | The soft highlight (1; 0 = none); the bright Fresnel band at the edge, 0 physical .. 3 (1). |
+| `Dpth` | FrameOutput | The visuals' distance behind the bubbles in frame heights (.3): what the rims mirror. |
+| `Tint` | FrameOutput | How much the ColorMap colors the light the bubbles reflect, 0..1 (.2). |
+
+```
+Mesh="bubbles"  Src="wand"  PBar="32"
+Blow="6"  Size="55"  Pop="1"  Life="32"  Max="40"  Clst=".5"
+Film="520"  Iris="1"  Swrl="1"  Drn="1"
+```
+
+**Shatter** (`Mesh="shatter"`, docs/3d-design.md "Shatter"): a pane of glass over the colorized frame (not into the
+visuals) that cracks on the beats and shatters on the line. `X Y Z Scal Rot* Text Fill Shad Edge Pen EPen Flag Over`
+don't apply; `PDur`, `PBar`, `SBar`, `ColorKey` (0: cracks and shards raise the Syphon alpha) and `Seed` (load: the
+shatter's seed; default the object's own) do. The cycle runs on the phrase-aligned clock (4 x `SYNC_BAR`), else 120 BPM
+from the start: the line shatters the pane, a fresh one arrives 2 beats later, the first impact lands `Hit` beats after
+the line, every beat after it grows the web; a drop explodes the pane on the next 16th line, a build makes the cracks
+due next creep. One shatter at a time: a newer one replaces an older one at once.
+
+| Key | Tier | Meaning |
+|---|---|---|
+| `Imp` | Pre | Impacts per pane, 1..6 (1): the first on `Hit`, the others on later bar lines; each grows its own web and the webs meet along wandering seams. |
+| `Cycl` | Pre | Beats from one shatter to the next, 16..256 (64: a 16-bar phrase). Lines fall on multiples of it on the phrase clock. |
+| `Hit` | Pre | The first impact, beats after the line (4; at least 4, the pane arrives over beats 2..3.5). |
+| `Spk` | Pre | Radial cracks per impact, 5..12 (9; each impact varies it by up to 2). |
+| `Rng` | Pre | Ring cracks, 0 sparse (ratio 1.95 from one ring to the next) .. 1 dense (1.45) (.5). |
+| `Fork` | Pre | How often a radial crack forks, 0..1 (.6), once a third of the way out and again two rings later. |
+| `Crk` | Pre | The share of the web showing by the line, 0..1 (1); the rest are cuts that show only as the pane breaks. |
+| `Size` | Pre | The web's scale: the innermost ring and the crushed spot, x .04 frame heights (.026 with several impacts), .3..3 (1). Evaluated once. |
+| `Arrv` | Pre | `0` the fresh pane slides down (default), `1` it fades in. |
+| `Brst` | FrameOutput | The line's shatter, 0 a collapse (pieces fall, toppling) .. 1 an explosion (thrown out from the impact and towards the camera, spinning) (1). A drop always explodes. |
+| `Grav` | FrameOutput | Gravity on the falling shards, 0..4 (1: 1.4 frame heights per beat²). |
+| `Tilt` | FrameOutput | How much the pieces a crack cut loose tilt, 0..4 (1: .006-.016 rad): the visuals shift by a few pixels across a crack. |
+| `Dpth` | FrameOutput | The visuals' distance behind the glass in frame heights, 0..4 (.35): how strongly cracks, tilts and bevels bend them. |
+| `Spec`, `Line`, `Sprk`, `Gls`, `Thck` | FrameOutput | Highlights (1); the cracks' visibility (1); glints along them (1); the intact glass's faint sheen (1); the shards' thickness: their bevel and the slab's shift (1). |
+
+```
+Mesh="shatter"  PBar="64"  SBar="16"
+Imp="1"  Cycl="64"  Hit="4"  Spk="9"  Rng=".5"  Fork=".6"
+Crk="1"  Brst="1"  Dpth=".35"
 ```
 
 **Rubik** (`Mesh="rubik"`): 26 cubies, their state a pure function of `Seed`, `Moves` and `Turn`
@@ -989,6 +1087,7 @@ the beat clock when it is locked (`SYNC_BEAT`, and `SYNC_BAR` aligned to the phr
 | Kind | Load keys (default) | Frame keys (default) |
 |---|---|---|
 | `pendulums` | `Num` (15) pendulums, pendulum k swinging `Osc` + k times (`Osc` = `Cyc`) per cycle of `Cyc` bars (16, so they line up on the phrase lines); `View` 0 from above (a row and the snake through it), 1 from the side (strings from y = .9, `Len` 1.4 long), 2 a ring (radius `Len` / 2, swinging in and out); `Sprd` row width (3), `BobW` (10), `Wdth` string / line width (1.5) | `Amp` (.45 / .5 rad / .25), `Strg` line intensity relative to Pen (.35 / .6 / .35), `Phas` cycle position (default: the clock) |
+| `double` | Chaotic double pendulums released together on the phrase line (docs/rhythm-design.md "Pendulum Double"). `Num` pendulums (16; 1..32), `View` 0 all from one point, 1 a row of pivots `Sprd` wide (3.2), `Cyc` bars per cycle (16: released on the cycle line, gathered back by the next, on the phrase-aligned bars), `Back` beats of the gather (4), `BldG` how much a build lengthens it (0; 1 = up to twice `Back`), `Prd` beats of the first swing out and back from the start pose (2: g is chosen from it, so the swing follows the tempo), `Th1`, `Th2` the start pose in degrees from straight down (120, 150), `Div` bars until the fan opens (6: the spread at the release is chosen from it), `LRat` lower / upper arm (1), `MRat` lower / upper bob (1), `Kick` rad / beat pushed along the upper arms' motion on every beat line (.25; 0 = the free motion), `Drop` rad / beat a drop pushes them (2.5), `Len` reach of both arms (.92), `Trl` beats of tip trace (1.5; 0 = none, at most 16), `Wdth` arm width (2), `BobW` tip bob (7), `JntW` elbow dot (3), `TrcW` trace width (1.5), `Shd` the pendulums' intensities spread over 1 - Shd .. 1 (.45) | `Arm` arm intensity relative to Pen (.55), `Trc` trace intensity (.8). Fading out from a cycle line they stay gathered at the start pose. |
 | `phyllotaxis` | `Num` seeds (800), `Rate` seeds per beat (4), `Spc` spacing (.032; seed n at radius Spc √n), `DotW` (6) | `Ang` degrees between seeds (137.508, the golden angle) |
 | `harmonograph` | `Stps` (600), `Len` bars of trail (1), `Wdth` (2) | `FX`, `FY` cycles per bar (3, 2), `PhX`, `PhY` (0, PI/2), `AX`, `AY` (1.2, .8), `Damp` (0: decay along the tail per bar) |
 | `automaton` | `Rule` (90), `Cols` (101), `Rows` shown (56), `Rate` generations per beat (2), `Seed` 0 = one cell, 1 = random; `Cell` dot size (.8 of a cell) | |
@@ -996,22 +1095,20 @@ the beat clock when it is locked (`SYNC_BEAT`, and `SYNC_BAR` aligned to the phr
 | `lsystem` | literal `Axm` (X) and rules `R1`..`R4` ("F=FF"; default: a fern), `Gens` (5), `Rate` bars per generation (2; each new one traced over its first bar), `Wdth` (1.5). Turtle: F G draw, f move, + - turn, \| about-face, [ ] push / pop; fitted to the frame, root at the bottom | `Ang` degrees (25) |
 | `attractor` | `Num` points per frame (6000, at most 30000), `DotW` (1.5), `Sprd` scale (.42) | `PA`, `PB`, `PC`, `PD` (-1.4, 1.6, 1, .7): a Clifford attractor x' = sin(a y) + c cos(a x), y' = sin(b x) + d cos(b y) |
 | `dragon` | The paper-folding dragon (docs/rhythm-design.md "Dragon"). `Gens` generations at full growth (12; 0..14, Num x 2^Gens <= 16384), `Fold` beats per fold (1), `Cyc` bars per cycle (4: unfold, hold, refold, on the phrase-aligned bars), `Back` beats of refold at the cycle's end (2; 0 = cut), `Swng` share of a fold interval the copy swings over, ending on the line (.5), `Angl` fold angle in degrees (90), `Num` dragons tail to tail (1; 2 = twindragon, 4), `Stag` folds between successive dragons (0), `Sprd` their intensity spread (.45), `Rnd` corner radius as a share of a segment (0; at most .45), `Wdth` line width (3), `Thin` LWdt per pixel of segment length (.12), `Shd` intensity spread by birth generation (.6), `Flsh` the newest copy's flash (.5), `Run` a band running along it once per bar, in at the start after the bar line and out at the end before the next, moving without jumps as the curve unfolds (0), `Spin` 0 = the view turns with the curve, 1 = the full-grown curve's view (0), `Brst` beats a drop's burst takes (1), `Fill` share of the frame (.9), `Vary` a seeded mirror / half turn per cycle (1) | `Rise` 0..1 (0): the newest copy swings out at 1 - Rise of its brightness and brightens smoothly to full just as the next fold starts to swing (Dragon Fold .75, with `Flsh` 0). `Setl` 0..2 (0): the rise goes on to a glow of 1 + Setl times the level and settles back over the next fold interval; the level is 1 / (1 + Setl) (Dragon Fold .25, with `Shd` 0). Fading out from a cycle line it stays one still segment. |
-| `ripples` | GPU (render/FieldPipeline). `Rate` drops per beat (1; 0 = none), `Rad` drop radius in frame heights (.03), `Spd` wave speed in frame heights per second (.4), `Decy` seconds to 1/e (2.5), `Edge` 0 = the frame's edges absorb, 1 = they reflect, `Flag` sprite blend flags (0) | `DX`, `DY` where the next drop lands (tree units; default random), `Amp` drop height (1), `Rain` extra small drops per second (0), `Gain` brightness of the crests (3), `Pen` |
 | `julia` | GPU. `Iter` iterations (120; 8..1000), `Flag` (0) | `CRe`, `CIm` the constant c (-.8, .156), `X`, `Y`, `Scal`, `Rot` (the set's ±1.6 fills the frame height at Scal 1), `Gain` (1), `Band` bands per Iter of escape count (0 = none), `Phas` band phase in radians, `Pen` |
 | `mandel` | GPU. A Mandelbrot dive on the clock (engine/MandelDive). `Dive` bars per dive (16: one per phrase), `Dbl` beats per doubling of the magnification (2; 0 = paced to reach `Deep` just before the rush out), `Deep` deepest log2 magnification (34; at most 44), `Out` beats of the rush back out to the whole set at the end of a dive (4; 0 = a cut), `Algn` dives count from the phrase line (every Algn bars) at or before the start (16; 0 = from bar 0), `Ent` doublings a beat while catching up from the whole set after a start mid-dive (6; 0 = jump straight in), `Kick` doublings surging in on each beat line (.3), `Drop` doublings a drop pulls out (6), `Iter` least iterations (200), `Itk` x the iterations the target needs at the depth (1.5), `MaxI` cap (4000), `Prec` 0 auto (float32, perturbation past 2^12), 1 float32, 2 double-float, 3 perturbation, `Res` render scale (1; .5 = a quarter of the pixels, upscaled), `Mini` which endings: 0 all four kinds (spirals, lace, mini-Mandelbrots, the decorations around a mini; taking turns), 1 minis and decorations only, 2 no minis, `Aff` 0 turns off the mini interior shortcut (1), `Flag` (0) | `Tgt` target index (-1 = the shared seeded order, one per dive; 0-4 spirals, 5-6 lace, 7-10 minis, 11-13 decorations), `X`, `Y`, `Scal`, `Rot` (the whole set fills the frame height at Scal 1 and depth 0), `Gain` (1), `Band` escape-count iterations per band (0 = none), `Phas` band phase (default: the bands flow inward one per beat), `Glow` pixels from the edge fully lit (1; 0 = none), `Pen` |
 | `invaders`, `hopper`, `cycles`, `rocks`, `bricks`, `chase` | Arcade kinds (PLAN 5Q): an invader march, a pyramid hopper, light cycles, vector rocks, a brick wall, the light cycles in 3D behind one cycle; keys in docs/arcade-design.md | |
 
 The GPU kinds are not lines: each draws into its own frame-sized texture and is composited through the sprite pass
-like a solid (Pen, `Flag`, the fade envelope as opacity), so it trails. Ripples solve the wave equation on a grid of
-270 rows (the frame's aspect); a drop is a Gaussian bump. Julia shading: the smooth escape count mu, luminance
-(mu / Iter)^0.4 x Gain, times .5 + .5 cos(2 pi Band mu / Iter + Phas) when Band > 0; the set itself is dark.
+like a solid (Pen, `Flag`, the fade envelope as opacity), so it trails. Julia shading: the smooth escape count
+mu, luminance (mu / Iter)^0.4 x Gain, times .5 + .5 cos(2 pi Band mu / Iter + Phas) when Band > 0; the set itself is dark.
 Mandelbrot shading, the same at every depth: d = the distance estimate to the set in pixels, luminance
 (1 - log2(d) / 12) x Gain, times .5 + .5 cos(2 pi mu / Band + Phas) when Band > 0 (faded where the bands would
 alias), at least (Glow / d)^2 x Gain; the set itself is dark. Dives head for Misiurewicz points (the boundary
 looks the same at every depth there), so a dive never ends in a flat frame.
 
 **Groups** (the Objects card's dropdown): `content/Categories/Object/*.txt` (one category per group: Trees,
-Pendulums, Curves, Cells, Water, Fractals, Arcade) and a theme per group, `Objects: <group>`
+Pendulums, Curves, Cells, Overlay, Fractals, Arcade) and a theme per group, `Objects: <group>`
 (`Object.CategoryExpr = "+<group>"`, an organic every ~30 s). An organic in no group is listed under "Other".
 
 Example (content's Oak, abridged):

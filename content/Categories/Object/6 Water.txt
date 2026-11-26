@@ -1,9 +1,0 @@
-CategoryTitle = "Water"
-Include.List = "
-Rain Downpour
-Rain Floor
-Rain Pool
-Ripples Kick
-Ripples Pond
-Ripples Ring
-"

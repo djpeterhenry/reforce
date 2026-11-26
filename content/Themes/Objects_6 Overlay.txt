@@ -1,0 +1,4 @@
+ThemeName = "Objects: Overlay"
+About = "reforce: everything as in (Standard), plus something laid over the visuals (rain, bubbles or a pane of glass that shatters) every 30 seconds or so."
+Object.CategoryExpr = "+Overlay"
+Object.Slideshow.Interval.Duration = 30

@@ -7,7 +7,7 @@
 //
 // Scene keys (docs/scene-format.md "Solids"):
 //   Mesh   literal: tetrahedron | cube | octahedron | dodecahedron | icosahedron | sphere | torus | prism | rubik |
-//          fifteen | labyrinth | knight | soma | model
+//          fifteen | labyrinth | knight | soma | model | rain | fractal | jigsaw | hanoi | bubbles | shatter
 //          (default icosahedron)
 //   Text   0 = the current WaveShape on the faces (default), 1 = the previous frame, 2 = flat
 //   Pers   1 = perspective (default), 0 = orthographic
@@ -26,6 +26,8 @@
 //   engine/Fifteen.hpp frameAt; no Turn = solved); fifteen: Shuf per frame (1).
 //   rain (engine/Rain.hpp): Rain (literal window | floor), Slid, Bead, Wipe, Max, Seed at load; per frame Dens, Size,
 //   Drz, Clus, Wet, Fog, Refg, Fros, Dpth, Spec, Rim, Spd, Dcay.
+//   bubbles (engine/Bubbles.hpp): Src (literal wand | edge | air), Max, Clst, Seed at load; per frame Blow, Size, Pop,
+//   Life, Air, Rise, Film, Iris, Swrl, Drn, Bend, Spec, Rim, Dpth, Tint.
 //   knight: Sym, Brd (load), Orbt, Folw, Flsh, Hovr per frame; Turn in hops 0..64, Seed (engine/Knight.hpp).
 //   labyrinth (engine/Labyrinth.hpp): Grid, Beats, Traps (load: cells per side 4..12, 8; beats per run 8..128, 32;
 //   trap holes 0..6, 3), Turn (beats into the run; the ball drops into the goal at Turn = Beats) and Seed (the run:
@@ -33,8 +35,13 @@
 //   soma (engine/Soma.hpp): Figs (literal: "all" or figure names in round order; "cube"), Len / Hold / Each (load,
 //   beats: 32 / 8 / 2), Turn (beats into the round; no Turn = complete) and Seed (the round) per frame, Expl and Tens
 //   per frame (0).
+//   shatter (engine/Shatter.hpp, docs/3d-design.md "Shatter"): Imp, Cycl, Hit, Spk, Rng, Fork, Crk, Size, Arrv, Seed
+//   (load); Brst, Grav, Tilt, Dpth, Spec, Line, Sprk, Gls, Thck per frame.
 //   jigsaw (engine/Jigsaw.hpp, docs/3d-design.md "Jigsaw"): Pcs, Ordr, Cycl, Brk, Gap (load); Turn (beats into the
 //   cycle; no Turn = whole), Seed, Kick, Shak, Dim, Fros per frame.
+//   hanoi (engine/Hanoi.hpp, docs/3d-design.md "Tower of Hanoi"): Disc, Beats, Each, Rset (load); Turn (beats into
+//   the run; no Turn = solved), Seed (the run), Lift and Flip (latched per move), Hovr, Fros, Tint, Bend, Dpth, Spec
+//   per frame.
 
 #include <algorithm>
 #include <cmath>
@@ -42,14 +49,17 @@
 #include <optional>
 #include <string>
 
+#include "engine/Bubbles.hpp"
 #include "engine/CameraMoves.hpp"
 #include "engine/Labyrinth.hpp"
 #include "engine/Jigsaw.hpp"
 #include "engine/FractalZoom.hpp"
+#include "engine/Hanoi.hpp"
 #include "engine/Meshes.hpp"
 #include "engine/Particles.hpp"
 #include "engine/Soma.hpp"
 #include "engine/Rain.hpp"
+#include "engine/Shatter.hpp"
 #include "engine/Sprites.hpp"
 #include "scene/Evaluate.hpp"
 
@@ -78,6 +88,9 @@ struct SolidSpec {
     double floor = 0.55;
     double tiltGain = 1;  // Tilt: the board's drawn tilt x this (1 = as the physics tilts it)
     double frost = 12, tint = 0.35, bend = 1;
+    // hanoi: Mono >= 0: every part (discs, pegs, base) one glass color, the ColorMap's at that intensity; -1 (default):
+    // each disc its own color, the pegs and base nearly clear
+    double mono = -1;
     // knight (engine/Knight.hpp, docs/3d-design.md "Knight's tour"): Sym, Brd (load); Orbt, Folw, Flsh, Hovr (frame).
     // Turn = hops into the tour (0..64; absent: 64, the whole web), Seed picks the tour.
     bool symmetric = true;
@@ -101,11 +114,21 @@ struct SolidSpec {
     std::shared_ptr<const rain::Sim> rain;
     rain::Look rainLook;
     bool rainReset = false;
+    // mesh == Bubbles (docs/3d-design.md "Bubbles"): the simulation, stepped to this frame by evaluate(), its look.
+    std::shared_ptr<const bubbles::Sim> bubbles;
+    bubbles::Look bubbleLook;
+    // mesh == Shatter (docs/3d-design.md "Shatter"): the pane, stepped to this frame by evaluate(), and its look.
+    std::shared_ptr<const shatter::Player> shatter;
+    shatter::Look shatterLook;
     // mesh == Fractal (docs/3d-design.md "Fractal zoom"): the camera at this frame's zoom (glow: Glow x the beat
     // pulse; fill / shade: the fractal's defaults .06 / .85 unless the scene sets them).
     FractalCamera fractalCam;
     double zoom = 0;  // 0..1 through the step
     double fog = 3;
+    // mesh == Hanoi (docs/3d-design.md "Tower of Hanoi"): this frame's discs, and the glass's look (frost, tint and
+    // bend above; depth: Dpth, frame heights from the glass to the visuals; spec: Spec, the highlight).
+    hanoi::Frame hanoi;
+    double depth = 0.5, spec = 1;
 };
 
 // Load-time settings of a fractal solid (Mesh="fractal").
@@ -183,13 +206,22 @@ public:
         if (std::isfinite(s) && s > 0.1) model_.moveSeconds = s;
     }
 
-    // Rain solids (mesh() == Rain): the frame's aspect (width / height) the drops live in; set before the first
-    // evaluate (default 16:9).
+    // Rain, bubble and shatter solids (mesh() == Rain, Bubbles, Shatter): the frame's aspect
+    // (width / height) they live in; set before the first evaluate (default 16:9).
     void setAspect(double aspect) {
-        if (std::isfinite(aspect) && aspect > 0.1 && aspect < 10 && !rain_) aspect_ = aspect;
+        if (std::isfinite(aspect) && aspect > 0.1 && aspect < 10 && !rain_ && !bubbles_ && !shatter_)
+            aspect_ = aspect;
     }
+    const bubbles::Settings& bubbleSettings() const { return bubbleSettings_; }
+    const bubbles::Sim* bubbleSim() const { return bubbles_.get(); }
     const rain::Settings& rainSettings() const { return rainSettings_; }
+    // Tower of Hanoi solids (mesh() == Hanoi): the solve (null otherwise).
+    const hanoi::Plan* hanoi() const { return hanoi_.get(); }
     const rain::Sim* rainSim() const { return rain_.get(); }
+    // Shatter solids (mesh() == Shatter): the load-time config and seed; the player (null before the first evaluate).
+    const shatter::Config& shatterConfig() const { return shatterConfig_; }
+    std::uint64_t shatterSeed() const { return shatterSeed_; }
+    const shatter::Player* shatterPlayer() const { return shatter_.get(); }
 
 private:
     std::shared_ptr<const scene::CompiledConfig> cfg_;
@@ -202,11 +234,21 @@ private:
     ModelSettings model_;
     rain::Settings rainSettings_;
     std::shared_ptr<rain::Sim> rain_;
+    bubbles::Settings bubbleSettings_;
+    std::shared_ptr<bubbles::Sim> bubbles_;
     double aspect_ = 16.0 / 9.0;
+    shatter::Config shatterConfig_;
+    std::uint64_t shatterSeed_ = 0;
+    std::shared_ptr<shatter::Player> shatter_;
     // Labyrinth solids: the planned runs (made at the start, so frames allocate nothing) and the load-time keys.
     std::unique_ptr<labyrinth::Player> labyrinth_;
     int grid_ = 8, beats_ = 32, traps_ = 3;
     bool catchUpLogged_ = false;
+    // Hanoi solids: the solve (made at the start) and the style of the move in flight, latched when it starts.
+    std::unique_ptr<hanoi::Plan> hanoi_;
+    hanoi::Style hanoiStyle_;
+    int64_t hanoiRun_ = 0;
+    int hanoiMove_ = -3;
     std::unique_ptr<soma::Player> soma_;
     soma::Timing somaTiming_;
     std::string somaUnknown_;

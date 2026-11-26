@@ -107,7 +107,7 @@ TEST_CASE("meshes: names") {
     CHECK(parseMeshKind("Icosahedron") == MeshKind::Icosahedron);
     CHECK(parseMeshKind(" cube ") == MeshKind::Cube);
     CHECK(!parseMeshKind("blob"));
-    for (int k = 0; k <= int(MeshKind::Fractal); ++k)
+    for (int k = 0; k <= int(MeshKind::Shatter); ++k)
         CHECK(parseMeshKind(meshKindName(MeshKind(k))) == MeshKind(k));
 }
 

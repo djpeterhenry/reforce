@@ -113,12 +113,16 @@ bool Visualizer::startSolid(std::shared_ptr<const scene::CompiledConfig> cfg, co
     const auto mesh = engine::solidMesh(*cfg, &written);
     if (!mesh) {
         rlog("[reforce] Solid \"%s\": unknown Mesh \"%s\" (tetrahedron, cube, octahedron, dodecahedron, icosahedron, "
-             "sphere, torus, prism, rubik, fifteen, labyrinth, knight, soma, jigsaw, model, rain, fractal)\n",
+             "sphere, torus, prism, rubik, fifteen, labyrinth, knight, soma, jigsaw, model, rain, fractal, hanoi, bubbles, shatter)\n",
              label.c_str(), written.c_str());
         return false;
     }
     if (*mesh == engine::MeshKind::Jigsaw && !jigsaws_) {
         rlog("[reforce] Solid \"%s\": the jigsaw is unavailable\n", label.c_str());
+        return false;
+    }
+    if (*mesh == engine::MeshKind::Hanoi && !hanoi_) {
+        rlog("[reforce] Solid \"%s\": the Tower of Hanoi is unavailable\n", label.c_str());
         return false;
     }
     if (*mesh == engine::MeshKind::Model && !modelLoader_) {
@@ -143,7 +147,27 @@ bool Visualizer::startSolid(std::shared_ptr<const scene::CompiledConfig> cfg, co
             return false;
         }
     }
+    if (*mesh == engine::MeshKind::Bubbles && !soap_) {
+        rlog("[reforce] Solid \"%s\": bubbles are unavailable\n", label.c_str());
+        return false;
+    }
     const auto keepCfg = cfg;
+    if (*mesh == engine::MeshKind::Shatter) {
+        if (!shatter_) {
+            rlog("[reforce] Solid \"%s\": shatter is unavailable\n", label.c_str());
+            return false;
+        }
+        // One pane at a time (its crack maps are shared): a newer one replaces an older one at once.
+        for (auto it = liveSolids_.begin(); it != liveSolids_.end();) {
+            if (it->run->mesh() == engine::MeshKind::Shatter) {
+                rlog("[reforce] Solid \"%s\" replaced by \"%s\" (one shatter at a time)\n", it->run->name().c_str(),
+                     label.c_str());
+                it = liveSolids_.erase(it);
+            } else {
+                ++it;
+            }
+        }
+    }
     if (*mesh == engine::MeshKind::Rain) {
         if (!rain_) {
             rlog("[reforce] Solid \"%s\": rain is unavailable\n", label.c_str());
@@ -239,6 +263,21 @@ bool Visualizer::startSolid(std::shared_ptr<const scene::CompiledConfig> cfg, co
         const auto& rs = run->rainSettings();
         rlog("[reforce] Solid \"%s\" starts: rain (%s), seed %llu, slot %d, fade %.2f s, hold %.2f s\n", label.c_str(),
              engine::rain::modeName(rs.mode), static_cast<unsigned long long>(rs.seed), slot, e.fade, e.hold);
+    } else if (*mesh == engine::MeshKind::Bubbles) {
+        run->setAspect(double(opts_.width) / double(std::max(1u, unsigned(opts_.height))));
+        const auto& e = run->envelope();
+        const auto& bs = run->bubbleSettings();
+        rlog("[reforce] Solid \"%s\" starts: bubbles (%s, max %d), seed %llu, slot %d, fade %.2f s, hold %.2f s\n",
+             label.c_str(), engine::bubbles::sourceName(bs.source), bs.maxBubbles,
+             static_cast<unsigned long long>(bs.seed), slot, e.fade, e.hold);
+    } else if (*mesh == engine::MeshKind::Shatter) {
+        run->setAspect(double(opts_.width) / double(std::max(1u, unsigned(opts_.height))));
+        const auto& e = run->envelope();
+        const auto& c = run->shatterConfig();
+        rlog("[reforce] Solid \"%s\" starts: shatter, %d impact%s, %.0f beats a pane, seed %llu, slot %d, fade %.2f s, "
+             "hold %.2f s\n",
+             label.c_str(), c.impacts, c.impacts == 1 ? "" : "s", c.cycle,
+             static_cast<unsigned long long>(run->shatterSeed()), slot, e.fade, e.hold);
     } else if (*mesh == engine::MeshKind::Fractal) {
         const engine::FractalSettings& fs = run->fractal();
         if (!fs.path) return false;  // (checked above)
@@ -251,6 +290,13 @@ bool Visualizer::startSolid(std::shared_ptr<const scene::CompiledConfig> cfg, co
         const auto& e = run->envelope();
         rlog("[reforce] Solid \"%s\" starts: %s, Text=%d, slot %d, fade %.2f s, hold %.2f s\n", label.c_str(),
              engine::meshKindName(*mesh), run->text(), slot, e.fade, e.hold);
+        if (const engine::hanoi::Plan* hp = run->hanoi()) {
+            const auto& hs = hp->settings();
+            rlog("[reforce] Solid \"%s\": hanoi %d discs, %d moves, a move every %.2f beats, runs of %.2f beats "
+                 "(reset %.2f beats, %s)\n",
+                 label.c_str(), hs.discs, hp->moves(), hs.each, hs.beats, hp->resetBeats(),
+                 hs.reset == 1 ? "slide back" : "carry on");
+        }
         if (const engine::soma::Player* sp = run->soma()) {
             std::string figs;
             for (int f : sp->figures()) figs += std::string(figs.empty() ? "" : " ") + engine::soma::figure(f).name;
@@ -421,6 +467,9 @@ void Visualizer::stepSolids(MTL::CommandBuffer* cmd, double t, const audio::Audi
     glassDraws_.clear();
     jigsawDraws_.clear();
     rainDraws_.clear();
+    hanoiDraws_.clear();
+    soapDraws_.clear();
+    shatterDraws_.clear();
     modelColorDraws_.clear();
     for (auto it = liveSolids_.begin(); it != liveSolids_.end();) {
         if (it->run->expired(t)) {
@@ -433,7 +482,7 @@ void Visualizer::stepSolids(MTL::CommandBuffer* cmd, double t, const audio::Audi
     if (liveSolids_.empty() && solidTests_.empty()) return;
     // Face sources (PLAN 5L.3), once per step and only when a live solid uses them.
     bool wave = false, frame = false;
-    bool rubik = false, fifteen = false, maze = false, soma = false;
+    bool rubik = false, fifteen = false, maze = false, soma = false, hanoi = false;
     for (const auto& s : solidTests_) {
         const bool r = engine::isPuzzleMesh(s.spec.draw.mesh);
         rubik = rubik || s.spec.draw.mesh == engine::MeshKind::Rubik;
@@ -445,9 +494,14 @@ void Visualizer::stepSolids(MTL::CommandBuffer* cmd, double t, const audio::Audi
     }
     for (const auto& s : liveSolids_) {
         if (s.run->mesh() == engine::MeshKind::Model || s.run->mesh() == engine::MeshKind::Jigsaw ||
-            s.run->mesh() == engine::MeshKind::Rain || s.run->mesh() == engine::MeshKind::Fractal)
-            continue;  // models wear their own textures; the jigsaw and rain show the colorized frame;
-                       // fractals are raymarched
+            s.run->mesh() == engine::MeshKind::Rain || s.run->mesh() == engine::MeshKind::Fractal ||
+            s.run->mesh() == engine::MeshKind::Hanoi || s.run->mesh() == engine::MeshKind::Bubbles ||
+            s.run->mesh() == engine::MeshKind::Shatter) {
+            // models wear their own textures; the jigsaw, rain, bubbles, the shatter pane and the Tower of Hanoi show the
+            // colorized frame; fractals are raymarched
+            hanoi = hanoi || s.run->mesh() == engine::MeshKind::Hanoi;
+            continue;
+        }
         const bool r = engine::isPuzzleMesh(s.run->mesh());
         rubik = rubik || s.run->mesh() == engine::MeshKind::Rubik;
         maze = maze || s.run->mesh() == engine::MeshKind::Labyrinth;
@@ -501,9 +555,10 @@ void Visualizer::stepSolids(MTL::CommandBuffer* cmd, double t, const audio::Audi
                  to[1], to[2], trioPicker_.score());
         }
     }
-    // The soma: seven piece colors (engine::PiecePicker), light enough to shade.
+    // The soma: seven piece colors (engine::PiecePicker), light enough to shade; the Tower of Hanoi's discs tint their
+    // glass with them.
     std::array<float, engine::soma::kPieces> pieceLevels{};
-    if (soma) {
+    if (soma || hanoi) {
         piecePicker_.update(palette_, lut_, t);
         pieceLevels = piecePicker_.levels(t);
         const int sw = piecePicker_.switches();
@@ -627,7 +682,57 @@ void Visualizer::stepSolids(MTL::CommandBuffer* cmd, double t, const audio::Audi
                 }
                 continue;
             }
+            if (sp.mesh == engine::MeshKind::Bubbles) {
+                // Bubbles: simulated every step (from the first, even while invisible); colorize lays them over the
+                // frame, in a light tinted a little by the ColorMap.
+                if (soap_ && sp.bubbles && sp.opacity > 0) {
+                    BubbleDraw d{sp.bubbles, sp.bubbleLook};
+                    const auto c = engine::colorAt(palette_, lut_, 0.8f);
+                    for (int k = 0; k < 3; ++k) d.look.tintColor[k] = c[std::size_t(k)];
+                    soapDraws_.push_back(std::move(d));
+                }
+                continue;
+            }
+            if (sp.mesh == engine::MeshKind::Shatter) {
+                // Stepped every frame (the beat schedule), drawn by colorize over the frame (ShatterPipeline::encode).
+                if (shatter_ && sp.shatter && sp.opacity > 0) shatterDraws_.push_back({sp.shatter, sp.shatterLook});
+                continue;
+            }
             if (!(sp.opacity > 0)) continue;
+            if (sp.mesh == engine::MeshKind::Hanoi) {
+                // Not drawn into the visuals: colorize lays the glass over the frame (HanoiPipeline::encode).
+                render::HanoiDraw& hd = hanoiDraws_.emplace_back();
+                hd.slot = s.slot;
+                hd.pose = sp.pose;
+                hd.perspective = sp.perspective;
+                hd.frame = sp.hanoi;
+                // The discs' glass: the piece colors in ColorMap order, spread over the discs (the smallest the
+                // lowest intensity).
+                std::array<float, engine::soma::kPieces> lv = pieceLevels;
+                std::sort(lv.begin(), lv.end());
+                const int n = std::clamp(sp.hanoi.discs, engine::hanoi::kMinDiscs, engine::hanoi::kMaxDiscs);
+                for (int i = 0; i < n; ++i) {
+                    const int k = int(std::lround(double(i) * (engine::soma::kPieces - 1) / double(n - 1)));
+                    const auto c = engine::colorAt(palette_, lut_, lv[std::size_t(std::clamp(k, 0, 6))]);
+                    for (int j = 0; j < 3; ++j) hd.tint[std::size_t(i)][std::size_t(j)] = c[std::size_t(j)];
+                }
+                // Mono: one glass for every part, the ColorMap's color at that intensity (Peter 2026-11-26).
+                if (sp.mono >= 0) {
+                    const auto c = engine::colorAt(palette_, lut_, float(sp.mono));
+                    for (int i = 0; i < n; ++i)
+                        for (int j = 0; j < 3; ++j) hd.tint[std::size_t(i)][std::size_t(j)] = c[std::size_t(j)];
+                    for (int j = 0; j < 3; ++j) hd.clear[std::size_t(j)] = c[std::size_t(j)];
+                    hd.oneGlass = true;
+                }
+                hd.frost = float(sp.frost);
+                hd.tintAmount = float(sp.tint);
+                hd.bend = float(sp.bend);
+                hd.depth = float(sp.depth);
+                hd.spec = float(sp.spec);
+                hd.opacity = float(std::clamp(sp.opacity, 0.0, 1.0));
+                hd.opaque = !sp.colorKey;
+                continue;
+            }
             if (sp.mesh == engine::MeshKind::Jigsaw) {
                 // Not drawn into the visuals: colorize cuts it from the finished frame (JigsawPipeline::encode).
                 if (!s.jigsaw) continue;

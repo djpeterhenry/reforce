@@ -11,7 +11,7 @@
 //
 // Scene keys (docs/organics-design.md "Keys"):
 //   Kind   literal: tree (default) | pendulums | phyllotaxis | harmonograph | automaton | life | lsystem | attractor |
-//          dragon | ripples | julia | mandel
+//          dragon | double | julia | mandel
 //   PDur   seconds at full strength (else Object.Duration)
 //   Pts, PX, PY (per point, with s), Rts, RtX, RtY, RtA (per root), Seg, Infl, Kill, Jitr, Wdth, Tip, BudW, Wthr,
 //   Strk, SGap, SAln, SwyB, VibF, PlsB, PlsE, PlsL, PlsP, Rwir, RwrB, LeafW, LeafD, LeafA, LeafU
@@ -47,28 +47,14 @@ enum class OrganicKind { Tree, Pendulums, Body, Field };
 
 // GPU kinds (PLAN 5O.6): not line segments but a field drawn by render/FieldPipeline into the organic's own texture,
 // composited through the sprite pass like a solid (Pen, Flag, the fade envelope as opacity, trails).
-//   ripples  the wave equation on a grid (reforce.Organic.RippleRows rows): a drop on every 1 / Rate beats at DX, DY
-//            (random when absent), Rain more small drops per second; the crests are drawn
 //   julia    the Julia set of z^2 + c, c = CRe + i CIm per frame; Iter iterations, smooth escape-time shading
 //   mandel   a Mandelbrot dive on the beat clock (engine/MandelDive); deep views by perturbation (or double-float)
 struct OrganicField {
-    enum class Kind { Ripples, Julia, Mandel };
-    Kind kind = Kind::Ripples;
-    bool reset = false;            // first step: start from still water
+    enum class Kind { Julia, Mandel };
+    Kind kind = Kind::Julia;
     double pen = 1, opacity = 1;   // Pen; FADER
     unsigned flags = 0;            // Flag (sprite blend flags)
-    // ripples
-    struct Drop {
-        double x = 0.5, y = 0.5;   // frame UV (0..1, origin top-left)
-        double radius = 0.03;      // frame heights
-        double amp = 1;
-    };
-    std::vector<Drop> drops;       // this step's new drops
-    double dt = 0;                 // seconds simulated this step
-    double speed = 0.4;            // wave speed, frame heights per second
-    double decay = 2.5;            // seconds to 1/e
-    double gain = 3;               // display: luminance per unit of height
-    bool reflect = false;          // Edge = 1: the frame's edges reflect; 0: they absorb
+    double gain = 1;               // display: luminance scale
     // julia
     double cre = -0.8, cim = 0.156;
     double x = 0, y = 0, scale = 1, rot = 0;  // tree units (y = +-1 at the bottom / top): center, size, turn
@@ -166,12 +152,8 @@ private:
                        const FrameMapping& map, const LineStyle& style, std::vector<LineSegment>& out);
     // GPU kinds
     OrganicField field_;
-    bool fieldOn_ = false, fieldStarted_ = false;
+    bool fieldOn_ = false;
     int fieldSlot_ = -1;
-    double dropRate_ = 1, dropRadius_ = 0.03, rainAcc_ = 0;
-    long long lastDrop_ = 0;
-    bool haveDrop_ = false;
-    std::uint64_t rng_ = 0;
     MandelDive mandel_;
     int mandelPrec_ = 0;  // Prec: 0 auto (float32, perturbation past 2^12), 1 float32, 2 double-float, 3 perturbation
     void stepField(double t, double dtSim, const scene::OrganicFrame& f, double fader, const SpriteAudio& audio,

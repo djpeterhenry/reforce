@@ -8,4 +8,5 @@ Tilt Maze
 Soma Cube
 Jigsaw
 Jigsaw Mini
+Hanoi Tower
 "

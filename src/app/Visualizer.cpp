@@ -125,6 +125,27 @@ Visualizer::Visualizer(MTL::Device* device, const VisualizerOptions& opts)
                 rain_.reset();
             }
             try {
+                hanoi_ = std::make_unique<render::HanoiPipeline>(*solids_);
+            } catch (const std::exception& e) {
+                rlog("[reforce] the Tower of Hanoi is unavailable: %s\n", e.what());
+                hanoi_.reset();
+            }
+            try {
+                soap_ = std::make_unique<render::BubblePipeline>(*solids_);
+                soapDraws_.reserve(4);
+            } catch (const std::exception& e) {
+                rlog("[reforce] bubbles unavailable: %s\n", e.what());
+                soap_.reset();
+            }
+            try {
+                shatter_ = std::make_unique<render::ShatterPipeline>(pipeline_->device(), pipeline_->width(),
+                                                                     pipeline_->height());
+                shatterDraws_.reserve(2);
+            } catch (const std::exception& e) {
+                rlog("[reforce] shatter unavailable: %s\n", e.what());
+                shatter_.reset();
+            }
+            try {
                 fractals_ = std::make_unique<render::FractalPipeline>(*solids_);
             } catch (const std::exception& e) {
                 rlog("[reforce] fractal zooms unavailable: %s\n", e.what());
@@ -136,7 +157,7 @@ Visualizer::Visualizer(MTL::Device* device, const VisualizerOptions& opts)
             fo.maxLive = std::max(1, opts.prefs.objectMaxLive) + 1;  // + 1: see the solids
             fields_ = std::make_unique<render::FieldPipeline>(*pipeline_, fo);
         } catch (const std::exception& e) {
-            rlog("[reforce] ripples / Julia / Mandelbrot sets unavailable: %s\n", e.what());
+            rlog("[reforce] Julia / Mandelbrot sets unavailable: %s\n", e.what());
         }
         try {
             text_ = std::make_unique<render::TextOverlay>(pipeline_->device());
@@ -604,12 +625,22 @@ void Visualizer::colorize(MTL::CommandBuffer* cmd, MTL::Texture* output, double 
     // Glass puzzles (Glas = 1) over the colorized frame, before anything else goes on top.
     if (solids_)
         for (const auto& g : glassDraws_) solids_->encodeGlass(cmd, output, g, trackAlpha || backdrop);
+    // The glass Tower of Hanoi, likewise.
+    if (hanoi_)
+        for (const auto& h : hanoiDraws_) hanoi_->encode(cmd, output, h, trackAlpha || backdrop);
     // Rain on glass over the colorized frame (and the glass puzzle), likewise.
     if (rain_)
         for (const auto& r : rainDraws_) rain_->encodeComposite(cmd, output, *r.sim, r.look, trackAlpha || backdrop);
+    // Bubbles over that (they reflect and shift what is under them, rain included).
+    if (soap_)
+        for (const auto& b : soapDraws_) soap_->encodeComposite(cmd, output, *b.sim, b.look, trackAlpha || backdrop);
     // 3D models in color (look B) over the colorized frame, likewise.
     if (models_)
         for (const auto& d : modelColorDraws_) models_->encodeColor(cmd, output, d, trackAlpha || backdrop);
+    // The shatter's glass pane in front of it all (docs/3d-design.md "Shatter").
+    if (shatter_)
+        for (const auto& d : shatterDraws_)
+            shatter_->encode(cmd, output, d.player->frame(), d.look, trackAlpha || backdrop);
     // The visuals alone (reforce.Window.VisualsOnly): copied before anything goes on top. Its alpha may hold the
     // Syphon key; the window ignores alpha.
     if (visualsCopy) {

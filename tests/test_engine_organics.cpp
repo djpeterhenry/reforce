@@ -320,7 +320,7 @@ TEST_CASE("organics: every committed organic compiles cleanly, grows, and stays 
         a.sync.on = 1;
         std::vector<LineSegment> segs;
         const FrameMapping map = organicMapping(1920, 1080);
-        std::size_t most = 0, drops = 0, fields = 0;
+        std::size_t most = 0, fields = 0;
         for (double t = 0; t < r.endTime(); t += 1.0 / 30.0) {
             a.sync.beat = t * 2.0;
             a.sync.bar = t * 0.5;  // the phrase clock's bars
@@ -330,17 +330,10 @@ TEST_CASE("organics: every committed organic compiles cleanly, grows, and stays 
             most = std::max(most, segs.size());
             if (const OrganicField* f = r.field()) {
                 ++fields;
-                drops += f->drops.size();
                 REQUIRE(std::isfinite(f->pen));
                 REQUIRE(std::isfinite(f->cre));
                 REQUIRE(std::isfinite(f->cim));
                 REQUIRE(std::isfinite(f->scale));
-                for (const auto& d : f->drops) {
-                    CHECK(d.x >= 0.0);
-                    CHECK(d.x <= 1.0);
-                    CHECK(d.y >= 0.0);
-                    CHECK(d.y <= 1.0);
-                }
             }
             for (const auto& s : segs) {
                 REQUIRE(std::isfinite(s.ax));
@@ -355,9 +348,7 @@ TEST_CASE("organics: every committed organic compiles cleanly, grows, and stays 
         } else if (r.kind() == OrganicKind::Field) {
             CHECK(most == 0);  // drawn on the GPU (render/FieldPipeline), no line segments
             CHECK(fields > 100);
-            const OrganicField* f = r.field();
-            REQUIRE(f);
-            if (f->kind == OrganicField::Kind::Ripples) CHECK(drops > 10);  // drops on the beat over its life
+            REQUIRE(r.field());
         } else {
             CHECK(most > 10);
         }
@@ -372,7 +363,7 @@ TEST_CASE("organics: every committed organic compiles cleanly, grows, and stays 
     std::vector<std::string> names;
     for (const auto& e : organics) names.push_back(e.name);
     for (const auto& e : listScenes(content, reforce::scene::SceneType::Solid)) names.push_back(e.name);
-    static const char* const kGroups[] = {"Trees", "Pendulums", "Curves", "Cells", "Water", "Fractals",
+    static const char* const kGroups[] = {"Trees", "Pendulums", "Curves", "Cells", "Overlay", "Fractals",
                                           "Arcade", "Solids", "Puzzles"};
     std::size_t grouped = 0;
     for (const char* g : kGroups) {
@@ -394,45 +385,11 @@ TEST_CASE("organics: every committed organic compiles cleanly, grows, and stays 
     }
 }
 
-TEST_CASE("organics: ripples drop on the beat lines (Rate per beat, DX / DY placed), Julia follows its keys") {
+TEST_CASE("organics: Julia follows its keys; ripples are no longer a kind") {
     reforce::scene::Environment env;
     const FrameMapping map = organicMapping(1920, 1080);
-    {
-        const auto cfg = compileOrganic(
-            "Kind=\"ripples\"\nRate=\"2\"\nRad=\".05\"\nDX=\".5\"\nDY=\"-.5\"\nAmp=\".7\"\nPen=\".8\"\n");
-        for (const auto& d : cfg->diags.items()) {
-            CAPTURE(d.message);
-            CHECK(false);
-        }
-        REQUIRE(organicKind(*cfg) == OrganicKind::Field);
-        OrganicRun r(cfg, env, "r", 0.0, 0.5, 60.0, nullptr);
-        CHECK(r.kindName() == "ripples");
-        SpriteAudio a;
-        a.sync.on = 1;
-        std::vector<LineSegment> segs;
-        std::size_t drops = 0;
-        bool first = true;
-        for (int i = 0; i <= 240; ++i) {  // 4 s at 120 BPM: 8 beats, 16 drops at Rate 2 (plus the one at once)
-            const double t = i / 60.0;
-            a.sync.beat = 0.25 + t * 2.0;
-            r.step(t, a, map, LineStyle{}, segs);
-            const OrganicField* f = r.field();
-            REQUIRE(f);
-            CHECK(f->reset == first);
-            first = false;
-            CHECK(f->pen == doctest::Approx(0.8));
-            for (const auto& d : f->drops) {
-                // DX .5, DY -.5 (tree units) -> frame UV: x .5 + .25 / (16/9), y .75
-                CHECK(d.x == doctest::Approx(0.5 + 0.25 / (1920.0 / 1080.0)));
-                CHECK(d.y == doctest::Approx(0.75));
-                CHECK(d.radius == doctest::Approx(0.05));
-                CHECK(d.amp == doctest::Approx(0.7));
-            }
-            drops += f->drops.size();
-        }
-        CHECK(segs.empty());
-        CHECK(drops == 17);
-    }
+    // Ripples were removed (Peter 2026-11-26): the kind is unknown now.
+    CHECK_FALSE(organicKind(*compileOrganic("Kind=\"ripples\"\n")).has_value());
     {
         const auto cfg = compileOrganic(
             "Kind=\"julia\"\nIter=\"64\"\nCRe=\"-.4\"\nCIm=\".6\"\nScal=\"1.5\"\nBand=\"3\"\nPen=\"1\"\n");
