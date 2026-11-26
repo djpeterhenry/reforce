@@ -124,7 +124,8 @@ input[type="range"] { width: 100%; accent-color: var(--lc, var(--accent)); margi
 .tabs { display: none; }
 @media (max-width: 760px) {
   .tabs {
-    display: flex; gap: 6px; padding: 8px 16px 0; position: sticky; top: var(--barh, 57px); z-index: 4;
+    display: flex; gap: 6px; padding: 8px 16px 0; position: sticky; top: calc(var(--barh, 57px) + var(--favh, 0px));
+    z-index: 3;
     background: var(--bg);
   }
   .tabs button { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; border-bottom-width: 3px; }
@@ -190,22 +191,31 @@ main { padding: 14px 16px 24px; max-width: 1500px; margin: 0 auto; }
 .list li .star { color: var(--faint); cursor: pointer; flex: none; width: 1.1em; text-align: center; }
 .list li .star:hover { color: var(--text, inherit); }
 .list li .star.on { color: var(--beat); }
+/* Stuck under the top bar while scrolling (Peter 2026-11-26). */
 .favs { display: flex; gap: 6px; align-items: center; padding: 8px 16px; flex-wrap: wrap;
-  border-bottom: 1px solid var(--line); }
+  border-bottom: 1px solid var(--line); position: sticky; top: var(--barh, 57px); z-index: 4; background: var(--bg); }
 .favs-title { color: var(--beat); font-size: 16px; }
 /* The favorites flow in the row itself (Peter 2026-11-23: as one box, a second line of favorites pushed the box onto
    its own line, leaving the star alone above it and Clear sprites alone below): the star starts the first line, Clear
    sprites ends the last one. */
 .fav-buttons { display: contents; }
 .fav-buttons button { display: inline-flex; gap: 6px; align-items: baseline; }
-.fav-buttons button .kind { color: var(--muted); font-size: 11px; }
+/* The type as a small emoji, a little faded (its name is in the tooltip). */
+.fav-buttons button .kind { font-size: 12px; opacity: .75; }
 /* A favorite whose scene is gone: grayed out, dashed, with a ✕ that removes it. */
 .fav-missing { display: inline-flex; gap: 6px; align-items: center; padding: 0 4px 0 12px; min-height: 36px;
   border: 1px dashed var(--line); border-radius: 8px; color: var(--faint); white-space: nowrap; }
-.fav-missing .kind { color: var(--faint); font-size: 11px; }
+.fav-missing .kind { font-size: 12px; opacity: .45; filter: grayscale(1); }
 .fav-missing .fav-remove { min-height: 26px; padding: 2px 8px; font-size: 12px; color: var(--muted); }
 .fav-clear { margin-left: auto; }
 .favs .hint-empty { color: var(--muted); font-size: 12px; }
+/* Stuck at the top on a phone, wrapped favorites would fill the screen: one line that scrolls sideways. */
+@media (max-width: 760px) {
+  .favs { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .favs::-webkit-scrollbar { display: none; }
+  .favs > *, .fav-buttons > * { flex: none; }
+  .fav-clear { margin-left: 0; }
+}
 .list li .tag { flex: none; margin-left: auto; font-size: 10px; color: var(--faint); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; white-space: nowrap; }
 .list li .tag + .tag { margin-left: 4px; }
 .list li .tag.bpm { color: var(--ok); border-color: currentColor; min-width: 0; align-self: auto; }  /* (not the top bar's .bpm) */

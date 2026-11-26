@@ -14,6 +14,13 @@
     object: 'Objects', dancer: 'Dancers',
   };
 
+  // A favorite's type as a small emoji in the favorites bar (Peter 2026-11-26: the type's name took up room); the
+  // full name stays in the button's tooltip.
+  const KIND_EMOJI = {
+    flowfield: '🌀', waveshape: '〰️', colormap: '🎨', union: '🔀', particle: '✨', sprite: '🖼️', movie: '🎬',
+    object: '🧊', dancer: '💃',
+  };
+
   const $ = (sel, root = document) => root.querySelector(sel);
   // DOM writes only when the value changes: the live event runs at 20 Hz and every
   // text write would otherwise cost a style + layout pass.
@@ -139,14 +146,17 @@
       const name = (cfg ? cfg.name : f.id.slice(f.id.lastIndexOf('/') + 1)).trim();
       const kind = document.createElement('span');
       kind.className = 'kind';
-      kind.textContent = f.layer === 'sprite' ? (cfg && cfg.movie ? 'Movie sprite' : 'Image sprite')
-                                              : (TITLES[f.layer] || f.layer).replace(/s$/, '');
+      const movie = f.layer === 'sprite' && cfg && cfg.movie;
+      const kindName = f.layer === 'sprite' ? (movie ? 'Movie sprite' : 'Image sprite')
+                                            : (TITLES[f.layer] || f.layer).replace(/s$/, '');
+      kind.textContent = KIND_EMOJI[movie ? 'movie' : f.layer] || '•';
+      kind.setAttribute('aria-label', kindName);
       // A favorite whose scene is gone (removed or renamed; its ☆ is no longer in any list): grayed out, with a ✕ to
       // remove it. Only once that layer's library has loaded, so nothing is flagged before the lists arrive.
       if (!cfg && lib.configs.length > 0) {
         const m = document.createElement('span');
         m.className = 'fav-missing';
-        m.title = `${f.id} is no longer in the library`;
+        m.title = `${kindName} ${f.id} is no longer in the library`;
         const x = document.createElement('button');
         x.className = 'fav-remove';
         x.textContent = '✕';
@@ -158,7 +168,7 @@
       }
       const b = document.createElement('button');
       b.append(document.createTextNode(name), kind);
-      b.title = f.layer === 'sprite' ? `Start sprite ${f.id}` : `Switch ${TITLES[f.layer]} to ${f.id}`;
+      b.title = `${kindName}: ` + (f.layer === 'sprite' ? `start ${f.id}` : `switch to ${f.id}`);
       b.addEventListener('click', () => post({ layer: f.layer, action: 'switch', config: f.id }));
       box.append(b);
     }
@@ -1256,10 +1266,21 @@
       tabs.append(b);
     }
     activate(active);
-    const bar = $('.bar');
-    const setBarH = () => document.documentElement.style.setProperty('--barh', `${bar.offsetHeight}px`);
+    // The top bar and the favorites bar stay at the top while scrolling (both sticky); the phone tabs stick below
+    // them. Their heights follow resizes and favorites wrapping onto more lines.
+    const bar = $('.bar'), favs = $('#favs');
+    const setBarH = () => {
+      const root = document.documentElement.style;
+      root.setProperty('--barh', `${bar.offsetHeight}px`);
+      root.setProperty('--favh', `${favs ? favs.offsetHeight : 0}px`);
+    };
     setBarH();
     window.addEventListener('resize', setBarH);
+    if (window.ResizeObserver) {
+      const ro = new ResizeObserver(setBarH);
+      ro.observe(bar);
+      if (favs) ro.observe(favs);
+    }
   }
 
   // ------------------------------------------------------------ video (Phase 5F)

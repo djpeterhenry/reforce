@@ -619,7 +619,10 @@ The libraries on every card (FlowField, WaveShape, ColorMap and the extra layers
 Click the ☆ in front of any scene in the control panel's lists (FlowFields, WaveShapes, ColorMaps, Unions,
 Particles, Sprites) to make it a favorite; it gets a button in the ★ bar at the top of the panel. A sprite button
 starts that sprite (quick fade-in), the others switch their layer to it. Click ★ again to remove it. A favorite whose
-scene is gone (removed or renamed) shows grayed out and dashed in the bar, with a ✕ that removes it. Saved in
+scene is gone (removed or renamed) shows grayed out and dashed in the bar, with a ✕ that removes it. Each button
+shows its type as a small emoji (🌀 FlowField, 〰️ WaveShape, 🎨 ColorMap, 🔀 Union, ✨ Particles, 🖼️ image sprite, 🎬
+movie sprite, 🧊 Object, 💃 Dancer; the full name is in its tooltip), and the bar stays at the top under the top bar
+while you scroll (on a phone it is one line that scrolls sideways). Saved in
 settings.json as `reforce.Favorites` (`layer:id; layer:id`, e.g. `sprite:External/images/  dj peter henry`).
 The Sprites list also shows the extra sprite folder (`reforce.ExternalSpritesDir`, ids `External/...`).
 
