@@ -10,8 +10,8 @@ Peter's hand-gridded DJ library. Plan item: PLAN.md 5J.12. Status 2026-11-16: ki
   Loopback device). Steady tempo, breakdowns, beatmatched blends, sometimes pitch rides.
 - **Never modify the music library.** The library's `database.json` (a djtools Songs folder: `--songs DIR`, or
   `REFORCE_SONGS`) is only read; audio is opened read-only (ExtAudioFile); everything written goes to
-  `build/beat-eval/` (beat_eval.py refuses an `--out` inside the library). djtools is the maintainer's own library
-  tool (reference only).
+  `build/beat-eval/` (beat_eval.py refuses an `--out` inside the library). [djtools](https://github.com/djpeterhenry/djtools) is the
+  maintainer's own library tool (reference only).
 - numpy is only on `python3.11`: the training scripts need it; `beat_eval.py` runs on any python3.
 - After a finished change: tests (`ctest --test-dir build -j4`), then `scripts/install-app.sh`, no need to ask.
 - Live latency: `reforce.BeatClock.AudioOffsetMs` = 10 (the detector's own delay); Peter's Beat offset nudge

@@ -10,7 +10,7 @@
 //          Nothing audible for `hideSeconds`: hidden.
 //   vocal  the loudest audible deck tagged [#vocal], once audible for `vocalSeconds`; gone `vocalHoldSeconds`
 //          after it is no longer audible.
-// Titles are cleaned as history_server does: "(Original ...)" / "(Extended ...)" dropped, a trailing single digit
+// Titles are cleaned as history_server does: "(Original ...)" / "(Extended ...)" / "(als)" dropped, a trailing single digit
 // or "fixed" dropped ("Lost Signal 2", not "Tay Do 22"); the vocal line reads "<title before any '('> (Vocal)". The year comes from the [#yNN] tag:
 // 20NN up to this year, else 19NN.
 //

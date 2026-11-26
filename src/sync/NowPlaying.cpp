@@ -34,7 +34,7 @@ int tagsYear(const std::string& tags, int currentYear) {
 }
 
 std::string cleanTitle(const std::string& title) {
-    static const std::regex mix(R"(\s*\((?:original|extended)\b[^)]*\))", std::regex::icase);
+    static const std::regex mix(R"(\s*\((?:(?:original|extended)\b[^)]*|als)\))", std::regex::icase);
     static const std::regex tail(R"(\s+(?:fixed|\d)$)", std::regex::icase);
     std::string t = trim(std::regex_replace(trim(title), mix, ""));
     return trim(std::regex_replace(t, tail, ""));

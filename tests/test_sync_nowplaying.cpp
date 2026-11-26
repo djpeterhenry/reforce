@@ -13,6 +13,9 @@ TEST_CASE("now playing: titles and tags") {
     CHECK(cleanTitle("Tay Do 22") == "Tay Do 22");
     CHECK(cleanTitle("Warehouse Dub 2") == "Warehouse Dub");
     CHECK(cleanTitle("Stay") == "Stay");
+    CHECK(cleanTitle("Night Drive (Dub Mix) (als)") == "Night Drive (Dub Mix)");
+    CHECK(cleanTitle("Deep Blue (Acapella) (ALS) 2") == "Deep Blue (Acapella)");
+    CHECK(cleanTitle("Falsetto (Also Mix)") == "Falsetto (Also Mix)");
     CHECK(vocalTitle("Say My Name") == "Say My Name (Vocal)");
     CHECK(vocalTitle("Say My Name (Acapella)") == "Say My Name (Vocal)");
     CHECK(tagsVocal("[#good] [#vocal] [#y03]"));

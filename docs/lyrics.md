@@ -66,7 +66,7 @@ A song file (other fields are ignored):
 - `reviewed`: with `reforce.Lyrics.ReviewedOnly`, only these show.
 
 The files above are the interface: any tool that writes them works. The author makes them with their own DJ library
-tools (djtools, not public: `lyrics.py` looks the lyrics up on LRCLIB, separates the vocals with Demucs, finds the
+tools ([djtools](https://github.com/djpeterhenry/djtools): `lyrics.py` looks the lyrics up on LRCLIB, separates the vocals with Demucs, finds the
 song's structure with Whisper and times every word with forced alignment; `lyrics_server.py` is a page to review and
 correct them while listening). Lyrics are copyrighted: keep lyrics files local, never in this repository.
 
