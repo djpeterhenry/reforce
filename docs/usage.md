@@ -220,6 +220,14 @@ the tag), which plays it the other way and remembers that in its `.reforce.txt`.
 tick *Allow Transparency* on the Syphon Client source and remove the Color Key filter.
 Details: [docs/syphon-alpha.md](syphon-alpha.md).
 
+**Sync test flash** (top bar **Flash**, or `--command T=videoset:beatflash:on`; not saved, off on the next launch):
+the whole output, window and Syphon, goes opaque white for the first quarter of each beat and black otherwise, with
+the Beat offset applied (steady dark gray while the beat clock is not locked). It overrides the video layer, the
+Syphon alpha and *window shows the visuals only* while on. Use it to check what stream viewers get: play a track
+with sharp beats, record a few seconds in OBS with the stream's sources, and compare each flash's first white frame
+with the beat in the recorded audio. Visuals early on the stream: a *Render Delay* filter on OBS's Syphon Client
+source; visuals late: the audio source's *Sync Offset*. The local Beat offset stays as it is.
+
 ## Video (movie sprites, color video layer, cameras, Syphon input)
 
 One video-source layer (`src/video/`, architecture §5c) feeds two places:
@@ -532,20 +540,31 @@ style's wardrobe (outfits, hats, prints, shiny / sequin / velvet / neon fabrics)
 visor, heart, star, cat-eye, square; mirrored lenses reflect the visuals), glow sticks for house dancers in rave gear,
 and a face (eye shapes, lashes, brows, mouths, lipstick, freckles, beards). Stream guests dance the style they chose. Every look key is in docs/scene-format.md §5.9.
 
-They mill around the floor rather than standing in a line, and most of the time dance **with each other**: every 8
-bars the crew may pair up (partners dancing as mirror images, call and response, face to face) or form a **cypher**
-around a soloist, and sometimes all turn to the audience. Social = **mingle** drops the formations: everyone is on
-their own clock (dancing, showing off, wandering, taking a break at the edge, walking over to someone), pairs and
-groups of 3-4 form when someone goes over and break up one person at a time, and they glance at each other.
+They **mingle** on the floor rather than standing in a line: everyone is on their own clock (dancing, showing off,
+wandering, taking a break at the edge, walking over to someone), pairs (partners dancing as mirror images when they dance
+the same style, call and response, face to face) and groups of 3-4 in a horseshoe form when someone goes over and break up one person at a
+time, and they glance at each other.
 
 **Card settings** (saved to settings.json): Disco floor (`reforce.Dancer.Floor`), New dancer: one button per style brings on someone new in that style (there is no library list: Past guests brings back guests). `reforce.Dancer.RandomStyles` (settings.json only: `all`, `none` or e.g. `disco,stomp`) still limits which styles Start next and the slideshow pick; the old names robot / rave / retro / chill read as pop / house / lock / jazz, Floor = reflects the visuals (an
 opaque glossy floor mirroring the visuals as if they were a wall behind it) / see-through (`reforce.Dancer.FloorLook`,
-`mirror` | `seethrough`), the dancers always mingle (since 2026-11-21: the formations, crew sync modes and
-`reforce.Dancer.Social` / `Sync` are gone from use), Lit by visuals (`reforce.Dancer.Lighting`, .75), Size (`reforce.Dancer.Height`, .24 of
+`mirror` | `seethrough`), the dancers always mingle (`reforce.Dancer.Social` / `Sync` are not read since 2026-11-21; the crew-wide
+formations and crew sync modes were removed 2026-11-27), Lit by visuals (`reforce.Dancer.Lighting`, .75), Size (`reforce.Dancer.Height`, .24 of
 the frame), Outline (`reforce.Dancer.Outline`, 2 px), Human (`reforce.Dancer.Human`, 1: each dancer's own
-timing, size of moves and posture; 0 = machine-exact), Mocap moves (tries the moves recorded from real dancers, from AIST++,
+timing, size of moves and posture; 0 = machine-exact), Hair motion (`reforce.Dancer.Hair`, 1: hair physics, hanging hair bends,
+trails and keeps out of the body, short and big hair bounces a little; 0 = the classic swing; 2 = looser; `beatset dancehair`; long hair bends too, as three
+columns that swing out on spins and are pushed by the arms, the curls riding on them: `reforce.Dancer.LongHair` in
+settings.json, 1, no panel control (Peter, 2026-11-27); 0 = rigid, the tube round the head turning whole as before, to
+compare; `beatset dancelonghair on|off`), Mocap moves (tries the moves recorded from real dancers, from AIST++,
 one by one: `beatset dancetry ID|off`; the dancers use only these: `reforce.Dancer.Mocap` in settings.json, 1, is the
-share of routines that are mocap moves, 0 = the hand-made ones; no control on the card), name tags: always over stream guests, never over generated dancers (no control; `reforce.Dancer.NameTags` is no
+share of routines that are mocap moves, 0 = the hand-made ones; no control on the card; break's floor moves are
+in the list as their own entry, **break floor** (low work on the hands, knees and hips); break dancers mix them in by
+themselves, as ordinary break moves: `reforce.Dancer.FloorMoves` in settings.json, 0..4, default 1 = as often as a
+standing break move, 0 = never; a floor move waits for room (never gives up): neighbors step back, the dancer stays put,
+and if there's no room yet it starts on the next 4- or 8-bar point; docs/dancers-design.md "Break floor work", "Floor
+moves held still, room to go down"), **Bust a move** on each dancer in the list (from their next 8-bar point two
+whole break routines with floor work, 32 bars, whatever their style, then their own moves again; the ones they were
+dancing with make room and watch; `beatset dancebust ID|NAME|#N`; stream guests have the same button on the guest
+page), name tags: always over stream guests, never over generated dancers (no control; `reforce.Dancer.NameTags` is no
 longer read), Stream guests (off by default; set up a guest service, [guests.md](guests.md):
 viewers who signed up on your guest page and tap "I'm here" join the floor for `reforce.Guests.Minutes`, 30; every guest's latest dancer is kept in `Guests/` next to settings.json, and the card's **Past guests** list brings one back by hand to dance until sent off or Clear (`beatset guestcall ID|NAME`; `reforce --import-guests FILE.json` adds guests from the service's database);
 Hide dancers (beatset `dancehide`, not saved) fades the stage out while it keeps going;
@@ -555,7 +574,8 @@ docs/dancers-design.md). Also `Dancer.Slideshow.Interval.Duration` (0 = none),
 **Characters** are scene files in `content/Packages/reforce.Dancer.package/` (a `Random <Style>` file per style, no named characters; keys in
 docs/scene-format.md §5.9): colors, `HairStyle`, `Outfit`, `Hat`, `Build`, `Tall`, `Style`, `Moves` (favorite
 moves), `Snap`. Test hook: `--dancer-test pop,hiphop,disco` (generated characters, the same each run, from the first frame; `pop@afro` forces a
-hairstyle, to look at one; `pop@bob@cap` a hairstyle and a hat).
+hairstyle, to look at one; `pop@bob@cap` a hairstyle and a hat); `--name-tags` puts a name tag over every dancer, generated
+ones too (normally only guests have one), for trying things.
 
 ## Rhythm: phrases, kick zoom, drops (PLAN 5O)
 

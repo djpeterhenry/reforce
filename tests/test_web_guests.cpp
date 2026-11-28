@@ -269,3 +269,137 @@ TEST_CASE("guests: the read key goes out as a bearer token; a refused key says s
     srv.stop();
     th.join();
 }
+
+TEST_CASE("guests: the floor goes out with each poll; social settings come back") {
+    httplib::Server srv;
+    std::mutex mu;
+    std::string lastFloor, lastBust;
+    bool hadBust = false;
+    srv.Get("/api/checkins", [&](const httplib::Request& req, httplib::Response& res) {
+        {
+            std::lock_guard<std::mutex> lock(mu);
+            lastFloor = req.get_param_value("floor");
+            lastBust = req.get_param_value("bust");
+            hadBust = req.has_param("bust");
+        }
+        res.set_content(R"({"seq":0,"checkins":[],"social":[{"id":"g1","vibe":"solo","with":""},)"
+                        R"({"id":"g2","vibe":"crew","with":"g1"},{"vibe":"crew"}]})",
+                        "application/json");
+    });
+    const int port = srv.bind_to_any_port("127.0.0.1");
+    REQUIRE(port > 0);
+    std::thread th([&] { srv.listen_after_bind(); });
+
+    reforce::web::GuestFeed feed;
+    feed.setFloor({"g1", "g2", "a b"});
+    feed.configure(true, "http://127.0.0.1:" + std::to_string(port), 1.0);
+    reforce::web::GuestFeed::Batch b;
+    for (int i = 0; i < 100 && !b.hasSocial; ++i) {
+        b = feed.take();
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    REQUIRE(b.hasSocial);
+    REQUIRE(b.social.size() == 2);  // the one without an id is skipped
+    CHECK(b.social[0].id == "g1");
+    CHECK(b.social[0].vibe == "solo");
+    CHECK(b.social[1].with == "g1");
+    {
+        std::lock_guard<std::mutex> lock(mu);
+        CHECK(lastFloor == "g1,g2,a b");  // (sent as a%20b)
+        CHECK(hadBust);  // (sent, empty: this reforce reports busts, nobody has one)
+        CHECK(lastBust == "");
+    }
+    CHECK(!feed.take().hasSocial);  // handed over once per poll
+    feed.configure(false, "");
+    srv.stop();
+    th.join();
+
+    // A service without social settings: none handed over.
+    const auto p = reforce::web::parseGuestPoll(R"({"seq":1,"checkins":[]})");
+    REQUIRE(p);
+    CHECK(!p->hasSocial);
+}
+
+TEST_CASE("guests: requests (Bust a move) come once each, after reqAfter; a service without them sends none") {
+    // docs/guests.md "requests" (Peter, 2026-11-27).
+    httplib::Server srv;
+    std::mutex mu;
+    std::vector<std::string> reqAfter;
+    srv.Get("/api/checkins", [&](const httplib::Request& req, httplib::Response& res) {
+        std::lock_guard<std::mutex> lock(mu);
+        reqAfter.push_back(req.get_param_value("reqAfter"));
+        const bool first = reqAfter.size() == 1;
+        res.set_content(first ? R"({"seq":0,"checkins":[],"reqSeq":4,"requests":[{"seq":3,"id":"g1","kind":"bust"},)"
+                                R"({"seq":4,"id":"g2","kind":"somethingnew"},{"seq":5,"kind":"bust"}]})"
+                              : R"({"seq":0,"checkins":[],"reqSeq":4,"requests":[]})",
+                        "application/json");
+    });
+    const int port = srv.bind_to_any_port("127.0.0.1");
+    REQUIRE(port > 0);
+    std::thread th([&] { srv.listen_after_bind(); });
+    reforce::web::GuestFeed feed;
+    feed.configure(true, "http://127.0.0.1:" + std::to_string(port), 1.0);
+    std::vector<reforce::web::GuestRequest> got;
+    for (int i = 0; i < 150; ++i) {
+        auto b = feed.take();
+        got.insert(got.end(), b.requests.begin(), b.requests.end());
+        {
+            std::lock_guard<std::mutex> lock(mu);
+            if (reqAfter.size() >= 2) break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    auto b = feed.take();
+    got.insert(got.end(), b.requests.begin(), b.requests.end());
+    feed.configure(false, "");
+    srv.stop();
+    th.join();
+    REQUIRE(got.size() == 2);  // (the one without an id is skipped; an unknown kind is handed over, the stage ignores it)
+    CHECK(got[0].id == "g1");
+    CHECK(got[0].kind == "bust");
+    CHECK(got[1].kind == "somethingnew");
+    REQUIRE(reqAfter.size() >= 2);
+    CHECK(reqAfter[0] == "-1");
+    CHECK(reqAfter[1] == "4");
+    // An older service: no requests, nothing happens.
+    const auto p = reforce::web::parseGuestPoll(R"({"seq":1,"checkins":[]})");
+    REQUIRE(p);
+    CHECK(p->requests.empty());
+    CHECK(p->reqLatest == -1);
+}
+
+TEST_CASE("guests: each guest's bust goes out with the polls (docs/guests.md \"bust\")") {
+    using reforce::web::GuestBust;
+    CHECK(reforce::web::bustParam({}) == "");
+    CHECK(reforce::web::bustParam({{"g1", GuestBust::State::Waiting, 12.4}, {"g2", GuestBust::State::Room, 20.6},
+                                   {"g3", GuestBust::State::On, 57}, {"a b", GuestBust::State::Waiting, -1}}) ==
+          "g1:wait:12,g2:room:21,g3:on:57,a%20b:wait");
+    httplib::Server srv;
+    std::mutex mu;
+    std::vector<std::string> sent;
+    srv.Get("/api/checkins", [&](const httplib::Request& req, httplib::Response& res) {
+        {
+            std::lock_guard<std::mutex> lock(mu);
+            sent.push_back(req.get_param_value("bust"));
+        }
+        res.set_content(R"({"seq":0,"checkins":[]})", "application/json");
+    });
+    const int port = srv.bind_to_any_port("127.0.0.1");
+    REQUIRE(port > 0);
+    std::thread th([&] { srv.listen_after_bind(); });
+    reforce::web::GuestFeed feed;
+    feed.setBusts({{"g1", GuestBust::State::On, 30}});
+    feed.configure(true, "http://127.0.0.1:" + std::to_string(port), 1.0);
+    for (int i = 0; i < 150; ++i) {
+        {
+            std::lock_guard<std::mutex> lock(mu);
+            if (!sent.empty()) break;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    }
+    feed.configure(false, "");
+    srv.stop();
+    th.join();
+    REQUIRE(!sent.empty());
+    CHECK(sent[0] == "g1:on:30");
+}

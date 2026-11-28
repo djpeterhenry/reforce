@@ -215,11 +215,24 @@ void App::onFrame(const platform::FrameInfo& frame) {
         // dancers: the frame (window and Syphon) is then opaque.
         backdrop = vis.backdropActive();
         syphonAlpha = vis.syphonAlpha() && !backdrop;
+        // Sync test flash: one opaque frame for the window and Syphon alike.
+        const bool flash = vis.beatFlashOn();
+        if (flash) splitVideo = false, syphonAlpha = false;
         // Window shows the visuals only (for screen-mirrored room lights): without a split video layer, a copy taken
         // from this pass before the backdrop, dancers and text; with one, its own pass below.
-        windowVisuals = vis.windowVisualsOnly() && frame.layer;
+        windowVisuals = vis.windowVisualsOnly() && frame.layer && !flash;
         MTL::Texture* visualsCopy = windowVisuals && !splitVideo ? windowFrame() : nullptr;
         director_->colorize(cmd, renderer_->frameTexture(), !splitVideo, syphonAlpha, backdrop, visualsCopy);
+        if (flash) {  // over everything: a clear pass in the flash's gray
+            const double g = vis.beatFlashLevel();
+            MTL::RenderPassDescriptor* rp = MTL::RenderPassDescriptor::renderPassDescriptor();
+            MTL::RenderPassColorAttachmentDescriptor* att = rp->colorAttachments()->object(0);
+            att->setTexture(renderer_->frameTexture());
+            att->setLoadAction(MTL::LoadActionClear);
+            att->setStoreAction(MTL::StoreActionStore);
+            att->setClearColor(MTL::ClearColor(g, g, g, 1.0));
+            render::makeRenderEncoder(cmd, rp)->endEncoding();
+        }
         colorizeMs = msSince(k0);
     } else {
         renderer_->encodeTestPattern(cmd, static_cast<float>(wallT));

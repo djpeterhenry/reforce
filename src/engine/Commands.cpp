@@ -183,7 +183,7 @@ Command Command::beatSet(std::string key, std::string value) {
     c.type = CommandType::BeatSet;
     for (char ch : key) c.text.push_back(char(std::tolower(static_cast<unsigned char>(ch))));
     // Settings are case-insensitive; a dancer's name and the words of a speech bubble are not.
-    if (c.text == "dancesay" || c.text == "dancetry" || c.text == "guestcall") c.arg = value;
+    if (c.text == "dancesay" || c.text == "dancetry" || c.text == "guestcall" || c.text == "dancebust") c.arg = value;
     else
         for (char ch : value) c.arg.push_back(char(std::tolower(static_cast<unsigned char>(ch))));
     return c;
@@ -247,8 +247,12 @@ std::string validateBeatSetting(const std::string& key, const std::string& value
     if (key == "danceheight") return number(0.15, 0.9, v) ? std::string() : "danceheight: 0.15..0.9";
     if (key == "dancehuman") return number(0, 2, v) ? std::string() : "dancehuman: 0..2";
     if (key == "dancemocap") return number(0, 1, v) ? std::string() : "dancemocap: 0..1";
+    if (key == "dancehair") return number(0, 2, v) ? std::string() : "dancehair: 0..2";
+    if (key == "dancelonghair")
+        return value == "on" || value == "off" || value == "1" || value == "0" ? std::string() : key + ": on | off";
     if (key == "guestcall") return value.empty() ? "guestcall: a past guest's id or name" : std::string();
     if (key == "dancetry") return value.empty() ? "dancetry: a mocap move's id or label, or off" : std::string();
+    if (key == "dancebust") return value.empty() ? "dancebust: a dancer's id, name or #N (on stage, 1 = first)" : std::string();
     if (key == "dancemax") return number(1, 32, v) ? std::string() : "dancemax: 1..32";
     return "unknown rhythm setting \"" + key + "\"";
 }
@@ -496,6 +500,8 @@ PrefsTable slideshowSaveEntries(const Command& c) {
         if (c.text == "danceheight") t.set("reforce.Dancer.Height", v, false);
         if (c.text == "dancehuman") t.set("reforce.Dancer.Human", v, false);
         if (c.text == "dancemocap") t.set("reforce.Dancer.Mocap", v, false);
+        if (c.text == "dancehair") t.set("reforce.Dancer.Hair", v, false);
+        if (c.text == "dancelonghair") t.set("reforce.Dancer.LongHair", v == "on" || v == "1" ? "1" : "0", false);
         if (c.text == "dancemax") t.set("reforce.Dancer.MaxLive", v, false);
         if (c.text == "nowplaying") t.set("reforce.NowPlaying.Show", v == "on" || v == "1" ? "1" : "0", false);
         if (c.text == "nowplayingsize") t.set("reforce.NowPlaying.Size", v, false);

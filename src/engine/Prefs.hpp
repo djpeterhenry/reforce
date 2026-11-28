@@ -239,7 +239,13 @@ struct Settings {
     double dancerReflection = 0.35;           // reforce.Dancer.Reflection: the dancers mirrored in the floor, 0..1
     double dancerOutline = 2.0;               // reforce.Dancer.Outline: outline width, px at 1080p (0 = none)
     double dancerHeight = 0.24;               // reforce.Dancer.Height: dancer height, fraction of the frame height
+    double dancerHair = 1.0;                  // reforce.Dancer.Hair: 0 classic swing .. 1 hair physics .. 2 loose
+    bool dancerLongHair = true;               // reforce.Dancer.LongHair: long hair bends (1) / the rigid tube (0)
     double dancerMocap = 1.0;                 // reforce.Dancer.Mocap: share of routines that are mocap moves (0..1)
+    // reforce.Dancer.FloorMoves (0..4, default 1: a break move like any other; the older Footwork read when it is
+    // missing; 0 = never): how often break dancers do floor moves (low work on the hands, knees and hips), each
+    // against a standing move (DanceClips setFloorWeights; docs/dancers-design.md "Break floor work").
+    double dancerFloorMoves = 1.0;
     double dancerHuman = 1.0;                 // reforce.Dancer.Human: 0 machine-exact .. 1 as designed .. 2 sloppy
     bool guestsEnabled = false;  // reforce.Guests.Enabled: poll the guest service for stream guests (docs/guests.md)
     std::string guestsUrl;       // reforce.Guests.Url: the guest service (no built-in one: nothing polls until set)

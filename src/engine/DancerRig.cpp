@@ -57,6 +57,39 @@ Frame frameAlong(V3 o, V3 axis, V3 xHint) {
     return f;
 }
 
+// Long hair that bends (HairBend; the dancer shader's bendHair does the same, in step).
+V3 bendHairPoint(const BodyPart& p, const HairBend& b, V3 world, V3* normal) {
+    const Frame& f = p.frame;
+    const V3 d = world - f.o;
+    const V3 q{dot(d, f.x), dot(d, f.y), dot(d, f.z)};  // the part's frame, x and z scaled (world units)
+    const float span = p.len - b.y0;
+    if (!p.bent || q.y <= b.y0 || span < 1e-6f) return world;
+    const float t = std::min((q.y - b.y0) / span, 1.0f), extra = q.y - b.y0 - t * span;
+    const float r = std::max(p.r0 + (p.r1 - p.r0) * std::clamp(q.y / p.len, 0.0f, 1.0f), 1e-6f) * p.scaleX;
+    const float s = std::clamp(q.x / r, -1.0f, 1.0f);
+    const float w[3] = {1.0f - std::fabs(s), std::max(s, 0.0f), std::max(-s, 0.0f)};
+    const V3 anchor[3] = {{0, 0, b.backZ}, {b.sideX, 0, b.sideZ}, {-b.sideX, 0, b.sideZ}};
+    const V3 p0{0, b.y0, 0}, p1{0, b.y0 + span / 3, 0};
+    const V3 n0 = normal ? V3{dot(*normal, f.x), dot(*normal, f.y), dot(*normal, f.z)} : V3{};
+    V3 out{}, nOut{};
+    for (int c = 0; c < 3; ++c) {
+        if (w[c] <= 0) continue;
+        const float u = 1 - t;
+        const V3 B = p0 * (u * u * u) + p1 * (3 * u * u * t) + b.p2[c] * (3 * u * t * t) + b.p3[c] * (t * t * t);
+        const V3 dB = (p1 - p0) * (3 * u * u) + (b.p2[c] - p1) * (6 * u * t) + (b.p3[c] - b.p2[c]) * (3 * t * t);
+        const V3 T = normalize(dB);
+        // The turn taking +y to T: v c + k x v + k (k . v) / (1 + c), k = y x T.
+        const V3 k{T.z, 0, -T.x};
+        const float c1 = std::max(1.0f + T.y, 1e-4f);
+        auto turn = [&](V3 v) { return v * T.y + cross(k, v) + k * (dot(k, v) / c1); };
+        const V3 off = V3{q.x, 0, q.z} - anchor[c];
+        out = out + (B + anchor[c] + turn(off) + T * extra) * w[c];
+        if (normal) nOut = nOut + turn(n0) * w[c];
+    }
+    if (normal) *normal = normalize(f.x * nOut.x + f.y * nOut.y + f.z * nOut.z, *normal);
+    return f.o + f.x * out.x + f.y * out.y + f.z * out.z;
+}
+
 std::optional<Rgb> parseRgb(std::string_view text) {
     std::string s;
     for (char c : text)
@@ -107,7 +140,10 @@ std::optional<HairStyle> parseHairStyle(std::string_view s) {
     if (k == "bald" || k == "none") return HairStyle::Bald;
     if (k == "mohawk") return HairStyle::Mohawk;
     if (k == "pigtails") return HairStyle::Pigtails;
-    if (k == "curly" || k == "curls" || k == "ringlets") return HairStyle::Curly;
+    if (k == "curly") return HairStyle::Curly;
+    if (k == "curls" || k == "longcurls" || k == "long-curls" || k == "ringlets" || k == "spirals") return HairStyle::Curls;
+    if (k == "bigcurls" || k == "big-curls") return HairStyle::BigCurls;
+    if (k == "hugecurls" || k == "huge-curls" || k == "curlymane" || k == "mane") return HairStyle::HugeCurls;
     if (k == "pompadour") return HairStyle::Pompadour;
     if (k == "sidepart" || k == "side-part" || k == "swoop" || k == "emo") return HairStyle::SidePart;
     if (k == "undercut" || k == "fade") return HairStyle::Undercut;
@@ -136,7 +172,6 @@ std::optional<HairStyle> parseHairStyle(std::string_view s) {
     if (k == "coils" || k == "twists") return HairStyle::Coils;
     if (k == "waves" || k == "360waves" || k == "360") return HairStyle::Waves;
     if (k == "lob" || k == "shoulder") return HairStyle::Bob;  // cut 2026-11-21
-    if (k == "longcurls" || k == "long-curls") return HairStyle::Curly;  // cut 2026-11-21
     if (k == "layers" || k == "layered") return HairStyle::Layers;
     if (k == "halfup" || k == "half-up") return HairStyle::HalfUp;
     if (k == "lowbun" || k == "low-bun" || k == "chignon") return HairStyle::Ponytail;  // cut 2026-11-21
@@ -268,6 +303,23 @@ DancePose mix(const DancePose& a, const DancePose& b, float t) {
     p.elbowR = lerp(a.elbowR, b.elbowR, t);
     p.kneeL = lerp(a.kneeL, b.kneeL, t);
     p.kneeR = lerp(a.kneeR, b.kneeR, t);
+    // The pelvis quaternion the short way round (q and -q are the same turn).
+    const float sq = a.hipQx * b.hipQx + a.hipQy * b.hipQy + a.hipQz * b.hipQz + a.hipQw * b.hipQw < 0 ? -1.0f : 1.0f;
+    p.hipQx = f(a.hipQx, sq * b.hipQx);
+    p.hipQy = f(a.hipQy, sq * b.hipQy);
+    p.hipQz = f(a.hipQz, sq * b.hipQz);
+    p.hipQw = f(a.hipQw, sq * b.hipQw);
+    p.ground = f(a.ground, b.ground);
+    p.clear = f(a.clear, b.clear);
+    p.plantL = f(a.plantL, b.plantL);
+    p.plantR = f(a.plantR, b.plantR);
+    p.pinHandL = f(a.pinHandL, b.pinHandL);
+    p.pinHandR = f(a.pinHandR, b.pinHandR);
+    p.pinFootL = f(a.pinFootL, b.pinFootL);
+    p.pinFootR = f(a.pinFootR, b.pinFootR);
+    p.pinKneeL = f(a.pinKneeL, b.pinKneeL);
+    p.pinKneeR = f(a.pinKneeR, b.pinKneeR);
+    p.pinHead = f(a.pinHead, b.pinHead);
     return p;
 }
 
@@ -281,7 +333,9 @@ void forEachPoseFloat(DancePose& p, F&& f) {
                         &p.footYawL, &p.footYawR, &p.footPitchL, &p.footPitchR,
                         &p.mouth, &p.blink, &p.brow, &p.fist,
                         &p.elbowL.x, &p.elbowL.y, &p.elbowL.z, &p.elbowR.x, &p.elbowR.y, &p.elbowR.z,
-                        &p.kneeL.x, &p.kneeL.y, &p.kneeL.z, &p.kneeR.x, &p.kneeR.y, &p.kneeR.z};
+                        &p.kneeL.x, &p.kneeL.y, &p.kneeL.z, &p.kneeR.x, &p.kneeR.y, &p.kneeR.z,
+                        &p.hipQx, &p.hipQy, &p.hipQz, &p.hipQw, &p.ground, &p.clear, &p.plantL, &p.plantR,
+                        &p.pinHandL, &p.pinHandR, &p.pinFootL, &p.pinFootR, &p.pinKneeL, &p.pinKneeR, &p.pinHead};
     static_assert(sizeof(scalars) / sizeof(scalars[0]) == kPoseFloats);
     int i = 0;
     for (float* s : scalars) f(i++, *s);
@@ -323,6 +377,16 @@ DancePose mirrored(const DancePose& q) {
     p.elbowR = mx(q.elbowL);
     p.kneeL = mx(q.kneeR);
     p.kneeR = mx(q.kneeL);
+    p.hipQy = -q.hipQy;  // mirrored in x: turns about y and z reverse, about x stay
+    p.hipQz = -q.hipQz;
+    p.plantL = q.plantR;
+    p.plantR = q.plantL;
+    p.pinHandL = q.pinHandR;
+    p.pinHandR = q.pinHandL;
+    p.pinFootL = q.pinFootR;
+    p.pinFootR = q.pinFootL;
+    p.pinKneeL = q.pinKneeR;
+    p.pinKneeR = q.pinKneeL;
     return p;
 }
 
@@ -557,9 +621,25 @@ namespace {
 Frame bodyOf(const DancePose& pose) {
     return Frame{}.translated({pose.bodyX, 0, pose.bodyZ}).rotatedY(pose.bodyYaw);
 }
+// A frame turned by a quaternion (normalized here: mixes and filters leave it a little short).
+Frame rotatedQ(const Frame& f, float x, float y, float z, float w) {
+    const float n = std::sqrt(x * x + y * y + z * z + w * w);
+    if (n < 1e-6f) return f;
+    x /= n;
+    y /= n;
+    z /= n;
+    w /= n;
+    Frame r = f;
+    r.x = f.dir({1 - 2 * (y * y + z * z), 2 * (x * y + w * z), 2 * (x * z - w * y)});
+    r.y = f.dir({2 * (x * y - w * z), 1 - 2 * (x * x + z * z), 2 * (y * z + w * x)});
+    r.z = f.dir({2 * (x * z + w * y), 2 * (y * z - w * x), 1 - 2 * (x * x + y * y)});
+    return r;
+}
 Frame pelvisOf(const Frame& body, const Skeleton& sk, const DancePose& pose) {
-    return body.translated(V3{0, sk.hipY, 0} + pose.hip)
-        .rotatedY(pose.hipYaw)
+    Frame f = body.translated(V3{0, sk.hipY, 0} + pose.hip);
+    if (pose.hipQx != 0 || pose.hipQy != 0 || pose.hipQz != 0)  // floor work (standing moves: exactly identity)
+        f = rotatedQ(f, pose.hipQx, pose.hipQy, pose.hipQz, pose.hipQw);
+    return f.rotatedY(pose.hipYaw)
         .rotatedZ(pose.hipRoll)
         .rotatedX(pose.hipPitch);
 }
@@ -584,13 +664,312 @@ static V3 hintedPole(V3 own, const Frame& frame, V3 hint) {
     return normalize(own) * (1 - w) + frame.dir(normalize(hint)) * w;
 }
 
+namespace {
+float smoothstep(float e0, float e1, float x) {
+    const float t = clampf((x - e0) / (e1 - e0), 0.0f, 1.0f);
+    return t * t * (3 - 2 * t);
+}
+// One arm's IK as groundPose sees it (buildBody's, without keeping it out of the head: none on the floor).
+IkResult armIk(const Skeleton& sk, const DancePose& p, const Frame& chest, int side) {
+    const float sx = side == 0 ? 1.0f : -1.0f;
+    const V3 shoulder = chest.point({sx * sk.shoulderHalf, sk.shoulderY, 0});
+    const V3 pole = hintedPole(chest.dir({sx * 0.8f, -0.45f, -0.6f}), chest, side == 0 ? p.elbowL : p.elbowR);
+    return solveTwoBone(shoulder, chest.point(side == 0 ? p.handL : p.handR), sk.upperArm, sk.forearm, pole);
+}
+// The hand ball's lowest point (buildBody: an ellipsoid past the wrist, 0.85 as wide across).
+float ballBottom(const IkResult& arm, const Frame& chest, float fist) {
+    const V3 along = normalize(arm.end - arm.mid);
+    const float hr = 0.05f * (1.0f - 0.12f * clampf(fist, 0, 1));
+    const Frame f = frameAlong(arm.end + along * 0.032f, along, chest.x);
+    const float a = 0.85f * hr * f.x.y, b = hr * f.y.y, c = hr * f.z.y;
+    return f.o.y - std::sqrt(a * a + b * b + c * c);
+}
+}  // namespace
+
+float handBallBottom(const Skeleton& sk, const DancePose& p, int side) {
+    const Frame chest = chestOf(pelvisOf(bodyOf(p), sk, p), sk, p);
+    return ballBottom(armIk(sk, p, chest, side), chest, p.fist);
+}
+
+void groundPose(const Skeleton& sk, DancePose& p, const HeadExtent* ext) {
+    if (!(p.ground > 0)) return;
+    const float leg = sk.thigh + sk.shin;
+    const float clear = std::max(0.0f, p.clear);
+    // Held to its height only near the floor (a toprock in a floor routine keeps its own hips).
+    const float hold = std::min(1.0f, p.ground) * (1 - smoothstep(0.05f * leg, 0.25f * leg, clear));
+    const float lift = std::min(1.0f, 2 * p.ground);
+    // The lowest point of the upper body as posed; `skipHand` (bit 0 left, 1 right): those hands left out.
+    auto lowest = [&](int skipHand) {
+        const Frame body = bodyOf(p), pelvis = pelvisOf(body, sk, p), chest = chestOf(pelvis, sk, p);
+        float low = 1e9f;
+        auto at = [&](V3 c, float r) { low = std::min(low, c.y - r); };
+        const Frame head = headOn(chest, sk, p);
+        at(head.o, sk.headR);
+        // The hair and hat (a little margin: big hair lags the head by a few millimeters).
+        if (ext)
+            for (int i = 0; i < ext->n; ++i) at(head.point(ext->pts[i]), 0.01f);
+        at(pelvis.o, 0.1f);
+        at(chest.point({0, 0.035f, 0}), 0.1f);
+        for (int side = 0; side < 2; ++side) {
+            const float sx = side == 0 ? 1.0f : -1.0f;
+            const IkResult arm = armIk(sk, p, chest, side);
+            at(chest.point({sx * sk.shoulderHalf, sk.shoulderY, 0}), 0.05f);
+            at(arm.mid, 0.045f);
+            if (!(skipHand & (1 << side))) at(arm.end + normalize(arm.end - arm.mid) * 0.032f, 0.05f);  // the hand ball
+            const V3 hipJ = pelvis.point({sx * sk.hipHalf, -0.01f, 0});
+            const V3 kpole = hintedPole(body.dir({sx * 0.3f, 0, 1}), body, side == 0 ? p.kneeL : p.kneeR);
+            const IkResult legIk = solveTwoBone(hipJ, body.point((side == 0 ? p.footL : p.footR) + V3{0, sk.ankleY, 0}),
+                                                sk.thigh, sk.shin, kpole);
+            at(legIk.mid, 0.05f);
+        }
+        return low;
+    };
+    auto lower = [&](float dy) {  // the body (and the feet in the air) by dy
+        p.hip.y += dy;
+        for (V3* f : {&p.footL, &p.footR}) f->y = std::max(0.0f, f->y + dy * smoothstep(0.1f * leg, 0.3f * leg, f->y));
+    };
+    // Twice: the knees and elbows move a little with the body.
+    for (int pass = 0; pass < 2; ++pass) {
+        const float low = lowest(0);
+        float dy = hold * (clear - low);
+        dy = std::max(dy, -low * lift);
+        if (std::fabs(dy) < 1e-5f) break;
+        lower(dy);
+    }
+    // Planted hands (2026-11-27): our arms are short for our heads, so a hand the source dancer had on the floor ends
+    // above it. Its target moved down (in the chest frame) until the hand ball rests on the floor, by `plant` of the
+    // way (fading in and out with the source's contact).
+    const float g = std::min(1.0f, p.ground);
+    const float w[2] = {clampf(p.plantL, 0, 1) * g, clampf(p.plantR, 0, 1) * g};
+    if (w[0] < 1e-3f && w[1] < 1e-3f) return;
+    float want[2];
+    for (int side = 0; side < 2; ++side) want[side] = (1 - w[side]) * std::max(0.0f, handBallBottom(sk, p, side));
+    auto pull = [&]() {  // each planted hand's target towards `want`; returns how far the worst one is still above it
+        float worst = 0;
+        for (int side = 0; side < 2; ++side) {
+            if (w[side] < 1e-3f) continue;
+            V3& h = side == 0 ? p.handL : p.handR;
+            const V3 shoulderL{(side == 0 ? 1.0f : -1.0f) * sk.shoulderHalf, sk.shoulderY, 0};  // chest frame
+            const float reach = 0.995f * (sk.upperArm + sk.forearm);
+            for (int it = 0; it < 4; ++it) {
+                const Frame chest = chestOf(pelvisOf(bodyOf(p), sk, p), sk, p);
+                const float off = want[side] - ballBottom(armIk(sk, p, chest, side), chest, p.fist);
+                if (std::fabs(off) < 2e-4f) break;
+                const V3 t = chest.point(h) + V3{0, off, 0};
+                const V3 d = t - chest.o;
+                h = {dot(d, chest.x), dot(d, chest.y), dot(d, chest.z)};
+                // Never past the arm's reach (the IK would hold the hand there anyway): a target pulled far beyond it
+                // would hardly move the hand when it has to come back.
+                const V3 r = h - shoulderL;
+                if (length(r) > reach) h = shoulderL + r * (reach / length(r));
+            }
+            worst = std::max(worst, handBallBottom(sk, p, side) - want[side]);
+        }
+        return worst;
+    };
+    const float short_ = pull();
+    if (short_ > 1e-3f) {
+        // Out of reach: the body lowered by what is missing, as far as nothing else goes through the floor (the
+        // planted hands left out; half a centimeter to spare), at most 0.12 leg.
+        const int planted = (w[0] >= 1e-3f ? 1 : 0) | (w[1] >= 1e-3f ? 2 : 0);
+        const float room = std::max(0.0f, lowest(planted) - 0.005f);
+        const float dy = std::min({short_, room, 0.12f * leg});
+        if (dy > 1e-5f) {
+            lower(-dy);
+            pull();
+        }
+    }
+}
+
 Frame headFrame(const Skeleton& sk, const DancePose& pose) {
     const Frame body = bodyOf(pose);
     return headOn(chestOf(pelvisOf(body, sk, pose), sk, pose), sk, pose);
 }
 
+Frame chestFrame(const Skeleton& sk, const DancePose& pose) { return chestOf(pelvisOf(bodyOf(pose), sk, pose), sk, pose); }
+
+V3 pelvisAt(const Skeleton& sk, const DancePose& pose) { return pelvisOf(bodyOf(pose), sk, pose).o; }
+
+V3 kneeAt(const Skeleton& sk, const DancePose& p, int side) {
+    // As groundPose and buildBody place it.
+    const Frame body = bodyOf(p), pelvis = pelvisOf(body, sk, p);
+    const float sx = side == 0 ? 1.0f : -1.0f;
+    const V3 hipJ = pelvis.point({sx * sk.hipHalf, -0.01f, 0});
+    const V3 kpole = hintedPole(body.dir({sx * 0.3f, 0, 1}), body, side == 0 ? p.kneeL : p.kneeR);
+    return solveTwoBone(hipJ, body.point((side == 0 ? p.footL : p.footR) + V3{0, sk.ankleY, 0}), sk.thigh, sk.shin, kpole)
+        .mid;
+}
+
+namespace {
+// One arm (character space): the IK as posed, then kept out of the head. Where a pose puts the forearm, the hand or
+// the upper arm inside the head ball, the whole arm (its bend kept) swings about the shoulder, away from the head,
+// by the smallest angle that clears it. That angle changes smoothly with the pose, so a move sliding past the head
+// bends around it.
+struct ArmSolve {
+    V3 shoulder, mid, end, posedEnd;
+    float posedDepth = 0, depth = 0;  // how far into the head (> 0) as posed / as solved
+};
+ArmSolve solveArm(const Look& look, const Skeleton& sk, const DancePose& pose, const Frame& chest, const Frame& head,
+                  int side) {
+    const float limb = clampf(look.limbs, 0.75f, 1.35f);
+    const float R = sk.headR;
+    const V3 headC = head.o;
+    auto closestOn = [](V3 p, V3 a, V3 b) {
+        const V3 ab = b - a;
+        const float t = clampf(dot(p - a, ab) / std::max(dot(ab, ab), 1e-8f), 0.0f, 1.0f);
+        return a + ab * t;
+    };
+    auto rotateAbout = [](V3 v, V3 axis, float ang) {  // Rodrigues, axis normalized
+        const float c = std::cos(ang), s = std::sin(ang);
+        return v * c + cross(axis, v) * s + axis * (dot(axis, v) * (1 - c));
+    };
+    const float sx = side == 0 ? 1.0f : -1.0f;
+    const V3 shoulder = chest.point({sx * sk.shoulderHalf, sk.shoulderY, 0});
+    const V3 target = chest.point(side == 0 ? pose.handL : pose.handR);
+    const V3 pole = hintedPole(chest.dir({sx * 0.8f, -0.45f, -0.6f}), chest, side == 0 ? pose.elbowL : pose.elbowR);
+    IkResult ik = solveTwoBone(shoulder, target, sk.upperArm, sk.forearm, pole);
+    // The head ball is 1.05 R wide, 0.97 R deep: 1.02 R plus the arm's own radius. The upper arm counts from a
+    // third of the way out (its root is the shoulder, always beside the head).
+    const float keepFore = R * 1.02f + 0.041f * limb, keepHand = R * 1.02f + 0.045f;
+    const float keepUpper = R * 1.02f + 0.047f * limb;
+    auto depth = [&](V3 mid, V3 end) {
+        const V3 handC = end + normalize(end - mid) * 0.032f;
+        float d = keepHand - length(handC - headC);
+        d = std::max(d, keepFore - length(closestOn(headC, mid, handC) - headC));
+        d = std::max(d, keepUpper - length(closestOn(headC, shoulder + (mid - shoulder) * 0.33f, mid) - headC));
+        return d;
+    };
+    ArmSolve r;
+    r.shoulder = shoulder;
+    r.posedEnd = ik.end;
+    const float posed = depth(ik.mid, ik.end);
+    r.posedDepth = posed;
+    if (posed > 0) {
+        // Swing away from the head: the arm's middle moves away from the head's center (across the arm), with a
+        // gentle preference for out to its own side and forward, so the direction stays steady where "away" is
+        // ambiguous (an arm reaching straight over the head). The smallest clearing angle by bisection (up to
+        // 100 degrees).
+        const V3 v = (ik.mid + ik.end) * 0.5f - shoulder;
+        const V3 vn = normalize(v, chest.y);
+        V3 away = (shoulder + v) - headC;
+        away = away - vn * dot(away, vn);
+        const V3 pref = normalize(chest.x * sx + chest.z * 0.6f);
+        V3 esc = away + (pref - vn * dot(pref, vn)) * 0.08f;
+        V3 axis = cross(vn, esc);
+        axis = length(axis) > 1e-6f ? normalize(axis) : normalize(cross(vn, chest.z), chest.x);
+        auto swung = [&](float ang, V3* mid, V3* end) {
+            *mid = shoulder + rotateAbout(ik.mid - shoulder, axis, ang);
+            *end = shoulder + rotateAbout(ik.end - shoulder, axis, ang);
+        };
+        // The first clearing angle: a coarse scan outwards (the overlap need not shrink steadily), then
+        // bisection within that step.
+        V3 m, e;
+        float lo = 0, hi = 1.75f;
+        for (int i = 1; i <= 25; ++i) {
+            const float ang = 1.75f * float(i) / 25.0f;
+            swung(ang, &m, &e);
+            if (depth(m, e) <= 0) {
+                hi = ang;
+                break;
+            }
+            lo = ang;
+        }
+        for (int i = 0; i < 10; ++i) {
+            const float mid = 0.5f * (lo + hi);
+            swung(mid, &m, &e);
+            (depth(m, e) > 0 ? lo : hi) = mid;
+        }
+        // Floor work: none (hands planted by the head, a headstand's tripod, stay planted; the swing jumps where
+        // arms pass the head as often as they do on the floor). Faded out over the first half of `ground`.
+        swung(pose.ground > 0 ? hi * clampf(1 - 2 * pose.ground, 0.0f, 1.0f) : hi, &ik.mid, &ik.end);
+    }
+    r.mid = ik.mid;
+    r.end = ik.end;
+    r.depth = depth(ik.mid, ik.end);
+    return r;
+}
+}  // namespace
+
+void hairColliders(const Look& look, const Skeleton& sk, const DancePose& pose, HairCollider out[kHairColliders]) {
+    const float build = clampf(look.build, 0.7f, 1.4f);
+    const float limb = clampf(look.limbs, 0.75f, 1.35f);
+    const float belly = clampf(look.belly, 0.0f, 1.0f);
+    const Frame body = bodyOf(pose);
+    const Frame pelvis = pelvisOf(body, sk, pose);
+    const Frame chest = chestOf(pelvis, sk, pose);
+    const Frame head = headOn(chest, sk, pose);
+    // The torso as buildBody makes it (pelvis to the top of the chest, flattened).
+    {
+        HairCollider& t = out[kColTorso];
+        t.a = pelvis.o;
+        t.b = chest.point({0, 0.035f, 0});
+        t.r0 = 0.102f * (1 + 0.22f * belly);
+        t.r1 = 0.112f;
+        const V3 axis = normalize(t.b - t.a, chest.y);
+        const Frame f = frameAlong(t.a, axis, normalize(pelvis.x + chest.x, chest.x));
+        t.x = f.x;
+        t.z = f.z;
+        t.sx = 1.15f * build;
+        t.sz = 0.86f + 0.22f * belly;
+    }
+    {
+        HairCollider& h = out[kColHead];
+        h.a = h.b = head.o;
+        h.r0 = h.r1 = sk.headR * 1.0f;
+    }
+    for (int side = 0; side < 2; ++side) {
+        const ArmSolve arm = solveArm(look, sk, pose, chest, head, side);
+        HairCollider& u = out[kColArms + 3 * side];
+        u.a = arm.shoulder;
+        u.b = arm.mid;
+        u.r0 = 0.047f * limb;
+        u.r1 = 0.041f * limb;
+        HairCollider& f = out[kColArms + 3 * side + 1];
+        f.a = arm.mid;
+        f.b = arm.end;
+        f.r0 = 0.041f * limb;
+        f.r1 = 0.036f * limb;
+        HairCollider& hand = out[kColArms + 3 * side + 2];
+        hand.a = hand.b = arm.end + normalize(arm.end - arm.mid) * 0.032f;
+        hand.r0 = hand.r1 = 0.05f;
+    }
+}
+
+float colliderDepth(const HairCollider& c, V3 p, float r, V3* out) {
+    // In the collider's own space (a flattened torso scaled round): the closest point on the axis, the radius there.
+    const V3 ab = c.b - c.a;
+    const float L2 = dot(ab, ab);
+    const bool flat = c.sx != 1.0f || c.sz != 1.0f;
+    V3 d = p - c.a;
+    V3 y{};
+    float along = 0;
+    if (L2 > 1e-10f) {
+        y = ab * (1.0f / std::sqrt(L2));
+        along = dot(d, y);
+    }
+    if (flat) {  // to the torso's round space: x / sx, z / sz (y kept)
+        d = y * along + c.x * (dot(d, c.x) / c.sx) + c.z * (dot(d, c.z) / c.sz);
+    }
+    const float t = L2 > 1e-10f ? clampf(along / std::sqrt(L2), 0.0f, 1.0f) : 0.0f;
+    const V3 q = d - ab * t;  // from the axis point (round space)
+    const float dist = length(q);
+    // A ball of radius r is (roughly) a ball of r / scale in round space: the smaller scale keeps it conservative.
+    const float rr = flat ? r / std::min(c.sx, c.sz) : r;
+    const float depthRound = c.r0 + (c.r1 - c.r0) * t + rr - dist;
+    const V3 n = dist > 1e-7f ? q * (1.0f / dist) : (flat ? c.z * -1.0f : V3{0, 1, 0});
+    if (!flat) {
+        if (out) *out = n;
+        return depthRound;
+    }
+    // Back to character units: the push out of the round space, stretched back across (x sx, z sz).
+    const V3 push = y * dot(n, y) + c.x * (dot(n, c.x) * c.sx) + c.z * (dot(n, c.z) * c.sz);
+    const float k = length(push);
+    if (out) *out = push * (1.0f / std::max(k, 1e-7f));
+    return depthRound * k;
+}
+
 void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, const Frame& placement, float scale,
-               BodyOut& out) {
+               BodyOut& out, const HairState* hair) {
     Builder B{placement, scale, out.parts};
     const float build = clampf(look.build, 0.7f, 1.4f);
     const float limb = clampf(look.limbs, 0.75f, 1.35f);
@@ -723,78 +1102,17 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
     }
 
     // ---- arms and hands
-    // Arms never pass through the head: where a pose puts the forearm, the hand or the upper arm inside the head
-    // ball, the whole arm (its bend kept) swings about the shoulder, away from the head, by the smallest angle that
-    // clears it. That angle changes smoothly with the pose, so a move sliding past the head bends around it.
-    const V3 headC = head.o;
+    // Arms never pass through the head (solveArm).
     out.armInHeadPosed = out.armInHead = 0;
-    auto closestOn = [](V3 p, V3 a, V3 b) {
-        const V3 ab = b - a;
-        const float t = clampf(dot(p - a, ab) / std::max(dot(ab, ab), 1e-8f), 0.0f, 1.0f);
-        return a + ab * t;
-    };
-    auto rotateAbout = [](V3 v, V3 axis, float ang) {  // Rodrigues, axis normalized
-        const float c = std::cos(ang), s = std::sin(ang);
-        return v * c + cross(axis, v) * s + axis * (dot(axis, v) * (1 - c));
-    };
     for (int side = 0; side < 2; ++side) {
-        const float sx = side == 0 ? 1.0f : -1.0f;
-        const V3 shoulder = chest.point({sx * sk.shoulderHalf, sk.shoulderY, 0});
-        const V3 target = chest.point(side == 0 ? pose.handL : pose.handR);
-        const V3 pole = hintedPole(chest.dir({sx * 0.8f, -0.45f, -0.6f}), chest, side == 0 ? pose.elbowL : pose.elbowR);
-        IkResult ik = solveTwoBone(shoulder, target, sk.upperArm, sk.forearm, pole);
-        // The head ball is 1.05 R wide, 0.97 R deep: 1.02 R plus the arm's own radius. The upper arm counts from a
-        // third of the way out (its root is the shoulder, always beside the head).
-        const float keepFore = R * 1.02f + 0.041f * limb, keepHand = R * 1.02f + 0.045f;
-        const float keepUpper = R * 1.02f + 0.047f * limb;
-        auto depth = [&](V3 mid, V3 end) {
-            const V3 handC = end + normalize(end - mid) * 0.032f;
-            float d = keepHand - length(handC - headC);
-            d = std::max(d, keepFore - length(closestOn(headC, mid, handC) - headC));
-            d = std::max(d, keepUpper - length(closestOn(headC, shoulder + (mid - shoulder) * 0.33f, mid) - headC));
-            return d;
-        };
-        out.handsPosed[side] = ik.end;
-        const float posed = depth(ik.mid, ik.end);
-        out.armInHeadPosed = std::max(out.armInHeadPosed, std::max(0.0f, posed));
-        if (posed > 0) {
-            // Swing away from the head: the arm's middle moves away from the head's center (across the arm), with a
-            // gentle preference for out to its own side and forward, so the direction stays steady where "away" is
-            // ambiguous (an arm reaching straight over the head). The smallest clearing angle by bisection (up to
-            // 100 degrees).
-            const V3 v = (ik.mid + ik.end) * 0.5f - shoulder;
-            const V3 vn = normalize(v, chest.y);
-            V3 away = (shoulder + v) - headC;
-            away = away - vn * dot(away, vn);
-            const V3 pref = normalize(chest.x * sx + chest.z * 0.6f);
-            V3 esc = away + (pref - vn * dot(pref, vn)) * 0.08f;
-            V3 axis = cross(vn, esc);
-            axis = length(axis) > 1e-6f ? normalize(axis) : normalize(cross(vn, chest.z), chest.x);
-            auto swung = [&](float ang, V3* mid, V3* end) {
-                *mid = shoulder + rotateAbout(ik.mid - shoulder, axis, ang);
-                *end = shoulder + rotateAbout(ik.end - shoulder, axis, ang);
-            };
-            // The first clearing angle: a coarse scan outwards (the overlap need not shrink steadily), then
-            // bisection within that step.
-            V3 m, e;
-            float lo = 0, hi = 1.75f;
-            for (int i = 1; i <= 25; ++i) {
-                const float ang = 1.75f * float(i) / 25.0f;
-                swung(ang, &m, &e);
-                if (depth(m, e) <= 0) {
-                    hi = ang;
-                    break;
-                }
-                lo = ang;
-            }
-            for (int i = 0; i < 10; ++i) {
-                const float mid = 0.5f * (lo + hi);
-                swung(mid, &m, &e);
-                (depth(m, e) > 0 ? lo : hi) = mid;
-            }
-            swung(hi, &ik.mid, &ik.end);
-        }
-        out.armInHead = std::max(out.armInHead, std::max(0.0f, depth(ik.mid, ik.end)));
+        const ArmSolve arm = solveArm(look, sk, pose, chest, head, side);
+        const V3 shoulder = arm.shoulder;
+        IkResult ik;
+        ik.mid = arm.mid;
+        ik.end = arm.end;
+        out.handsPosed[side] = arm.posedEnd;
+        out.armInHeadPosed = std::max(out.armInHeadPosed, std::max(0.0f, arm.posedDepth));
+        out.armInHead = std::max(out.armInHead, std::max(0.0f, arm.depth));
         out.hands[side] = ik.end;
         Rgb upper0 = look.top, upper1 = look.skin, lower = look.skin;
         Region u0 = Top, u1 = Skin, lo = Skin;
@@ -829,6 +1147,7 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
 
     // ---- head
     const std::size_t headBegin = out.parts.size();  // head, face, glasses, hair and hat from here on
+    out.headBegin = headBegin;
     {
         BodyPart& h = B.ball(head, R, 1.05f, 0.97f, look.skin);
         h.material = Material::Head;
@@ -903,8 +1222,35 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
     // inside, seen through the cut, is shaded as solid hair (DancerPipeline body_fs). Every hair part is drawn with
     // strands (Material::Strands, set at the end): `strands` says which way they run.
     const Rgb hairC = look.hair;
+    // Hair physics (2026-11-27): loose volumes lag the head (hair->lagT, lagR). A point near the head moved by `wT`
+    // of the lag's shift and `wR` of its turn about the head's center; a frame likewise (turned too). Without the
+    // sim (the classic swing) nothing moves.
+    const V3 lagT = hair ? head.dir(hair->lagT) : V3{}, lagR = hair ? head.dir(hair->lagR) : V3{};
+    auto jigP = [&](V3 p, float wT, float wR) {
+        if (!hair) return p;
+        return p + lagT * wT + cross(lagR * wR, p - head.o);
+    };
+    auto jigF = [&](Frame f, float wT, float wR) {
+        if (!hair) return f;
+        f.o = jigP(f.o, wT, wR);
+        const V3 ax = lagR * wR;
+        const float ang = length(ax);
+        if (ang > 1e-6f) {
+            const V3 n = ax * (1.0f / ang);
+            const float c = std::cos(ang), s = std::sin(ang);
+            auto rot = [&](V3 v) { return v * c + cross(n, v) * s + n * (dot(n, v) * (1 - c)); };
+            f.x = rot(f.x);
+            f.y = rot(f.y);
+            f.z = rot(f.z);
+        }
+        return f;
+    };
+    // Under a hat the close hair and the lifts are held still (they would poke out of it).
+    const bool hatted = look.hat == Hat::Cap || look.hat == Hat::Beanie || look.hat == Hat::Top;
     auto shell = [&](float k, V3 n, float w, V3 off = {0, 0.012f, -0.012f}) -> BodyPart& {
-        BodyPart& s = B.ball(head.translated(off * hs), R * k, 1.05f, 0.98f, hairC);
+        // Close shells only turn a little with the lag (a shift would show the scalp): the hairline and the strands
+        // drift a few millimeters.
+        BodyPart& s = B.ball(jigF(head.translated(off * hs), 0.0f, hatted ? 0.0f : 0.12f), R * k, 1.05f, 0.98f, hairC);
         s.material = Material::Hair;
         B.clip(s, n, w * R * k);
         return s;
@@ -923,15 +1269,16 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
     // it is off-center (a lift at the front, volume on top) and sinks into the hair under it elsewhere. Cut at the
     // usual hairline (`hairline`: its offset).
     auto layer = [&](V3 off, float k, float hairline) -> BodyPart& {
-        BodyPart& s = B.ball(head.translated(off * R), R * k, 1.05f, 0.98f, hairC);
+        // A lift bobs with the lag; its hairline cut stays with the head.
+        BodyPart& s = B.ball(jigF(head.translated(off * R), hatted ? 0.0f : 0.15f, hatted ? 0.0f : 0.2f), R * k, 1.05f, 0.98f, hairC);
         s.material = Material::Hair;
         cut(s, {0, -0.62f, 0.78f}, hairline);
         return s;
     };
     // A solid mass (never cut open) set up and back so the face pokes out in front of it: where they meet is the
     // hairline (the afro). A mass must cross the head steeply (well off-center) or the hairline steps.
-    auto mass = [&](V3 c, float r, float sx = 1.0f, float sz = 1.0f) -> BodyPart& {
-        BodyPart& m = B.ball(head.translated(c * R), R * r, sx, sz, hairC);
+    auto mass = [&](V3 c, float r, float sx = 1.0f, float sz = 1.0f, float loose = 0.0f) -> BodyPart& {
+        BodyPart& m = B.ball(jigF(head.translated(c * R), loose, loose), R * r, sx, sz, hairC);
         m.material = Material::Hair;
         return m;
     };
@@ -957,15 +1304,84 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
         return Rgb{a.r + (b.r - a.r) * t, a.g + (b.g - a.g) * t, a.b + (b.b - a.b) * t};
     };
     auto hash = [](int i) { return std::fabs(std::sin(float(i) * 12.9898f) * 43758.5453f) - std::floor(std::fabs(std::sin(float(i) * 12.9898f) * 43758.5453f)); };
+    // Hanging hair (hair physics, 2026-11-27): a chain from `a` (rest tip `b`) in `segs` pieces, as the hair sim
+    // moves it (`hair`), or (classic) one straight piece swung by the hair swing. Each chain's rest layout goes to
+    // out.hairChains (the sim reads it once from a rest build): `radius` its thickness for collisions, `droop` how
+    // much gravity bends it, `headCol` kept outside the head. Fills `pts` (up to kHairChainPts); returns how many.
+    out.hairChainCount = 0;
+    int chainIndex = 0;
+    float chainFloor = 0;  // (HairChainDef::floor for the chains made from here on)
+    auto hang = [&](V3 a, V3 b, int segs, float radius, float droop, float stiff, bool headCol, V3 swing, float amount,
+                    V3 inward, V3* pts, float cone = 0, float damp = 1) -> int {
+        const int ci = chainIndex++;
+        segs = std::clamp(segs, 1, kHairChainPts - 1);
+        if (ci < kHairChains) {
+            auto local = [&](V3 p) {
+                const V3 q = p - head.o;
+                return V3{dot(q, head.x), dot(q, head.y), dot(q, head.z)};
+            };
+            HairChainDef& d = out.hairChains[ci];
+            d.a = local(a);
+            d.b = local(b);
+            d.segs = segs;
+            d.radius = radius;
+            d.droop = droop;
+            d.stiff = stiff;
+            d.head = headCol;
+            d.cone = cone;
+            d.damp = damp;
+            d.floor = chainFloor;
+            out.hairChainCount = ci + 1;
+        }
+        pts[0] = a;
+        if (!hair) {
+            pts[1] = swung(a, b, swing, amount, inward);
+            return 2;
+        }
+        for (int i = 1; i <= segs; ++i)
+            pts[i] = ci < hair->chains ? hair->pts[ci][i] : lerp(a, b, float(i) / float(segs));
+        return segs + 1;
+    };
+    // A piece along a chain: one capsule per link, tapering from r0 to r1 by length (joints meet at equal radii).
+    // Flattened across (sx, sz) in each link's own frame (x towards `xHint`). Returns the first part's index.
+    auto strand = [&](const V3* p, int n, V3 xHint, float r0, float r1, float sx = 1.0f, float sz = 1.0f) {
+        const std::size_t first = out.parts.size();
+        // (The chain just made, drawn this thick: kept that far above the floor.)
+        if (chainIndex >= 1 && chainIndex <= kHairChains) {
+            HairChainDef& d = out.hairChains[chainIndex - 1];
+            d.floor = std::max(d.floor, std::max(r0, r1) * std::max({sx, sz, 1.0f}));
+        }
+        float total = 0;
+        for (int i = 0; i + 1 < n; ++i) total += length(p[i + 1] - p[i]);
+        float along = 0;
+        for (int i = 0; i + 1 < n; ++i) {
+            const float L = length(p[i + 1] - p[i]);
+            const float t0 = total > 1e-6f ? along / total : 0.0f, t1 = total > 1e-6f ? (along + L) / total : 1.0f;
+            BodyPart& s = B.segment(p[i], p[i + 1], xHint, r0 + (r1 - r0) * t0, r0 + (r1 - r0) * t1, hairC);
+            s.hangs = true;
+            s.scaleX = sx;
+            s.scaleZ = sz;
+            s.material = Material::Hair;
+            along += L;
+        }
+        return first;
+    };
     // Long hair (2026-11-21): close on top (a shell cut at the hairline, the strands parted at `part`, x R; > 5: no
     // parting) over a curtain hanging from under it: a tube round the head, open in front of the cheeks (its inside
     // shows as the hair behind the neck), cut level at the hem `drop` head radii below the head's center, swinging
-    // with the dance. Straight sides past the face, never a ball round it. Returns where the hem's middle moved to
-    // (swing) from where it hangs at rest, for pieces that hang on the curtain.
+    // with the dance. Straight sides past the face, never a ball round it. With hair physics the tube moves with
+    // the head down to just below it, the rest a chain (two links) that bends, trails and rests on the back.
+    // Bending (LongHair 1, 2026-11-27): the tube stays with the head down to about ear height and bends below that
+    // along three chains (three links each) hanging from its wall: the back and each side (HairBend).
+    const bool bendLong = hair && hair->bendLong;
+    // The columns (Peter, 2026-11-27: "a bit calmer"): where the bend starts (head radii below the tube's top, about
+    // ear height), how far their ends turn from hanging (radians; upside down more), shape stiffness, damping.
+    constexpr float kLongStart = 0.45f, kLongCone = 1.15f, kLongStiff = 0.9f, kLongDamp = 1.35f;
     struct Curtain {
         BodyPart* top;
-        BodyPart* tube;
-        V3 hemShift;  // character space
+        std::size_t first, last;  // the tube's parts
+        V3 hemShift;              // character space: how far the tube's end has moved from rest, per unit length
+        bool bent = false;        // the tube (`first`) is bent (out.bend)
     };
     auto curtain = [&](float drop, float part, float spread = 1.0f, float frame = 0.0f) -> Curtain {
         BodyPart& top = shell(1.065f, {0, -0.62f, 0.78f}, 0.06f);
@@ -977,18 +1393,102 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
         const float len = drop + 0.5f;
         const V3 a = head.point(V3{0, -0.04f, -0.17f} * R);
         const V3 rest = head.point(V3{0, -0.04f - len, -0.17f - 0.12f * len} * R);
-        const V3 b = swung(a, rest, swingMid, 0.35f);
-        BodyPart& t = B.segment(a, b, head.x, R * 0.97f, R * (0.99f + 0.08f * spread), hairC);
-        t.scaleX = 1.24f;
-        t.scaleZ = 0.82f;
-        t.material = Material::Hair;
-        // Open in front of the cheeks; `frame` slants the opening forward lower down (layers framing the face).
-        cut(t, {0, frame, 1}, 0.22f);
-        t.clip2 = {0, 1, 0, (drop - 0.04f) * R * scale};           // the hem (along the tube, which hangs down)
-        return Curtain{&out.parts[topIndex], &out.parts.back(), (b - rest) * (1.0f / std::max(len * R, 1e-6f))};
+        const float r0 = R * 0.97f, r1 = R * (0.99f + 0.08f * spread);
+        const float hem = (drop - 0.04f) * R;  // along the tube from `a`
+        const float rigid = std::min(1.0f, 0.45f * len);
+        auto tubePart = [&](V3 p0, V3 p1, float t0, float t1, float along) -> BodyPart& {
+            BodyPart& t = B.segment(p0, p1, head.x, r0 + (r1 - r0) * t0, r0 + (r1 - r0) * t1, hairC);
+            t.hangs = true;
+            t.scaleX = 1.24f;
+            t.scaleZ = 0.82f;
+            t.material = Material::Hair;
+            // Open in front of the cheeks; `frame` slants the opening forward lower down (layers framing the face).
+            cut(t, {0, frame, 1}, 0.22f);
+            t.clip2 = {0, 1, 0, (hem - along) * scale};  // the hem (along the tube, which hangs down)
+            return t;
+        };
+        if (bendLong) {
+            // The tube as at rest (with the head), bent where the columns hang. Each column hangs from the tube's
+            // wall where the bend starts (`rigid` along the axis): the back, and the sides a little behind their
+            // middle; parallel to the axis (the tube's own widening spreads the hem), so still is as designed.
+            const std::size_t tubeIndex = out.parts.size();
+            tubePart(a, rest, 0, 1, 0).bent = true;
+            const Frame tf = frameAlong(a, rest - a, head.x);  // the tube's frame (character space)
+            const float f0 = std::min(kLongStart, rigid) / len, rAt = r0 + (r1 - r0) * f0;
+            const V3 c0 = lerp(a, rest, f0), down = rest - c0;
+            const V3 back = tf.z * (dot(tf.z, head.z) < 0 ? 1.0f : -1.0f);  // across the axis, away from the face
+            const V3 roots[3] = {c0 + back * (0.82f * rAt * 0.92f), c0 + tf.x * (1.24f * rAt * 0.9f) + back * (0.3f * rAt),
+                                 c0 - tf.x * (1.24f * rAt * 0.9f) + back * (0.3f * rAt)};
+            const V3 tips[3] = {roots[0] + down, roots[1] + down, roots[2] + down};
+            V3 col[3][kHairChainPts];
+            int nc[3];
+            for (int c = 0; c < 3; ++c)
+                nc[c] = hang(roots[c], tips[c], 3, R * (c == 0 ? 0.3f : 0.25f), 0.8f, kLongStiff, true, swingMid, 0.35f,
+                             {0, 0, 1}, col[c], kLongCone, kLongDamp);
+            // The curves, in the tube's frame (world units, x and z scaled): each column moved to the axis.
+            BodyPart& tube = out.parts[tubeIndex];
+            const Frame& F = tube.frame;
+            auto lp = [&](V3 p) {
+                const V3 d = B.world(p) - F.o;
+                return V3{dot(d, F.x), dot(d, F.y), dot(d, F.z)};
+            };
+            HairBend& hb = out.bend;
+            hb.y0 = tube.len * f0;
+            const V3 aLeft = lp(roots[1]);
+            hb.backZ = lp(roots[0]).z;
+            hb.sideX = aLeft.x;
+            hb.sideZ = aLeft.z;
+            for (int c = 0; c < 3; ++c) {
+                const V3 anchor = lp(roots[c]);
+                V3 q[kHairChainPts];
+                float total = 0;
+                for (int i = 0; i < nc[c]; ++i) {
+                    const V3 l = lp(col[c][i]);
+                    q[i] = {l.x - anchor.x, l.y - anchor.y + hb.y0, l.z - anchor.z};
+                    if (i > 0) total += length(q[i] - q[i - 1]);
+                }
+                // The curve ends at the column's end, arriving along its last link (fitting the middle as well
+                // overshot: loops and shelves where the first link leaves the axis at an angle).
+                hb.p3[c] = q[nc[c] - 1];
+                hb.p2[c] = hb.p3[c] - normalize(q[nc[c] - 1] - q[nc[c] - 2], {0, 1, 0}) * (total / 3);
+            }
+            return Curtain{&out.parts[topIndex], tubeIndex, tubeIndex, {}, true};
+        }
+        // Hair physics: the part below the head is a chain (it trails, rests on the back, is pushed by the arms);
+        // the tube, still one piece (pieces of a tube this wide show their joins through the opening at the face),
+        // turns about its top towards where the chain's end is, part of the way (all the way would show the tube's
+        // inside round the head). Classic: swung by the hair swing.
+        V3 chain[kHairChainPts];
+        const int nc = hang(lerp(a, rest, rigid / len), rest, 2, R * 0.35f, 0.8f, 0.7f, false, swingMid, 0.35f,
+                            {0, 0, 1}, chain);
+        V3 pts[2] = {a, swung(a, rest, swingMid, 0.35f)};
+        const int n = 2;
+        if (hair) {
+            const V3 r = normalize(rest - a), want = normalize(chain[nc - 1] - a, r);
+            pts[1] = a + normalize(r + (want - r) * 0.6f, r) * (len * R);
+        }
+        const std::size_t first = out.parts.size();
+        float total = 0;
+        for (int i = 0; i + 1 < n; ++i) total += length(pts[i + 1] - pts[i]);
+        float along = 0;
+        for (int i = 0; i + 1 < n; ++i) {
+            const float L = length(pts[i + 1] - pts[i]);
+            if (along >= hem - 0.02f * R && i > 0) break;  // wholly below the hem
+            const float t0 = along / std::max(total, 1e-6f), t1 = (along + L) / std::max(total, 1e-6f);
+            tubePart(pts[i], pts[i + 1], t0, t1, along);
+            along += L;
+        }
+        return Curtain{&out.parts[topIndex], first, out.parts.size() - 1,
+                       (pts[1] - rest) * (1.0f / std::max(len * R, 1e-6f))};
     };
-    // Pieces hanging on a curtain (curls, waves) follow its swing: t of the way down moves t of the hem's shift.
+    // Pieces hanging on a curtain (curls, waves) follow its swing: t of the way down moves t of the hem's shift; on
+    // a bent tube, where the bend puts them.
     auto onCurtain = [&](V3 restHead, float t, float drop, const Curtain& c) {
+        if (c.bent) {
+            const V3 w = bendHairPoint(out.parts[c.first], out.bend, B.world(head.point(restHead * R)));
+            const V3 d = (w - B.place.o) * (1.0f / std::max(B.scale, 1e-6f));
+            return V3{dot(d, B.place.x), dot(d, B.place.y), dot(d, B.place.z)};
+        }
         return head.point(restHead * R) + c.hemShift * (t * (drop + 0.5f) * R);
     };
     // Under a cap or a beanie, big hair is built to hang out below the hat instead (a full mass cut at the band would
@@ -997,20 +1497,18 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
     const bool capped = look.hat == Hat::Cap || look.hat == Hat::Beanie;
     auto hatLocks = [&](float length, float width) {  // side locks from under the band, and the back
         shell(1.03f, {0, -0.62f, 0.78f}, 0.06f);
+        V3 pts[kHairChainPts];
         for (int side = 0; side < 2; ++side) {
             const float sx = side == 0 ? 1.0f : -1.0f;
             const V3 a = head.point(V3{sx * 0.98f, 0.02f, -0.12f} * R);
-            const V3 b = swung(a, head.point(V3{sx * 1.0f, -0.25f - length, -0.18f} * R), side == 0 ? swingL : swingR, 0.6f,
-                               {-sx, 0, 0});
-            BodyPart& l = B.segment(a, b, head.z, R * 0.3f * width, R * 0.24f * width, hairC);
-            l.scaleX = 0.6f;
-            l.material = Material::Hair;
+            const int n = hang(a, head.point(V3{sx * 1.0f, -0.25f - length, -0.18f} * R), 2, R * 0.2f * width, 0.7f,
+                               0.8f, true, side == 0 ? swingL : swingR, 0.6f, {-sx, 0, 0}, pts);
+            strand(pts, n, head.z, R * 0.3f * width, R * 0.24f * width, 0.6f);
         }
         const V3 a = head.point(V3{0, 0.0f, -0.62f} * R);
-        BodyPart& back = B.segment(a, swung(a, head.point(V3{0, -0.3f - length, -0.75f} * R), swingMid, 0.5f), head.x,
-                                   R * 0.78f * width, R * 0.62f * width, hairC);
-        back.scaleZ = 0.5f;
-        back.material = Material::Hair;
+        const int n = hang(a, head.point(V3{0, -0.3f - length, -0.75f} * R), 2, R * 0.3f * width, 0.7f, 0.8f, false,
+                           swingMid, 0.5f, {0, 0, 1}, pts);
+        strand(pts, n, head.x, R * 0.78f * width, R * 0.62f * width, 1.0f, 0.5f);
     };
     auto hatPuffs = [&](float r) {  // afro / curls showing below the band at the sides and back
         shell(1.03f, {0, -0.62f, 0.78f}, 0.06f).strands = kStrandsCoils;
@@ -1019,7 +1517,7 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
             const float u = 1.15f + (6.2831853f - 2.3f) * float(i) / float(n - 1);  // round the back, ear to ear
             for (int row = 0; row < 2; ++row) {
                 const V3 d = sphereDir(u, row == 0 ? -0.02f : -0.42f);
-                BodyPart& b = B.ball(head.translated(V3{d.x * 1.05f, d.y, d.z * 0.98f} * (R * 0.98f)),
+                BodyPart& b = B.ball(jigF(head.translated(V3{d.x * 1.05f, d.y, d.z * 0.98f} * (R * 0.98f)), 0.3f, 0.3f),
                                      R * r * (row == 0 ? 1.0f : 0.9f), 1, 1, hairC);
                 b.material = Material::Hair;
                 b.strands = kStrandsCoils;
@@ -1029,9 +1527,10 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
     // A tail (ponytail, pigtail, side pony) from `a` towards `b` (standard-head units), swinging, tied with the
     // accent color.
     auto tail = [&](V3 a0, V3 b0, V3 swing, float amount, V3 inward, float r0, float r1) {
-        const V3 a = hp(a0), b = swung(a, hp(b0), swing, amount, inward);
-        BodyPart& t = B.segment(a, b, head.x, r0 * hs, r1 * hs, hairC);
-        t.material = Material::Hair;
+        V3 pts[kHairChainPts];
+        const V3 a = hp(a0);
+        const int n = hang(a, hp(b0), 4, 0.5f * (r0 + r1) * hs, 0.6f, 1.0f, true, swing, amount, inward, pts);
+        strand(pts, n, head.x, r0 * hs, r1 * hs);
         B.ball(Frame{}.translated(a), 0.03f * hs, 1, 1, look.accent);
     };
     HairStyle style = look.hairStyle;
@@ -1045,6 +1544,9 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
             case HairStyle::Mullet: break;
             case HairStyle::Afro: hatPuffs(0.42f); style = HairStyle::Bald; break;
             case HairStyle::Curly: hatPuffs(0.3f); style = HairStyle::Bald; break;
+            case HairStyle::BigCurls:
+            case HairStyle::HugeCurls: hatPuffs(0.3f); hatLocks(1.3f, 1.25f); style = HairStyle::Bald; break;
+            case HairStyle::Curls: hatPuffs(0.25f); hatLocks(1.1f, 1.1f); style = HairStyle::Bald; break;
             case HairStyle::SpaceBuns:
             case HairStyle::TopKnot:
             case HairStyle::ManBun:
@@ -1076,7 +1578,7 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
                                {-0.25f, 0.8f, 0.55f}, {0.3f, 0.7f, -0.6f}, {-0.3f, 0.7f, -0.6f}, {0, 0.75f, -0.66f}};
             for (V3 d : dirs) {
                 d = normalize(d);
-                BodyPart& c = B.segment(head.point(d * (R * 0.92f)), head.point(d * (R * 1.48f)), head.x, 0.06f * hs,
+                BodyPart& c = B.segment(head.point(d * (R * 0.92f)), jigP(head.point(d * (R * 1.48f)), 0.6f, 0.8f), head.x, 0.06f * hs,
                                         0.008f * hs, hairC);
                 c.outline = true;
             }
@@ -1084,10 +1586,11 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
         }
         case HairStyle::Afro: {
             // A big mass with a few lobes, so the outline is not a perfect ball.
-            mass({0, 0.45f, -0.6f}, 1.35f, 1.1f).strands = kStrandsCoils;
-            mass({0.62f, 0.75f, -0.55f}, 0.85f, 1.0f).strands = kStrandsCoils;
-            mass({-0.62f, 0.75f, -0.55f}, 0.85f, 1.0f).strands = kStrandsCoils;
-            mass({0, 1.05f, -0.45f}, 0.9f, 1.1f).strands = kStrandsCoils;
+            // (Hair physics: the lobes lag the head more than the middle, so the outline wobbles.)
+            mass({0, 0.45f, -0.6f}, 1.35f, 1.1f, 1.0f, 0.3f).strands = kStrandsCoils;
+            mass({0.62f, 0.75f, -0.55f}, 0.85f, 1.0f, 1.0f, 0.6f).strands = kStrandsCoils;
+            mass({-0.62f, 0.75f, -0.55f}, 0.85f, 1.0f, 1.0f, 0.6f).strands = kStrandsCoils;
+            mass({0, 1.05f, -0.45f}, 0.9f, 1.1f, 1.0f, 0.6f).strands = kStrandsCoils;
             break;
         }
         case HairStyle::Ponytail: {
@@ -1099,14 +1602,14 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
         }
         case HairStyle::Bun:
             shell(1.06f, {0, -0.62f, 0.78f}, 0.06f);
-            B.ball(head.translated(V3{0, 0.19f, -0.07f} * hs), 0.075f * hs, 1, 1, hairC);
+            B.ball(jigF(head.translated(V3{0, 0.19f, -0.07f} * hs), 0.6f, 0.7f), 0.075f * hs, 1, 1, hairC);
             break;
         case HairStyle::Mohawk:
             for (int i = 0; i < 5; ++i) {
                 const float a = -0.35f + 0.38f * float(i);  // from the forehead over the top to the back
                 const V3 d{0, std::cos(a), std::sin(-a) + 0.15f};
                 const V3 base = head.point(normalize(d) * (R * 0.95f));
-                const V3 tip = head.point(normalize(d) * (R * 1.42f));
+                const V3 tip = jigP(head.point(normalize(d) * (R * 1.42f)), 0.6f, 0.8f);
                 BodyPart& c = B.segment(base, tip, head.x, 0.05f * hs, 0.01f * hs, hairC);
                 c.scaleX = 0.5f;
             }
@@ -1135,7 +1638,9 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
                 const V3 d{r * std::sin(a), y, r * std::cos(a)};
                 if (d.y < -0.35f || (d.y < 0.05f && d.z > -0.1f) || dot(d, face) > -0.12f) continue;
                 const float jig = 0.85f + 0.3f * std::fabs(std::sin(float(i) * 12.9898f) * 0.5f + 0.5f - 0.5f);
-                BodyPart& c = B.ball(head.translated(V3{d.x * 1.05f, d.y, d.z * 0.98f} * (R * 0.96f)), R * 0.3f * jig,
+                const float loose = 0.35f + 0.3f * std::max(0.0f, d.y);  // the top ones bounce most
+                BodyPart& c = B.ball(jigF(head.translated(V3{d.x * 1.05f, d.y, d.z * 0.98f} * (R * 0.96f)), loose, loose),
+                                     R * 0.3f * jig,
                                      1.0f, 1.0f, hairC);
                 c.material = Material::Hair;
                 c.strands = kStrandsCoils;
@@ -1190,18 +1695,17 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
         case HairStyle::Mullet: {
             // Business in front, party at the back: short on top, long and full down the back of the neck.
             shell(1.05f, {0, -0.62f, 0.78f}, 0.06f);
+            V3 pts[kHairChainPts];
             const V3 a = head.point(V3{0, -0.05f, -0.5f} * R);
-            BodyPart& back = B.segment(a, swung(a, head.point(V3{0, -1.45f, -0.72f} * R), swingMid, 0.6f),
-                                       head.x, R * 0.66f, R * 0.5f, hairC);
-            back.scaleZ = 0.5f;
-            back.material = Material::Hair;
+            int n = hang(a, head.point(V3{0, -1.45f, -0.72f} * R), 2, R * 0.25f, 0.7f, 0.8f, false, swingMid, 0.6f,
+                         {0, 0, 1}, pts);
+            strand(pts, n, head.x, R * 0.66f, R * 0.5f, 1.0f, 0.5f);
             for (int side = 0; side < 2; ++side) {
                 const float sx = side == 0 ? 1.0f : -1.0f;
                 const V3 a = head.point(V3{sx * 0.55f, -0.2f, -0.55f} * R);
-                const V3 b = swung(a, head.point(V3{sx * 0.72f, -1.15f, -0.62f} * R), side == 0 ? swingL : swingR,
-                                   0.9f, {-sx, 0, 0.5f});
-                BodyPart& t = B.segment(a, b, head.z, R * 0.32f, R * 0.08f, hairC);
-                t.material = Material::Hair;
+                n = hang(a, head.point(V3{sx * 0.72f, -1.15f, -0.62f} * R), 2, R * 0.1f, 0.7f, 0.8f, true,
+                         side == 0 ? swingL : swingR, 0.9f, {-sx, 0, 0.5f}, pts);
+                strand(pts, n, head.z, R * 0.32f, R * 0.08f);
             }
             break;
         }
@@ -1230,16 +1734,36 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
         case HairStyle::Braid: {
             // A side braid: gathered behind one ear and plaited, hanging forward over the shoulder, tied at the end.
             shell(1.06f, {0, -0.62f, 0.78f}, 0.06f).strands = kStrandsBack;
-            const V3 a = hp({0.16f, -0.02f, -0.08f}), b = swung(a, hp({0.2f, -0.36f, 0.0f}), swingL, 1.0f, {-1, 0, 0});
+            V3 pts[kHairChainPts];
+            const int np = hang(hp({0.16f, -0.02f, -0.08f}), hp({0.2f, -0.36f, 0.0f}), 4, 0.04f * hs, 0.6f, 1.0f, true,
+                                swingL, 1.0f, {-1, 0, 0}, pts);
+            float total = 0;
+            for (int i = 0; i + 1 < np; ++i) total += length(pts[i + 1] - pts[i]);
+            // A point t of the way along the chain, and the way it runs there.
+            auto along = [&](float t, V3* dir) {
+                float want = t * total;
+                for (int i = 0; i + 1 < np; ++i) {
+                    const float L = length(pts[i + 1] - pts[i]);
+                    if (want <= L || i + 2 == np) {
+                        *dir = normalize(pts[i + 1] - pts[i], head.y * -1.0f);
+                        return lerp(pts[i], pts[i + 1], L > 1e-6f ? std::min(1.0f, want / L) : 0.0f);
+                    }
+                    want -= L;
+                }
+                *dir = head.y * -1.0f;
+                return pts[0];
+            };
             const int n = 8;
+            V3 dir{};
             for (int i = 0; i < n; ++i) {
                 const float t = float(i) / float(n - 1);
                 const V3 side = head.dir({0, 0, (i % 2 ? 0.012f : -0.012f) * hs});
-                BodyPart& k = B.ball(frameAlong(a + (b - a) * t + side, b - a, head.x).rotatedZ(i % 2 ? 0.5f : -0.5f),
+                const V3 at = along(t, &dir);
+                BodyPart& k = B.ball(frameAlong(at + side, dir, head.x).rotatedZ(i % 2 ? 0.5f : -0.5f),
                                      (0.048f - 0.016f * t) * hs, 1.0f, 0.8f, hairC);
                 k.material = Material::Hair;
             }
-            B.ball(Frame{}.translated(b + normalize(b - a) * 0.02f * hs), 0.022f * hs, 1, 1, look.accent);
+            B.ball(Frame{}.translated(pts[np - 1] + dir * 0.02f * hs), 0.022f * hs, 1, 1, look.accent);
             break;
         }
         case HairStyle::SidePony: {
@@ -1254,15 +1778,16 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
             s.strandPart = 0;
             for (int side = 0; side < 2; ++side) {
                 const float sx = side == 0 ? 1.0f : -1.0f;
-                B.ball(head.translated(V3{sx * 0.115f, 0.165f, -0.03f} * hs), 0.062f * hs, 1, 1, hairC).material =
+                B.ball(jigF(head.translated(V3{sx * 0.115f, 0.165f, -0.03f} * hs), 0.6f, 0.7f), 0.062f * hs, 1, 1, hairC).material =
                     Material::Hair;
             }
             break;
         }
         case HairStyle::TopKnot:
             shell(1.06f, {0, -0.62f, 0.78f}, 0.06f);
-            B.ball(head.translated(V3{0, 0.235f, -0.02f} * hs), 0.085f * hs, 1.05f, 1.0f, hairC).material = Material::Hair;
-            B.ball(head.translated(V3{0, 0.17f, -0.02f} * hs), 0.04f * hs, 1.3f, 1.3f, look.accent);
+            B.ball(jigF(head.translated(V3{0, 0.235f, -0.02f} * hs), 0.7f, 0.8f), 0.085f * hs, 1.05f, 1.0f, hairC).material =
+                Material::Hair;
+            B.ball(jigF(head.translated(V3{0, 0.17f, -0.02f} * hs), 0.35f, 0.4f), 0.04f * hs, 1.3f, 1.3f, look.accent);
             break;
         case HairStyle::Shaved: {
             // Shaved to a shadow: barely darker than the skin, closer than a buzz cut.
@@ -1305,7 +1830,8 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
         }
         case HairStyle::ManBun:
             shell(1.06f, {0, -0.62f, 0.78f}, 0.06f).strands = kStrandsBack;
-            B.ball(head.translated(V3{0, 0.17f, -0.12f} * hs), 0.07f * hs, 1.1f, 1, hairC).material = Material::Hair;
+            B.ball(jigF(head.translated(V3{0, 0.17f, -0.12f} * hs), 0.6f, 0.7f), 0.07f * hs, 1.1f, 1, hairC).material =
+                Material::Hair;
             break;
         case HairStyle::Coils: {
             // Short coils / twists close over the top, faded at the sides.
@@ -1318,7 +1844,8 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
                 const float a = 2.39996323f * float(i);
                 const V3 d{r * std::sin(a), y, r * std::cos(a)};
                 if (d.y < 0.3f - 0.2f * std::max(0.0f, -d.z) || dot(d, normalize(V3{0, -0.5f, 0.86f})) > -0.2f) continue;
-                BodyPart& c = B.ball(head.translated(V3{d.x * 1.05f, d.y, d.z * 0.98f} * (R * 1.0f)), R * 0.16f, 1, 1, hairC);
+                BodyPart& c = B.ball(jigF(head.translated(V3{d.x * 1.05f, d.y, d.z * 0.98f} * (R * 1.0f)), 0.25f, 0.3f),
+                                     R * 0.16f, 1, 1, hairC);
                 c.material = Material::Hair;
                 c.strands = kStrandsCoils;
             }
@@ -1331,15 +1858,19 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
         }
         case HairStyle::Layers: {
             // Long layers: shorter round the face, longer at the back (the hem slants up to the front).
-            curtain(2.0f, 0.0f, 1.2f).tube->clip2 = {0, 0, 0, 1e9f};
-            cut(out.parts.back(), {0, -1, 0.75f}, 1.55f, true);
+            const Curtain c = curtain(2.0f, 0.0f, 1.2f);
+            for (std::size_t i = c.first; i <= c.last; ++i) {
+                out.parts[i].clip2 = {0, 0, 0, 1e9f};
+                cut(out.parts[i], {0, -1, 0.75f}, 1.55f, true);
+            }
             break;
         }
         case HairStyle::HalfUp: {
             // Long, the top half combed back to a little bun at the crown.
             const Curtain c = curtain(2.1f, 9.0f);
             c.top->strands = kStrandsBack;
-            B.ball(head.translated(V3{0, 0.82f, -0.62f} * R), R * 0.3f, 1.1f, 1.0f, hairC).material = Material::Hair;
+            B.ball(jigF(head.translated(V3{0, 0.82f, -0.62f} * R), 0.6f, 0.7f), R * 0.3f, 1.1f, 1.0f, hairC).material =
+                Material::Hair;
             break;
         }
         case HairStyle::Anime: {
@@ -1350,7 +1881,7 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
             // A point at (u around, v up, k head radii out); `swing` moves the tip, `amount` of it.
             auto at = [&](float u, float v, float k) { return head.point(sphereDir(u, v) * (R * k)); };
             auto lock = [&](V3 a, V3 m, V3 t, float w, V3 swing, float amount, V3 inward) {
-                t = swung(m, t, swing, amount, inward);
+                t = jigP(swung(m, t, swing, amount, inward), 0.5f, 0.6f);
                 const V3 pieces[2][2] = {{a, m}, {m, t}};
                 for (int i = 0; i < 2; ++i) {
                     const V3 p0 = pieces[i][0], p1 = pieces[i][1];
@@ -1367,7 +1898,8 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
             // (Straight pieces: a bend's round joint stood out as a ridge along the hairline.)
             for (int i = 0; i < 5; ++i) {
                 const float u = fu[i], lean = (i % 2 ? 0.1f : -0.07f);
-                const V3 a = at(u * 0.85f, 0.78f, 1.0f), t = at(u * 1.05f + lean, (i == 2 ? 0.2f : 0.27f) + 0.04f * float(i % 2), 1.065f);
+                const V3 a = at(u * 0.85f, 0.78f, 1.0f);
+                const V3 t = jigP(at(u * 1.05f + lean, (i == 2 ? 0.2f : 0.27f) + 0.04f * float(i % 2), 1.065f), 0.15f, 0.2f);
                 const V3 axis = normalize(t - a), radial = normalize((a + t) * 0.5f - head.o, head.z);
                 BodyPart& l = B.segment(a, t, normalize(cross(axis, radial), head.x), R * 0.27f, R * 0.015f, hairC);
                 l.scaleZ = 0.35f;
@@ -1391,9 +1923,86 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
             // A cowlick sticking up off the crown and curling forward.
             {
                 const V3 a = head.point(V3{0.05f, 0.95f, -0.1f} * R), m = head.point(V3{0.05f, 1.38f, -0.02f} * R);
-                const V3 t = swung(m, head.point(V3{0.12f, 1.48f, 0.3f} * R), swingMid, 0.6f);
+                const V3 t = jigP(swung(m, head.point(V3{0.12f, 1.48f, 0.3f} * R), swingMid, 0.6f), 1.0f, 1.0f);
                 B.segment(a, m, head.x, R * 0.09f, R * 0.07f, hairC).material = Material::Hair;
                 B.segment(m, t, head.x, R * 0.07f, R * 0.01f, hairC).material = Material::Hair;
+            }
+            break;
+        }
+        case HairStyle::HugeCurls:
+        case HairStyle::BigCurls:
+        case HairStyle::Curls: {
+            // A long curly mane (2026-11-27) in three sizes (Peter: the first one, now HugeCurls, "pretty good but
+            // really large"): a few curly masses that merge into one lumpy outline, close on top and widening below
+            // the ears to the shoulders (the triangle of long natural curls), the lower ones swinging with the
+            // curtain inside. Set back and out to the sides so the face pokes out in front. `w` is how far the
+            // masses stand out from the head (1: the huge one), `sz` their size, `drop` the length.
+            struct Size {
+                float drop, w, sz, crown, spread;
+                int small;
+            };
+            const Size z = style == HairStyle::HugeCurls ? Size{1.8f, 1.0f, 1.0f, 1.18f, 2.2f, 14}
+                           : style == HairStyle::BigCurls ? Size{1.6f, 0.6f, 0.8f, 1.12f, 1.4f, 16}
+                                                          : Size{1.4f, 0.3f, 0.62f, 1.07f, 0.8f, 18};
+            const float drop = z.drop, ys = drop / 1.8f;  // the huge one's heights, scaled to this length
+            auto outX = [&](float x, float from) { return from + (x - from) * z.w; };
+            const float fwd = 0.2f * (1.0f - z.w);  // the smaller ones sit a little further forward, framing the face
+            // (Its columns kept as far above the floor as the curls riding them reach out: floor work.)
+            chainFloor = R * (0.3f + 0.9f * z.sz);
+            const Curtain c = curtain(drop, 9.0f, z.spread);
+            chainFloor = 0;
+            c.top->strands = kStrandsCoils;
+            for (std::size_t i = c.first; i <= c.last; ++i) out.parts[i].strands = kStrandsCoils;
+            mass({0, 0.5f, -0.55f}, z.crown, 1.0f + 0.12f * (z.crown - 1.0f) / 0.18f, 1.0f).strands = kStrandsCoils;
+            struct Lobe {
+                V3 at;
+                float r;
+            };
+            // Per side: by the temple, below the ear, at the shoulder (widest), and a tip lower down.
+            const Lobe lobes[] = {{{0.82f, 0.2f, -0.45f}, 0.78f},
+                                  {{1.12f, -0.55f, -0.5f}, 0.82f},
+                                  {{1.32f, -1.35f, -0.45f}, 0.86f},
+                                  {{1.15f, -2.05f, -0.5f}, 0.66f}};
+            for (int side = 0; side < 2; ++side) {
+                const float sx = side == 0 ? 1.0f : -1.0f;
+                for (const Lobe& l : lobes) {
+                    const float y = l.at.y > 0 ? l.at.y : l.at.y * ys;
+                    const float t = std::clamp((-y + 0.3f) / (drop + 0.5f), 0.0f, 1.0f);
+                    const V3 p = onCurtain({sx * outX(l.at.x, 0.95f), y, l.at.z + fwd}, t, drop, c);
+                    BodyPart& m = B.ball(Frame{}.translated(p), R * l.r * z.sz, 0.9f, 1.0f, hairC);
+                    m.hangs = t > 0.15f;  // (by the temple: with the head)
+                    m.material = Material::Hair;
+                    m.strands = kStrandsCoils;
+                }
+            }
+            // The back: two columns down to the tips.
+            for (int row = 0; row < 3; ++row) {
+                const float y = (-0.4f - 0.8f * float(row)) * ys;
+                const float t = std::clamp((-y + 0.3f) / (drop + 0.5f), 0.0f, 1.0f);
+                for (int side = 0; side < 2; ++side) {
+                    const float sx = side == 0 ? 1.0f : -1.0f;
+                    const float back = -0.8f - (0.25f + 0.12f * float(row)) * z.w;
+                    const V3 p = onCurtain({sx * 0.45f, y, back}, t, drop, c);
+                    BodyPart& m = B.ball(Frame{}.translated(p), R * (0.85f - 0.06f * float(row)) * z.sz, 1.0f, 0.85f, hairC);
+                    m.hangs = true;
+                    m.material = Material::Hair;
+                    m.strands = kStrandsCoils;
+                }
+            }
+            // Smaller curls breaking up the outline round the sides and the bottom.
+            for (int i = 0; i < z.small; ++i) {
+                const float f = (float(i) + 0.5f) / float(z.small);
+                const float sx = f < 0.5f ? 1.0f : -1.0f;
+                const float g = f < 0.5f ? f * 2 : (f - 0.5f) * 2;  // 0 top .. 1 bottom on each side
+                const float y = 0.35f - (0.35f + 2.2f * ys) * g;
+                const float lowY = -0.3f * ys;
+                const float out = (y > lowY ? 1.25f : 1.5f + 0.35f * std::min(1.0f, (lowY - y) / (1.2f * ys))) + 0.1f * hash(i);
+                const float t = std::clamp((-y + 0.3f) / (drop + 0.5f), 0.0f, 1.0f);
+                const V3 p = onCurtain({sx * outX(out, 1.05f), y, -0.55f + fwd - 0.2f * hash(i + 9)}, t, drop, c);
+                BodyPart& b2 = B.ball(Frame{}.translated(p), R * (0.3f + 0.08f * hash(i + 21)) * (0.55f + 0.45f * z.sz), 1, 1, hairC);
+                b2.hangs = t > 0.15f;
+                b2.material = Material::Hair;
+                b2.strands = kStrandsCoils;
             }
             break;
         }
@@ -1560,6 +2169,8 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
     out.face.lipstick = look.lips.has_value();
     if (look.lips) out.face.lips = *look.lips;
     out.rootFloor = B.world(body.point({pose.hip.x, 0, pose.hip.z}));
+    out.ground = clampf(pose.ground, 0, 1);
+    out.size = scale;
     // The top of the head, hair and hat: each part's highest point (its ends' spheres, stretched across the axis).
     out.headTop = out.headCenter.y;
     for (std::size_t i = headBegin; i < out.parts.size(); ++i) {
@@ -1568,6 +2179,46 @@ void buildBody(const Look& look, const Skeleton& sk, const DancePose& pose, cons
         const float up = std::sqrt(f.x.y * f.x.y * p.scaleX * p.scaleX + f.y.y * f.y.y + f.z.y * f.z.y * p.scaleZ * p.scaleZ);
         out.headTop = std::max({out.headTop, f.o.y + p.r0 * up, f.o.y + f.y.y * p.len + p.r1 * up});
     }
+}
+
+HeadExtent headExtent(const Look& look, const Skeleton& sk) {
+    // Built at rest: every part from the head on that doesn't hang (BodyPart::hangs: left to the hair sim). Short
+    // locks that swing a little count where they rest.
+    const DancePose rp = restPose(sk);
+    BodyOut a;
+    buildBody(look, sk, rp, Frame{}, 1.0f, a);
+    const Frame head = headFrame(sk, rp);
+    const float R = sk.headR;
+    std::vector<V3> pts;
+    for (std::size_t i = a.headBegin; i < a.parts.size(); ++i) {
+        const BodyPart& q = a.parts[i];
+        if (q.hangs) continue;
+        forSurface(q, [&](V3 l) {
+            if (l.x * q.clip[0] + l.y * q.clip[1] + l.z * q.clip[2] > q.clip[3] ||
+                l.x * q.clip2[0] + l.y * q.clip2[1] + l.z * q.clip2[2] > q.clip2[3])
+                return;  // cut away
+            const V3 w = q.frame.o + q.frame.x * (l.x * q.scaleX) + q.frame.y * l.y + q.frame.z * (l.z * q.scaleZ);
+            const V3 d = w - head.o;
+            const V3 h{dot(d, head.x), dot(d, head.y), dot(d, head.z)};
+            if (length(h) > 1.02f * R) pts.push_back(h);  // (the head ball itself groundPose knows)
+        });
+    }
+    // The farthest out in each of kMax directions (spread evenly round the sphere), each point once.
+    HeadExtent e;
+    if (pts.empty()) return e;
+    for (int k = 0; k < HeadExtent::kMax; ++k) {
+        const float y = 1 - 2 * (float(k) + 0.5f) / float(HeadExtent::kMax), r = std::sqrt(std::max(0.0f, 1 - y * y));
+        const float ang = 2.39996323f * float(k);
+        const V3 dir{r * std::cos(ang), y, r * std::sin(ang)};
+        std::size_t best = 0;
+        for (std::size_t i = 1; i < pts.size(); ++i)
+            if (dot(pts[i], dir) > dot(pts[best], dir)) best = i;
+        if (dot(pts[best], dir) <= 1.02f * R) continue;  // no further out than the head this way
+        bool dup = false;
+        for (int j = 0; j < e.n; ++j) dup = dup || length(e.pts[j] - pts[best]) < 1e-6f;
+        if (!dup) e.pts[e.n++] = pts[best];
+    }
+    return e;
 }
 
 }  // namespace reforce::engine::dance

@@ -16,6 +16,11 @@ Peter's hand-gridded DJ library. Plan item: PLAN.md 5J.12. Status 2026-11-16: ki
 - After a finished change: tests (`ctest --test-dir build -j4`), then `scripts/install-app.sh`, no need to ask.
 - Live latency: `reforce.BeatClock.AudioOffsetMs` = 10 (the detector's own delay); Peter's Beat offset nudge
   (top bar, `reforce.BeatClock.OffsetMs`) was ~45 ms before the one-step fix, ~52 ms expected after it.
+- Measured 2026-11-27 (top bar **Flash** + `scripts/av-sync-check.py`, docs/usage.md "Sync test flash"): in the
+  room (phone video from the listening spot, `--local --reference OBS.mov`) the Beat offset is right at **+55 ms**
+  (±10 ms clip to clip). The OBS stream's DDJ-1000 Loopback audio lags the room by ~190 ms, so at +45 the Syphon
+  visuals were 167 ms early there; OBS Render Delay 210 ms on the Syphon Client source (= 5 frames at 30 fps: OBS
+  rounds down, 177 ms gave 4) brought the stream to +4 ms. Beat offset changes move the stream 1:1.
 
 ## 2. How it works
 

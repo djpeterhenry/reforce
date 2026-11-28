@@ -190,12 +190,21 @@ Visualizer::Visualizer(MTL::Device* device, const VisualizerOptions& opts)
             const std::string settings = engine::defaultSettingsPath();
             guestBook_ = std::make_unique<web::GuestBook>(settings.substr(0, settings.find_last_of('/') + 1) + "Guests");
         }
-        if (opts.network) {
+        if (!opts.guestsTestUrl.empty()) {
+            // A test service (--guests-url): its own, remembering nothing between runs.
+            guestsTest_ = true;
+            guestsOn_ = true;
+            guestsUrl_ = opts.guestsTestUrl;
+            guestsKey_ = opts.guestsTestKey;
+            guestFeed_ = std::make_unique<web::GuestFeed>("");
+            guestFeed_->configure(guestsOn_, guestsUrl_, 1.0, guestsKey_);
+            rlog("[reforce] stream guests from the test service %s (nothing saved)\n", guestsUrl_.c_str());
+        } else if (opts.network) {
             // Remembers which check-ins were handed over (next to settings.json): a restart never repeats them.
             const std::string settings = engine::defaultSettingsPath();
             guestFeed_ = std::make_unique<web::GuestFeed>(settings.substr(0, settings.find_last_of('/') + 1) +
                                                           "guests-seen.txt");
-            guestFeed_->configure(guestsOn_, guestsUrl_, 5.0, guestsKey_);
+            guestFeed_->configure(guestsOn_, guestsUrl_, 1.0, guestsKey_);
         }
         danceRandom_ = opts.prefs.dancerRandomStyles;
         danceLighting_ = opts.prefs.dancerLighting;
@@ -204,6 +213,8 @@ Visualizer::Visualizer(MTL::Device* device, const VisualizerOptions& opts)
         danceHeight_ = opts.prefs.dancerHeight;
         danceHuman_ = opts.prefs.dancerHuman;
         danceMocap_ = opts.prefs.dancerMocap;
+        danceHair_ = opts.prefs.dancerHair;
+        danceLongHair_ = opts.prefs.dancerLongHair;
         danceMaxLive_ = opts.prefs.dancerMaxLive;
         dancerTestsPending_ = opts.dancerTests;
         // Test hook (--solid-test): one target slot each, up to reforce.Object.MaxLive + 1.

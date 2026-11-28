@@ -2,7 +2,7 @@
 // reforce extension: stream guests (docs/dancers-design.md "Stream guests").
 //
 // Viewers sign up once on a guest page (a name and a dancer look) and tap "I'm here" while watching. A guest service,
-// separate from reforce, keeps the check-ins; GuestFeed polls its /api/checkins every few seconds on its own thread,
+// separate from reforce, keeps the check-ins; GuestFeed polls its /api/checkins every second on its own thread,
 // and the Visualizer puts each new guest on the dance floor with their name tag (reforce.Guests.*). The protocol is
 // in docs/guests.md.
 //
@@ -36,11 +36,41 @@ struct GuestMessage {
     std::string text;  // UTF-8, control characters removed
 };
 
-// One poll of /api/checkins: new arrivals and messages, and the service's newest seqs.
+// How a guest on stage wants to dance (set on the guest page; docs/guests.md "Social").
+struct GuestSocial {
+    std::string id;
+    std::string vibe;  // "solo" | "mingle" | "crew" ("" or anything else: mingle)
+    std::string with;  // the guest they want to dance with ("" = nobody in particular)
+};
+
+// A one-off request from a guest on the floor (docs/guests.md "requests"): `kind` "bust" (Bust a move: two whole
+// break routines with floor work, 32 bars). Unknown kinds are kept and ignored by the stage.
+struct GuestRequest {
+    std::int64_t seq = 0;
+    std::string id;    // the guest
+    std::string kind;
+};
+
+// Where a guest's "Bust a move" stands (docs/guests.md "bust"), sent with every poll for the guests on stage that
+// have one (none: left out), so the guest page can show it.
+struct GuestBust {
+    enum class State { Waiting, Room, On };  // for its 8-bar point / put off, making room / busting
+    std::string id;
+    State state = State::Waiting;
+    double seconds = -1;  // until it starts (Waiting, Room) or ends (On); < 0 unknown
+};
+// The &bust= value: "ID:wait:12,ID:room:20,ID:on:57" (whole seconds, left out when unknown; ids percent-encoded
+// like &floor=).
+std::string bustParam(const std::vector<GuestBust>& busts);
+
+// One poll of /api/checkins: new arrivals, messages and requests, and the service's newest seqs.
 struct GuestPoll {
     std::vector<GuestArrival> arrivals;
     std::vector<GuestMessage> messages;
-    std::int64_t latest = -1, msgLatest = -1;
+    std::vector<GuestSocial> social;  // the guests on the floor (and arriving), when the service sent "social"
+    bool hasSocial = false;
+    std::vector<GuestRequest> requests;  // (a service without them sends none: nothing happens)
+    std::int64_t latest = -1, msgLatest = -1, reqLatest = -1;
 };
 std::optional<GuestPoll> parseGuestPoll(std::string_view json, std::string* error = nullptr);
 
@@ -71,12 +101,21 @@ public:
     // Poll `baseUrl` (no trailing /api) every `interval` seconds while on; "" or off stops polling. Check-ins from the
     // last few hours that were never handed over (guests who tapped before the stream started) come first. `key`:
     // the service's read key, sent as a bearer token ("" = none).
-    void configure(bool on, const std::string& baseUrl, double interval = 5.0, const std::string& key = "");
+    void configure(bool on, const std::string& baseUrl, double interval = 1.0, const std::string& key = "");
+    // The guests on stage now (their ids), sent with every poll as &floor=ID,ID (the service shows them on its page
+    // and answers with their social settings). Any thread.
+    void setFloor(const std::vector<std::string>& ids);
+    // Their busts (bustParam), sent with every poll as &bust= (an empty one too: the service learns this reforce
+    // reports them). Any thread.
+    void setBusts(const std::vector<GuestBust>& busts);
     // New arrivals and messages since the last call, together (a message's guest arrives in the same batch or
     // earlier). Any thread.
     struct Batch {
         std::vector<GuestArrival> arrivals;
         std::vector<GuestMessage> messages;
+        std::vector<GuestSocial> social;  // the latest social settings (when hasSocial)
+        bool hasSocial = false;
+        std::vector<GuestRequest> requests;
     };
     Batch take();
     // For the panel: "" before the first poll, "ok", or the last error.
@@ -91,11 +130,16 @@ private:
     bool on_ = false, stop_ = false;
     std::string url_;
     std::string key_;
-    double interval_ = 5.0;
+    double interval_ = 1.0;
+    std::string floor_;  // "ID,ID" (URL-safe)
+    std::string busts_;  // bustParam (URL-safe)
     std::uint64_t generation_ = 0;  // bumped when the URL changes: the next poll starts from what is remembered
     std::string memoryPath_;
     std::vector<GuestArrival> pending_;
     std::vector<GuestMessage> pendingMessages_;
+    std::vector<GuestRequest> pendingRequests_;
+    std::vector<GuestSocial> social_;
+    bool socialFresh_ = false;
     std::string status_;
     std::atomic<int> total_{0};
     std::thread thread_;

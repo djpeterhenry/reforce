@@ -94,18 +94,6 @@ std::vector<std::pair<float, float>> stageSlots(int n, const StageCamera& cam) {
     return out;
 }
 
-const char* socialModeName(SocialMode m) {
-    switch (m) {
-        case SocialMode::Show: return "show";
-        case SocialMode::Partner: return "partners";
-        case SocialMode::Call: return "call & response";
-        case SocialMode::Side: return "face to face";
-        case SocialMode::Cypher: return "cypher";
-        case SocialMode::Mingle: return "mingling";
-    }
-    return "?";
-}
-
 namespace {
 std::uint32_t mix32(std::uint32_t x) {
     x ^= x >> 16;
@@ -131,183 +119,6 @@ float yawTowards(float x, float z, float tx, float tz) {
 }
 }  // namespace
 
-SocialMode pickSocialMode(const std::string& setting, int dancers, long segment, std::uint32_t seed) {
-    if (setting == "mingle") return SocialMode::Mingle;
-    if (setting == "off" || dancers < 2) return SocialMode::Show;
-    if (setting == "partners") return SocialMode::Partner;
-    if (setting == "call") return SocialMode::Call;
-    if (setting == "facing") return SocialMode::Side;
-    if (setting == "cypher") return dancers >= 3 ? SocialMode::Cypher : SocialMode::Call;
-    auto hashOf = [&](long seg) { return seed * 0x9e3779b9U + std::uint32_t(seg) * 0x85ebca6bU; };
-    const std::uint32_t h = hashOf(segment);
-    // Auto: a third of the draws are "show", but never two show segments in a row (about 3/4 of the time social).
-    const bool drawShow = unit32(h) >= 0.65f, prevDrawShow = unit32(hashOf(segment - 1)) >= 0.65f;
-    if (setting != "always" && drawShow && !prevDrawShow) return SocialMode::Show;
-    const float u = unit32(h + 1), v = unit32(h + 2);
-    if (dancers >= 3 && u < 0.3f) return SocialMode::Cypher;
-    return v < 0.4f ? SocialMode::Partner : v < 0.75f ? SocialMode::Call : SocialMode::Side;
-}
-
-std::vector<std::pair<float, float>> scatterSpots(int n, const StageCamera& cam, double bar, std::uint32_t seed,
-                                                  float minDist, int people) {
-    std::vector<std::pair<float, float>> p(std::size_t(std::max(0, n)));
-    if (n <= 0) return p;
-    if (people < 0) people = n;
-    // Room: most of the visible width (less for few people, so they stay near the middle), the floor's depth.
-    const float W = float(cam.halfWidth) * std::min(0.92f, 0.35f + 0.11f * float(people));
-    for (int k = 0; k < n; ++k) {
-        // Each wanders on its own schedule: a new spot every 3-5 bars, offset per person.
-        const float every = 3.0f + 2.0f * unit32(seed * 31u + std::uint32_t(k) * 7919u);
-        const double shifted = bar + double(k) * 1.37;
-        const auto period = std::uint32_t(std::max(0.0, std::floor(shifted / every)));
-        const std::uint32_t h = seed * 0x9e3779b9U ^ (std::uint32_t(k) * 0x85ebca6bU) ^ (period * 0xc2b2ae35U);
-        float z = cam.floorBack + 0.1f + unit32(h + 1) * (kFloorZMax - cam.floorBack - 0.15f);
-        float x = (unit32(h) * 2 - 1) * W * floorWiden(cam, z);  // the floor is wider further back
-        // ... and drifts a little all the time.
-        const float ph = 6.2831853f * unit32(h + 2);
-        x += 0.07f * std::sin(float(bar) * 0.45f + ph);
-        z += 0.05f * std::sin(float(bar) * 0.33f + ph * 1.7f);
-        p[std::size_t(k)] = {x, z};
-    }
-    // Push apart anyone closer than minDist (deterministic relaxation), keep inside the room.
-    for (int it = 0; it < 24; ++it) {
-        bool moved = false;
-        for (int i = 0; i < n; ++i)
-            for (int j = i + 1; j < n; ++j) {
-                auto& a = p[std::size_t(i)];
-                auto& b = p[std::size_t(j)];
-                float dx = b.first - a.first, dz = (b.second - a.second) * 0.5f;  // depth counts half
-                float d = std::sqrt(dx * dx + dz * dz);
-                if (d >= minDist) continue;
-                if (d < 1e-4f) {
-                    dx = 1;
-                    dz = 0;
-                    d = 1;
-                }
-                const float push = (minDist - d) * 0.5f / d;
-                a.first -= dx * push;
-                a.second -= dz * push;
-                b.first += dx * push;
-                b.second += dz * push;
-                moved = true;
-            }
-        for (auto& q : p) {
-            q.second = std::clamp(q.second, cam.floorBack, kFloorZMax);
-            const float wx = float(cam.halfWidth) * 0.92f * floorWiden(cam, q.second);  // as the spots: wider at the back
-            q.first = std::clamp(q.first, -wx, wx);
-        }
-        if (!moved) break;
-    }
-    return p;
-}
-
-std::vector<StageSpot> planStage(int n, const StageCamera& cam, SocialMode mode, double bar, std::uint32_t seed) {
-    std::vector<StageSpot> out(std::size_t(std::max(0, n)));
-    if (n <= 0) return out;
-    const auto turn = long(std::floor(std::max(0.0, bar) / 2.0));  // whose turn: every 2 bars
-    if (mode == SocialMode::Show || mode == SocialMode::Mingle || n < 2) {  // Mingle: engine::Mingle plans it
-        const auto spots = scatterSpots(n, cam, bar, seed, 0.75f);
-        for (int k = 0; k < n; ++k) {
-            StageSpot& s = out[std::size_t(k)];
-            s.x = spots[std::size_t(k)].first;
-            s.z = spots[std::size_t(k)].second;
-            // Mostly towards the audience, each turned a little their own way (changing every few bars).
-            const auto period = std::uint32_t(std::max(0.0, std::floor((bar + k * 2.1) / 4.0)));
-            s.facing = -s.x * 0.1f + 0.45f * (unit32(seed ^ (std::uint32_t(k) * 0x27d4eb2fU) ^ (period * 0x165667b1U)) - 0.5f);
-        }
-        return out;
-    }
-    if (mode == SocialMode::Cypher) {
-        const int solo = int(turn % n);
-        const int m = n - 1;
-        const float sx = 0, sz = 0.2f;
-        const float rx = std::min(0.85f * float(cam.halfWidth), 0.42f * float(m) + 0.2f);
-        int k = 0;
-        for (int i = 0; i < n; ++i) {
-            StageSpot& s = out[std::size_t(i)];
-            if (i == solo) {
-                s.x = sx;
-                s.z = sz;
-                s.role = "solo";
-                continue;
-            }
-            const float a = m == 1 ? 0.0f : -1.05f + 2.1f * float(k) / float(m - 1);
-            ++k;
-            const float wob = 6.2831853f * unit32(seed + std::uint32_t(i) * 101u);
-            s.x = rx * std::sin(a) + 0.05f * std::sin(float(bar) * 0.5f + wob);
-            s.z = -0.4f - 0.45f * std::cos(a) + 0.04f * std::sin(float(bar) * 0.37f + wob * 1.3f);
-            s.facing = yawTowards(s.x, s.z, sx, sz);
-            s.react = true;
-            s.other = solo;
-            s.look = 0.15f * (sx > s.x ? 1.0f : -1.0f);
-            s.role = "cheering";
-        }
-        return out;
-    }
-    // Pairs (and a trio for an odd count), groups left to right.
-    std::vector<std::vector<int>> groups;
-    int i = 0;
-    while (i < n) {
-        const int size = (n - i == 3) ? 3 : 2;
-        std::vector<int> g;
-        for (int j = 0; j < size && i < n; ++j) g.push_back(i++);
-        groups.push_back(g);
-    }
-    if (groups.back().size() == 1) groups[groups.size() - 2].push_back(groups.back()[0]), groups.pop_back();
-    // Groups mill around too (scattered, far enough apart that pairs read as pairs), each at its own tilt.
-    const auto centers = scatterSpots(int(groups.size()), cam, bar, seed ^ 0xabcdu, 1.25f, n);
-    for (std::size_t gi = 0; gi < groups.size(); ++gi) {
-        const auto& g = groups[gi];
-        const float cx = centers[gi].first, cz = centers[gi].second;
-        const float half = 0.25f;
-        // Places: a pair side by side; a trio adds one at the back. Turned by the group's tilt (every 4 bars).
-        std::vector<std::pair<float, float>> local = {{-half, 0.0f}, {half, 0.0f}};
-        if (g.size() == 3) local = {{-0.31f, 0.1f}, {0.31f, 0.1f}, {0.0f, -0.27f}};
-        const auto tp = std::uint32_t(std::max(0.0, std::floor((bar + double(gi) * 1.9) / 4.0)));
-        const float tilt = 0.75f * (unit32(seed * 13u + std::uint32_t(gi) * 977u + tp * 7717u) * 2 - 1);
-        std::vector<std::pair<float, float>> place;
-        for (const auto& l : local)
-            place.push_back({cx + l.first * std::cos(tilt) - l.second * std::sin(tilt),
-                             std::clamp(cz + l.first * std::sin(tilt) + l.second * std::cos(tilt), cam.floorBack, kFloorZMax)});
-        float mx = 0, mz = 0;
-        for (const auto& p : place) {
-            mx += p.first / float(place.size());
-            mz += p.second / float(place.size());
-        }
-        const int caller = g[std::size_t(turn % long(g.size()))];
-        for (std::size_t j = 0; j < g.size(); ++j) {
-            StageSpot& s = out[std::size_t(g[j])];
-            s.x = place[j].first;
-            s.z = place[j].second;
-            // Face the partner (a pair) or the middle of the trio.
-            const float tx = g.size() == 2 ? place[1 - j].first : mx, tz = g.size() == 2 ? place[1 - j].second : mz;
-            s.facing = yawTowards(s.x, s.z, tx, tz);
-            s.other = g.size() == 2 ? g[1 - j] : g[(j + 1) % g.size()];
-            s.look = 0.12f * (tx > s.x ? 1.0f : tx < s.x ? -1.0f : 0.0f);
-            switch (mode) {
-                case SocialMode::Partner:
-                    s.leader = g[0];
-                    s.mirror = j == 1;
-                    s.role = "with";
-                    break;
-                case SocialMode::Call:
-                    if (g[j] == caller) {
-                        s.facing *= 0.5f;  // half towards the audience: showing off to both
-                        s.role = "showing";
-                        s.other = g[(j + 1) % g.size()];
-                    } else {
-                        s.react = true;
-                        s.other = caller;
-                        s.role = "watching";
-                    }
-                    break;
-                default: s.role = "facing"; break;
-            }
-        }
-    }
-    return out;
-}
-
 // ---- mingle (Peter, 2026-11-20): each dancer on their own clock, groups that form and break up.
 namespace {
 float rnd(std::uint32_t& s) {
@@ -320,9 +131,43 @@ float screenDist(float ax, float az, float bx, float bz) {
     const float dx = bx - ax, dz = (bz - az) * 0.5f;
     return std::sqrt(dx * dx + dz * dz);
 }
-float groupRadius(std::size_t n) { return n <= 2 ? 0.26f : n == 3 ? 0.34f : 0.4f; }
+// Round a group: neighbors at least kGroupGap apart (a pair face to face; 3+ round the horseshoe, kHorseshoe either
+// side of its back). Arms reach about 0.48 from a dancer's axis (Peter, 2026-11-27: arms went into neighbors at the
+// old 0.52 / 0.54 / 0.46 gaps).
+constexpr float kGroupGap = 0.62f, kHorseshoe = 1.85f;
+float groupRadius(std::size_t n) {
+    if (n <= 2) return 0.5f * kGroupGap;
+    return std::max(0.5f * kGroupGap, kGroupGap / (2.0f * std::sin(kHorseshoe / float(n - 1))));
+}
 constexpr std::size_t kMaxGroup = 4;
+constexpr std::size_t kMaxGroupWith = 6;  // a group grows past kMaxGroup only for someone who picked a member
 }  // namespace
+
+std::optional<MingleVibe> parseMingleVibe(std::string_view s) {
+    if (s == "mingle" || s.empty()) return MingleVibe::Mingle;
+    if (s == "solo" || s == "alone") return MingleVibe::Solo;
+    if (s == "crew" || s == "group") return MingleVibe::Crew;
+    return std::nullopt;
+}
+
+float Mingle::sociable(const Agent& a) const {
+    return a.vibe == MingleVibe::Solo ? 0.0f : a.vibe == MingleVibe::Crew ? 1.0f : kPersonality.sociable;
+}
+
+bool Mingle::together(std::uint64_t a, std::uint64_t b) const {
+    int ga = 0, gb = 0;
+    for (const auto& x : agents_) {
+        if (x.id == a) ga = x.group;
+        if (x.id == b) gb = x.group;
+    }
+    return ga && ga == gb;
+}
+
+std::uint64_t Mingle::watching(std::uint64_t id) const {
+    for (const auto& a : agents_)
+        if (a.id == id) return a.act == Act::Watch ? a.target : 0;
+    return 0;
+}
 
 void Mingle::clear() {
     agents_.clear();
@@ -352,12 +197,12 @@ int Mingle::groupSize(std::uint64_t id) const {
 
 Mingle::Traits Mingle::traits(std::uint64_t id) const {
     for (const auto& a : agents_)
-        if (a.id == id) return a.tr;
-    return {};
+        if (a.id == id) return kPersonality;
+    return {0, 0, 0};
 }
 
 float Mingle::roomHalfWidth(const StageCamera& cam) const {
-    // As scatterSpots: most of the visible width (less for few people, so they stay near the middle).
+    // Most of the visible width (less for few people, so they stay near the middle).
     return float(cam.halfWidth) * std::min(0.92f, 0.35f + 0.11f * float(agents_.size()));
 }
 
@@ -374,6 +219,7 @@ std::pair<float, float> Mingle::pickSpot(Agent& a, const StageCamera& cam, bool 
         for (const auto& o : agents_) {
             if (o.id == a.id) continue;
             clear = std::min({clear, screenDist(x, z, o.x, o.z), screenDist(x, z, o.outX, o.outZ)});
+            if (o.room > 0) clear = std::min(clear, std::hypot(x - o.ax, z - o.az) - o.room * o.reach.max);
         }
         for (const auto& g : groups_) clear = std::min(clear, screenDist(x, z, g.cx, g.cz) - groupRadius(g.members.size()));
         const float walk = std::hypot(x - a.x, z - a.z);
@@ -450,10 +296,74 @@ void Mingle::layout(Group& g) {
     }
 }
 
+float Mingle::clearPad(const Agent& a) const {
+    // The air kept round a floor move's reach: more the longer they wait for room (Peter, 2026-11-27: never give up,
+    // clear it more firmly): up to 0.35 more after about 9 s.
+    return kFloorClear + std::min(0.35f, 0.04f * a.waitT);
+}
+
+bool Mingle::mayGoDown(const Agent& a) const {
+    // Never while walking: on their own spot, showing off, busting a move, or in a pair or group (the others make room
+    // and watch: Peter, 2026-11-27); never inside the room someone else on the floor has (they step out first).
+    if (!a.anchored)
+        for (const auto& o : agents_)
+            if (o.id != a.id && o.anchored &&
+                (std::hypot(a.x - o.ax, a.z - o.az) < floorNeed(o.reach, o.floorFacing, a.x - o.ax, a.z - o.az, kFloorClear) ||
+                 (a.floor && std::hypot(a.x - o.ax, a.z - o.az) < floorNeed(a.reach, 0, o.ax - a.x, o.az - a.z, kFloorKeep))))
+                return false;
+    if (a.bustMove) return true;
+    if (a.act == Act::Solo || a.act == Act::Show) return true;
+    if (a.act != Act::Group) return false;
+    for (const auto& g : groups_) {
+        if (g.id != a.group) continue;
+        if (g.floorId) return g.floorId == a.id;  // (one at a time in a group: whoever has waited longest next)
+        for (const auto& m : agents_)
+            if (m.id != a.id && m.group == a.group && m.floor == 1 && m.wantT > a.wantT) return false;
+        return true;
+    }
+    return false;
+}
+
+float Mingle::pickFloorFacing(const Agent& a) const {
+    // The turn with the most room for the move's reach (the neighbors inside it, by how far), towards the audience
+    // when it's close; a head-first move (face down towards the front) hardly turned away from the camera.
+    const float most = a.reach.headFirst ? 0.25f : 0.6f;
+    float best = 0, bestScore = -1e9f;
+    for (int i = -4; i <= 4; ++i) {
+        const float f = most * float(i) / 4.0f;
+        float inside = 0;
+        for (const auto& o : agents_) {
+            if (o.id == a.id) continue;
+            const float dx = o.x - a.x, dz = o.z - a.z;
+            inside += std::max(0.0f, floorNeed(a.reach, f, dx, dz, kFloorClear) - std::hypot(dx, dz));
+        }
+        const float score = -inside - 0.15f * std::fabs(f) + (i == 0 ? 0.01f : 0.0f);
+        if (score > bestScore) {
+            bestScore = score;
+            best = f;
+        }
+    }
+    return best;
+}
+
 void Mingle::decide(Agent& a, const StageCamera& cam, double beat) {
-    const float soc = a.tr.sociable, rest = a.tr.restless;
+    const float soc = sociable(a), rest = kPersonality.restless * (a.vibe == MingleVibe::Crew ? 0.3f : 1.0f);
     if (a.group) {
-        // Time to move on: wander off, or straight over to someone else (the sociable ones).
+        // Stay: Crew always, with whoever they picked, and (mostly) with someone who picked them.
+        bool stay = a.vibe == MingleVibe::Crew;
+        if (const Group* g = findGroup(a.group)) {
+            for (const auto id : g->members) {
+                if (id == a.id) continue;
+                const Agent* m = find(id);
+                if (id == a.with) stay = true;
+                if (m && m->with == a.id && a.vibe != MingleVibe::Solo && rnd(a.rng) < 0.8f) stay = true;
+            }
+        }
+        if (stay) {
+            a.until = clock_ + (std::ceil(beat) - beat) + std::round(rndIn(a.rng, 4.0f, 8.0f) * 4.0f);
+            return;
+        }
+        // Time to move on: wander off.
         leaveGroup(a, beat);
         const auto s = pickSpot(a, cam, false);
         a.sx = s.first;
@@ -467,12 +377,14 @@ void Mingle::decide(Agent& a, const StageCamera& cam, double beat) {
     }
     // Who could be joined, watched.
     std::vector<std::pair<float, Agent*>> free, showing;
+    const bool crew = a.vibe == MingleVibe::Crew, solo = a.vibe == MingleVibe::Solo;
     for (auto& o : agents_) {
-        if (o.id == a.id || o.approachedBy) continue;
+        if (o.id == a.id || o.approachedBy || (o.vibe == MingleVibe::Solo && !o.bustMove)) continue;
+        if (o.floor || o.bustMove) continue;  // (going down or on the floor: nobody walks over)
         const float d = std::hypot(o.x - a.x, o.z - a.z);
-        if (d > 2.4f) continue;
-        if (o.act == Act::Solo || o.act == Act::Show || o.act == Act::Wander || o.act == Act::Rest)
-            free.push_back({(0.4f + o.tr.sociable) / (0.3f + d), &o});
+        if (d > (crew ? 1e9f : 2.4f)) continue;
+        if (!o.bustMove && (o.act == Act::Solo || o.act == Act::Show || o.act == Act::Wander || o.act == Act::Rest))
+            free.push_back({(0.4f + kPersonality.sociable) / (0.3f + d), &o});
         if (o.act == Act::Show) {
             int watchers = 0;
             for (const auto& w : agents_) watchers += w.act == Act::Watch && w.target == o.id;
@@ -483,9 +395,33 @@ void Mingle::decide(Agent& a, const StageCamera& cam, double beat) {
     for (auto& g : groups_) {
         std::size_t pending = 0;
         for (const auto& w : agents_) pending += w.act == Act::Seek && w.targetGroup == g.id;
-        if (g.members.size() + pending >= kMaxGroup) continue;
+        if (g.members.size() + pending >= kMaxGroup || g.floorId) continue;
         const float d = std::hypot(g.cx - a.x, g.cz - a.z);
-        if (d < 2.6f) open.push_back({1.0f / (0.4f + d), &g});
+        // Crew: the biggest group with room, anywhere (the nearest of those).
+        if (crew) open.push_back({float(g.members.size()) * 100.0f - d, &g});
+        else if (d < 2.6f) open.push_back({1.0f / (0.4f + d), &g});
+    }
+    if (crew && !solo) {
+        if (!open.empty()) {
+            a.targetGroup = std::max_element(open.begin(), open.end(),
+                                             [](const auto& x, const auto& y) { return x.first < y.first; })->second->id;
+            a.target = 0;
+            enter(a, Act::Seek, 8, beat);
+            return;
+        }
+        if (!free.empty()) {  // nobody in a group yet: the nearest (free holds closeness x sociability)
+            Agent* o = std::max_element(free.begin(), free.end(),
+                                        [](const auto& x, const auto& y) { return x.first < y.first; })->second;
+            a.target = o->id;
+            o->approachedBy = a.id;
+            if (o->act == Act::Wander) {
+                o->sx = o->x;
+                o->sz = o->z;
+                o->act = Act::Solo;
+            }
+            enter(a, Act::Seek, 8, beat);
+            return;
+        }
     }
     auto pickOne = [&](auto& v) {
         float sum = 0;
@@ -495,15 +431,15 @@ void Mingle::decide(Agent& a, const StageCamera& cam, double beat) {
             if ((r -= c.first) <= 0) return c.second;
         return v.back().second;
     };
-    const float wSeek = free.empty() ? 0 : 0.25f + 1.1f * soc;
-    const float wJoin = open.empty() ? 0 : 0.15f + 0.6f * soc;
-    const float wWatch = showing.empty() ? 0 : 0.3f + 0.6f * soc;
+    const float wSeek = free.empty() || solo ? 0 : 0.25f + 1.1f * soc;
+    const float wJoin = open.empty() || solo ? 0 : 0.15f + 0.6f * soc;
+    const float wWatch = showing.empty() || solo ? 0 : 0.3f + 0.6f * soc;
     const float wWander = 0.3f + 0.7f * rest;
     const float wRest = 0.12f * (1.3f - rest);
-    const float wShow = 0.08f + 0.45f * a.tr.showy;
+    const float wShow = 0.08f + 0.45f * kPersonality.showy;
     const float wSolo = 0.3f;
     float r = rnd(a.rng) * (wSeek + wJoin + wWatch + wWander + wRest + wShow + wSolo);
-    const float stay = 1.35f - 0.7f * rest;  // the restless move on sooner
+    const float stay = 1.35f - 0.7f * rest;  // (Crew: less restless, they stay longer)
     if ((r -= wSeek) < 0) {
         Agent* o = pickOne(free);
         a.target = o->id;
@@ -530,7 +466,7 @@ void Mingle::decide(Agent& a, const StageCamera& cam, double beat) {
         a.target = o->id;
         // Stand in front of them, a little to the side we come from.
         const float side = a.x >= o->x ? 1.0f : -1.0f;
-        a.sx = o->x + side * 0.5f;
+        a.sx = o->x + side * kGroupGap;
         a.sz = std::clamp(o->z + 0.18f, cam.floorBack, kFloorZMax);
         enter(a, Act::Watch, rndIn(a.rng, 1.5f, 4.0f), beat);
         return;
@@ -559,6 +495,66 @@ void Mingle::decide(Agent& a, const StageCamera& cam, double beat) {
     enter(a, Act::Solo, rndIn(a.rng, 2.0f, 6.0f) * stay, beat);
 }
 
+bool Mingle::keepWith(Agent& a, const StageCamera& cam, double beat) {
+    auto dropSeek = [&]() {
+        if (Agent* o = a.target ? find(a.target) : nullptr; o && o->approachedBy == a.id) o->approachedBy = 0;
+        a.target = 0;
+        a.targetGroup = 0;
+    };
+    Agent* b = a.with ? find(a.with) : nullptr;
+    if (!b) {
+        // Solo: out of any group, not going over to anyone.
+        if (a.vibe != MingleVibe::Solo || !(a.group || a.act == Act::Seek || a.act == Act::Watch)) return false;
+        if (a.group) leaveGroup(a, beat);
+        dropSeek();
+        a.sx = a.x;
+        a.sz = a.z;
+        enter(a, Act::Solo, rndIn(a.rng, 1.0f, 3.0f), beat);
+        return true;
+    }
+    // They want to be alone (and didn't pick us): dance near them, watching, and follow them round.
+    if (b->vibe == MingleVibe::Solo && b->with != a.id) {
+        const bool already = a.act == Act::Watch && a.target == b->id;
+        if (!already) {
+            if (a.group) leaveGroup(a, beat);
+            dropSeek();
+            a.target = b->id;
+            a.nearSide = a.x >= b->x ? 1.0f : -1.0f;  // kept while near them (no flipping as they cross over)
+        }
+        // Everyone near them has their own place round them: either side first, then further out in front (behind
+        // when they are at the front edge). By id, so the places hold still.
+        int k = 0;
+        for (const auto& o : agents_)
+            if (o.id != a.id && o.with == b->id && o.id < a.id && !(b->with == o.id)) ++k;
+        static constexpr float kNear[][2] = {{1.0f, 0.12f}, {-1.0f, 0.12f}, {0.62f, 0.62f}, {-0.62f, 0.62f},
+                                             {1.6f, 0.45f}, {-1.6f, 0.45f}};
+        const auto& slot = kNear[std::size_t(k) % 6];
+        const float depth = b->z + 0.7f > kFloorZMax ? -1.0f : 1.0f;
+        a.sx = b->x + a.nearSide * slot[0] * kGroupGap;
+        a.sz = std::clamp(b->z + depth * slot[1] * kGroupGap, cam.floorBack, kFloorZMax);
+        if (!already) enter(a, Act::Watch, 8, beat);
+        a.until = std::max(a.until, clock_ + 8);
+        return !already;
+    }
+    // With them already, or on the way.
+    if (a.group && a.group == b->group) return false;
+    if (b->anchored || b->bustMove) return false;  // (going down / on the floor: wait for them)
+    if (a.act == Act::Seek && (a.target == b->id || (b->group && a.targetGroup == b->group))) return false;
+    // Go over to them (or their group).
+    if (a.group) leaveGroup(a, beat);
+    dropSeek();
+    if (b->group) {
+        a.targetGroup = b->group;
+    } else {
+        a.target = b->id;
+        if (!b->approachedBy) b->approachedBy = a.id;
+        b->glanceAt = a.id;
+        b->glanceUntil = t_ + 1.5;
+    }
+    enter(a, Act::Seek, 16, beat);
+    return false;  // (the Seek below starts walking this frame)
+}
+
 std::vector<StageSpot> Mingle::plan(const std::vector<MinglePerson>& people, const StageCamera& cam, double beat,
                                     double dt, std::uint32_t seed) {
     // Our own clock in beats: follows the music, but a jump (a new track, the clock re-locking) doesn't strand
@@ -580,9 +576,6 @@ std::vector<StageSpot> Mingle::plan(const std::vector<MinglePerson>& people, con
             a = &agents_.back();
             a->id = p.id;
             a->rng = mix32(seed ^ std::uint32_t(p.id * 0x9e3779b97f4a7c15ULL >> 32)) | 1u;
-            a->tr.sociable = rnd(a->rng);
-            a->tr.restless = rnd(a->rng);
-            a->tr.showy = rnd(a->rng);
             a->x = p.x;
             a->z = p.z;
             a->outX = p.x;
@@ -596,6 +589,7 @@ std::vector<StageSpot> Mingle::plan(const std::vector<MinglePerson>& people, con
             a->sz = a->z;
             a->tilt = 0.45f * (rnd(a->rng) - 0.5f);
             a->nextGlance = t_ + rndIn(a->rng, 1.0f, 4.0f);
+            a->react = rndIn(a->rng, 0.3f, 1.1f);
             enter(*a, Act::Solo, rndIn(a->rng, 0.5f, 3.0f), beat);  // dance a moment where they popped in
         }
         a->seen = true;
@@ -605,6 +599,12 @@ std::vector<StageSpot> Mingle::plan(const std::vector<MinglePerson>& people, con
         }
         a->facing = p.facing;
         a->placed = p.placed;
+        a->vibe = p.bustMove ? MingleVibe::Solo : p.vibe;
+        a->with = p.with != p.id && !p.bustMove ? p.with : 0;
+        a->bustMove = p.bustMove;
+        a->style = p.style;
+        a->floor = p.bustMove ? std::max(1, p.floor) : p.floor;
+        if (a->floor) a->reach = p.reach;
     }
     // Gone: out of their group; whoever was walking over to or watching them changes plans.
     for (auto& a : agents_)
@@ -629,14 +629,108 @@ std::vector<StageSpot> Mingle::plan(const std::vector<MinglePerson>& people, con
     // Each on their own schedule.
     for (std::size_t i = 0; i < agents_.size(); ++i) {
         Agent& a = agents_[i];
+        // Floor work (going down or on the floor, busting a move): held where they are, no new plans until it's over.
+        if (a.floor && a.act == Act::Seek) {  // (stops walking over; never while walking)
+            if (Agent* o = a.target ? find(a.target) : nullptr; o && o->approachedBy == a.id) o->approachedBy = 0;
+            a.target = 0;
+            a.targetGroup = 0;
+            a.sx = a.x;
+            a.sz = a.z;
+            enter(a, Act::Solo, 1, beat);
+        }
+        if (a.floor && a.approachedBy) {  // whoever was walking over waits elsewhere
+            if (Agent* o = find(a.approachedBy); o && o->act == Act::Seek && o->target == a.id) {
+                o->target = 0;
+                o->sx = o->x;
+                o->sz = o->z;
+                enter(*o, Act::Solo, rndIn(o->rng, 1.0f, 3.0f), beat);
+            }
+            a.approachedBy = 0;
+        }
+        // Someone else going down or on the floor in the way (they won't be up for a while; of two waiting, the later
+        // one): not held here; Mingle walks them out of the way first (the last pass below), then holds them again.
+        if (a.anchored && a.floor == 1)
+            for (const auto& o : agents_)
+                if (o.id != a.id && o.anchored && (o.floor == 2 || o.id < a.id)) {
+                    const float dx = o.ax - a.ax, dz = o.az - a.az;
+                    if (std::hypot(dx, dz) < floorNeed(a.reach, a.floorFacing, dx, dz, kFloorKeep)) {
+                        a.anchored = false;
+                        if (Group* g = a.group ? findGroup(a.group) : nullptr; g && g->floorId == a.id) g->floorId = 0;
+                        break;
+                    }
+                }
+        // Their group's floor turn taken (someone else is down, maybe for 16 bars): after 6 s they leave it to go down
+        // on their own.
+        if (a.floor == 1 && a.group && a.wantT > 6)
+            if (const Group* g = findGroup(a.group); g && g->floorId && g->floorId != a.id) {
+                leaveGroup(a, beat);
+                a.sx = a.x;
+                a.sz = a.z;
+                enter(a, Act::Solo, 1, beat);
+            }
+        if (a.floor && !a.anchored && (mayGoDown(a) || a.floor == 2)) {
+            a.anchored = true;
+            a.ax = a.x;
+            a.az = a.z;
+            a.sx = a.x;
+            a.sz = a.z;
+            a.floorFacing = pickFloorFacing(a);
+            if (a.group)
+                if (Group* g = findGroup(a.group); g && !g->floorId) g->floorId = a.id;
+        }
+        if (!a.floor && a.anchored) {
+            a.anchored = false;
+            if (Group* g = a.group ? findGroup(a.group) : nullptr; g && g->floorId == a.id) g->floorId = 0;
+            a.sx = a.x;
+            a.sz = a.z;
+        }
+        if (a.bustMove && !a.group && a.act != Act::Show) {
+            // Busting a move on their own: showing off where they are.
+            a.sx = a.x;
+            a.sz = a.z;
+            enter(a, Act::Show, 8, beat);
+        }
+        if (a.floor) {
+            if (a.act == Act::Wander && !a.anchored) {
+                // (stops where they are: going down never while walking)
+                a.sx = a.x;
+                a.sz = a.z;
+                enter(a, Act::Solo, 1, beat);
+                continue;
+            } else {
+                if (a.act == Act::Rest || a.act == Act::Watch || a.act == Act::Wander || a.act == Act::Seek) {  // dances where they are
+                    a.sx = a.x;
+                    a.sz = a.z;
+                    a.target = 0;
+                    enter(a, Act::Solo, 1, beat);
+                }
+                a.until = std::max(a.until, clock_ + 1);
+                continue;
+            }
+        }
+        if (a.group)  // the group stays round someone going down until they're up again
+            if (const Group* g = findGroup(a.group); g && g->floorId) a.until = std::max(a.until, clock_ + 1);
+        if (keepWith(a, cam, beat)) continue;
         if (a.act == Act::Seek) {
             Agent* o = a.target ? find(a.target) : nullptr;
             Group* g = a.targetGroup ? findGroup(a.targetGroup) : nullptr;
+            if (o && (o->anchored || o->floor)) {  // going down: not now
+                if (o->approachedBy == a.id) o->approachedBy = 0;
+                a.target = 0;
+                o = nullptr;
+            }
+            if (g && g->floorId) g = nullptr;
+            if (o && o->vibe == MingleVibe::Solo && a.with != o->id) {  // they want to be alone now
+                if (o->approachedBy == a.id) o->approachedBy = 0;
+                a.target = 0;
+                o = nullptr;
+            }
+            const std::size_t cap = a.with ? kMaxGroupWith : kMaxGroup;
             if (o && o->group) {  // they got together with someone else first: join them instead
                 g = findGroup(o->group);
                 if (o->approachedBy == a.id) o->approachedBy = 0;
                 a.target = 0;
-                a.targetGroup = g && g->members.size() < kMaxGroup ? g->id : 0;
+                a.targetGroup = g && g->members.size() < cap ? g->id : 0;
                 o = nullptr;
                 if (!a.targetGroup) g = nullptr;
             }
@@ -652,9 +746,10 @@ std::vector<StageSpot> Mingle::plan(const std::vector<MinglePerson>& people, con
                 const float d = std::hypot(dx, dz);
                 if (d > 1e-3f) dx /= d, dz /= d;
                 else dx = 1, dz = 0;
-                a.sx = o->x + dx * 0.52f;
-                a.sz = std::clamp(o->z + dz * 0.52f, cam.floorBack, kFloorZMax);
-                if (d < 0.66f) {
+                a.sx = o->x + dx * kGroupGap;
+                a.sz = std::clamp(o->z + dz * kGroupGap, cam.floorBack, kFloorZMax);
+                // (Not while they are on their way to someone else, unless it is us.)
+                if (d < kGroupGap + 0.14f && (o->act != Act::Seek || o->target == a.id)) {
                     Group ng;
                     ng.id = nextGroup_++;
                     ng.members = {a.id, o->id};
@@ -672,7 +767,7 @@ std::vector<StageSpot> Mingle::plan(const std::vector<MinglePerson>& people, con
                         m->target = 0;
                         m->targetGroup = 0;
                         m->act = Act::Group;
-                        const double bars = 4 + 12 * rnd(m->rng) * (0.4f + 0.6f * m->tr.sociable);
+                        const double bars = 4 + 12 * rnd(m->rng) * (0.4f + 0.6f * sociable(*m));
                         m->until = clock_ + (std::ceil(beat) - beat) + std::round(bars * 4);
                     }
                     layout(groups_.back());
@@ -691,7 +786,7 @@ std::vector<StageSpot> Mingle::plan(const std::vector<MinglePerson>& people, con
                     a.group = g->id;
                     a.targetGroup = 0;
                     a.act = Act::Group;
-                    const double bars = 3 + 10 * rnd(a.rng) * (0.4f + 0.6f * a.tr.sociable);
+                    const double bars = 3 + 10 * rnd(a.rng) * (0.4f + 0.6f * sociable(a));
                     a.until = clock_ + (std::ceil(beat) - beat) + std::round(bars * 4);
                     if (g->members.size() >= 3) g->kind = Kind::Circle;
                     layout(*g);
@@ -710,10 +805,10 @@ std::vector<StageSpot> Mingle::plan(const std::vector<MinglePerson>& people, con
         }
         if (a.act == Act::Wander && std::hypot(a.x - a.sx, a.z - a.sz) < 0.12f) {
             a.tilt = 0.45f * (rnd(a.rng) - 0.5f);
-            enter(a, Act::Solo, rndIn(a.rng, 1.0f, 4.0f) * (1.35f - 0.7f * a.tr.restless), beat);
+            enter(a, Act::Solo, rndIn(a.rng, 1.0f, 4.0f) * (1.35f - 0.7f * kPersonality.restless), beat);
             continue;
         }
-        if (a.act == Act::Watch) {
+        if (a.act == Act::Watch && a.target != a.with) {
             const Agent* o = find(a.target);
             if (!o || o->act != Act::Show) a.until = std::min(a.until, clock_);
         }
@@ -722,6 +817,10 @@ std::vector<StageSpot> Mingle::plan(const std::vector<MinglePerson>& people, con
 
     // Groups: their own clocks. A pair may change how it dances at its own 8-bar marks; groups drift a little.
     for (auto& g : groups_) {
+        if (g.floorId) {  // (the one going down left, or is up again)
+            const Agent* f = find(g.floorId);
+            if (!f || f->group != g.id || !f->anchored) g.floorId = 0;
+        }
         const long block = long(std::floor((clock_ - g.start) / 32.0));
         if (block != g.kindBar) {
             g.kindBar = block;
@@ -736,6 +835,41 @@ std::vector<StageSpot> Mingle::plan(const std::vector<MinglePerson>& people, con
 
     // Glances (seconds, not beats).
     const float fdt = float(std::clamp(dt, 0.0, 0.1));
+    // The room kept round someone going down: grows quickly, shrinks over a couple of seconds as they get up (the
+    // neighbors drift back).
+    for (auto& a : agents_) {
+        // Waiting for room (anchored, not down yet): the room cleared more firmly, and every 2 s the turn looked at
+        // again (within its limits) while they are still standing.
+        a.wantT = a.floor == 1 ? a.wantT + fdt : 0.0f;
+        if (a.anchored && a.floor == 1) {
+            a.waitT += fdt;
+            if (std::floor(a.waitT / 2) != std::floor((a.waitT - fdt) / 2)) a.floorFacing = pickFloorFacing(a);
+            // Still no room after 4 s (someone boxed in by the edge of the floor, or by others): they themselves
+            // step away from whoever is in the way, slowly (at most 0.3 units/s), before going down.
+            if (a.waitT > 4 && !a.clearNow) {
+                float px = 0, pz = 0;
+                for (const auto& o : agents_) {
+                    if (o.id == a.id) continue;
+                    const float dx = a.ax - o.x, dz = a.az - o.z, d = std::max(1e-3f, std::hypot(dx, dz));
+                    const float in = floorNeed(a.reach, a.floorFacing, -dx, -dz, kFloorKeep) + 0.05f - d;
+                    if (in > 0) px += dx / d * in, pz += dz / d * in;
+                }
+                const float len = std::hypot(px, pz), most = 0.3f * fdt;
+                if (len > most) px *= most / len, pz *= most / len;
+                a.ax += px;
+                a.az = std::clamp(a.az + pz, cam.floorBack, kFloorZMax);
+                const float wx = float(cam.halfWidth) * 0.92f * floorWiden(cam, a.az);
+                a.ax = std::clamp(a.ax, -wx, wx);
+                a.sx = a.ax;
+                a.sz = a.az;
+            }
+        } else {
+            a.waitT = 0;
+        }
+        const float target = a.anchored ? 1.0f : 0.0f;
+        a.room += (target - a.room) * std::min(1.0f, fdt / (target > a.room ? 0.3f : 2.0f));
+        if (target == 0 && a.room < 0.02f) a.room = 0;
+    }
     for (auto& a : agents_) {
         if (a.act == Act::Watch || a.act == Act::Seek) {
             a.glanceAt = a.target;
@@ -767,7 +901,8 @@ std::vector<StageSpot> Mingle::plan(const std::vector<MinglePerson>& people, con
                         }
                     a.glanceUntil = t_ + rndIn(a.rng, 0.8f, 2.4f);
                 }
-                const float gap = rndIn(a.rng, 1.5f, 6.0f) * (1.4f - 0.6f * a.tr.sociable) * (a.group ? 2.0f : 1.0f);
+                const float gap =
+                    rndIn(a.rng, 1.5f, 6.0f) * (1.4f - 0.6f * kPersonality.sociable) * (a.group ? 2.0f : 1.0f);
                 a.nextGlance = std::max(a.glanceUntil, t_) + gap;
             }
         }
@@ -849,8 +984,9 @@ std::vector<StageSpot> Mingle::plan(const std::vector<MinglePerson>& people, con
                 const std::size_t j = std::size_t(
                     std::find(g->members.begin(), g->members.end(), a.id) - g->members.begin());
                 const float r = groupRadius(n);
-                const float cx = std::clamp(g->cx + 0.06f * std::sin(bar * 0.4f + g->phase), -W, W);
-                const float cz = std::clamp(g->cz + 0.04f * std::sin(bar * 0.3f + g->phase * 1.3f),
+                // Each sways on their own (not the whole group sliding together).
+                const float cx = std::clamp(g->cx + 0.05f * std::sin(bar * 0.4f + g->phase + wob), -W, W);
+                const float cz = std::clamp(g->cz + 0.035f * std::sin(bar * 0.3f + g->phase * 1.3f + wob * 0.7f),
                                             cam.floorBack + r, kFloorZMax - 0.3f * r);
                 float lx, lz;
                 if (n == 2) {
@@ -873,6 +1009,12 @@ std::vector<StageSpot> Mingle::plan(const std::vector<MinglePerson>& people, con
                 const long turn = long(std::floor((clock_ - g->start) / 8.0));
                 switch (g->kind) {
                     case Kind::Partners:
+                        // (Copying the other's routine only within a style: else face to face, each their own moves.
+                        // Peter, 2026-11-27.)
+                        if (mate && mate->style != a.style) {
+                            s.role = "facing";
+                            break;
+                        }
                         s.leader = indexOf(g->members[0]);
                         s.mirror = j == 1;
                         s.role = "with";
@@ -911,6 +1053,49 @@ std::vector<StageSpot> Mingle::plan(const std::vector<MinglePerson>& people, con
                 break;
             }
         }
+        // Floor work: held where they went down, turned as they were given.
+        if (a.anchored) {
+            s.x = a.ax;
+            s.z = a.az;
+            s.facing = a.floorFacing;
+            s.leader = -1;
+            s.mirror = false;
+            s.react = false;
+            s.role = a.floor == 2 ? "on the floor" : "going down";
+        } else if (const Group* g = a.act == Act::Group ? findGroup(a.group) : nullptr; g && g->floorId) {
+            // The rest of the group make room round them and watch, dancing as watchers do (watchPose: a basic of
+            // their own style): an arc open to the audience at the move's reach (a partner mirroring them:
+            // kFollowerMirrorsFloor).
+            const Agent* f = find(g->floorId);
+            const bool copy = kFollowerMirrorsFloor && g->kind == Kind::Partners && !g->members.empty() &&
+                              g->members[0] == g->floorId && f && f->style == a.style;
+            if (f && f->anchored && !copy) {
+                std::vector<std::pair<float, std::uint64_t>> order;
+                for (const auto id : g->members)
+                    if (id != f->id)
+                        if (const Agent* m = find(id)) order.push_back({std::atan2(m->x - f->ax, -(m->z - f->az)), id});
+                std::sort(order.begin(), order.end());
+                const std::size_t mcount = order.size();
+                std::size_t j = 0;
+                while (j < mcount && order[j].second != a.id) ++j;
+                float ang;
+                if (mcount == 1) ang = order[0].first >= 0 ? 1.0f : -1.0f;
+                else {
+                    const float th = std::min(1.5f, 0.55f * float(mcount));
+                    ang = -th + 2 * th * float(j) / float(mcount - 1);
+                }
+                const float dx = std::sin(ang), dz = -std::cos(ang);
+                const float r = floorNeed(f->reach.scaled(std::max(f->room, 0.3f)), f->floorFacing, dx, dz, clearPad(*f) + 0.05f);
+                s.x = f->ax + dx * r;
+                s.z = std::clamp(f->az + dz * r, cam.floorBack, kFloorZMax);
+                s.facing = yawTowards(s.x, s.z, f->ax, f->az);
+                s.leader = -1;
+                s.mirror = false;
+                s.react = true;  // (dancing a basic of their own style as they watch: watchPose)
+                s.other = indexOf(f->id);
+                s.role = "making room for";
+            }
+        }
         // The head: a glance at someone, or the group's own look; eased.
         float want = baseLook;
         if (const Agent* o = a.glanceAt && a.act != Act::Watch ? find(a.glanceAt) : nullptr) {
@@ -921,6 +1106,23 @@ std::vector<StageSpot> Mingle::plan(const std::vector<MinglePerson>& people, con
         }
         a.look += (want - a.look) * std::min(1.0f, fdt * 5.0f);
         s.look = a.look;
+        // In a group or near someone: follow their place with their own lag (Peter, 2026-11-27: groups shifted in
+        // unison), easing towards it over about `react` seconds; each lag different, so a group re-forming or
+        // drifting doesn't move as one.
+        if ((a.act == Act::Group || a.act == Act::Watch) && !a.anchored) {
+            if (!a.held) {  // just got here: the place itself
+                a.held = true;
+                a.hx = s.x;
+                a.hz = s.z;
+            }
+            const float k = 1.0f - std::exp(-fdt / a.react);
+            a.hx += (s.x - a.hx) * k;
+            a.hz += (s.z - a.hz) * k;
+            s.x = a.hx;
+            s.z = a.hz;
+        } else {
+            a.held = false;
+        }
         const float wx = float(cam.halfWidth) * 0.92f * floorWiden(cam, s.z);
         s.x = std::clamp(s.x, -wx, wx);
         s.z = std::clamp(s.z, cam.floorBack, kFloorZMax);
@@ -928,6 +1130,117 @@ std::vector<StageSpot> Mingle::plan(const std::vector<MinglePerson>& people, con
         a.outZ = s.z;
         if (s.other == int(k)) s.other = -1;
         if (s.leader == int(k)) s.leader = -1;
+    }
+    // No two spots closer than dancers may stand (Peter, 2026-11-27: jitter): otherwise both walk to their spots, get
+    // pushed apart (keepApart), and walk back, every frame. A few rounds of easing them apart, half each; the spots
+    // move smoothly as everyone does, so the result does too.
+    const float gap = kMinApart + 0.04f;
+    // Away from someone on the floor (unit ux, uz); where the front or back of the floor stops them, sideways, and
+    // where a side stops them, forward or back.
+    auto pushOut = [&](StageSpot& sp, float ux, float uz, float push) {
+        const float nx = sp.x + ux * push, nz = sp.z + uz * push;
+        const float wx = float(cam.halfWidth) * 0.92f * floorWiden(cam, std::clamp(nz, cam.floorBack, kFloorZMax));
+        const float overZ = nz > kFloorZMax ? nz - kFloorZMax : nz < cam.floorBack ? cam.floorBack - nz : 0.0f;
+        const float overX = std::fabs(nx) > wx ? std::fabs(nx) - wx : 0.0f;
+        sp.x = nx;
+        sp.z = nz;
+        if (overZ > 0) sp.x += (std::fabs(ux) > 0.05f ? (ux > 0 ? 1.0f : -1.0f) : (sp.x >= 0 ? -1.0f : 1.0f)) * overZ * 1.5f;
+        if (overX > 0) sp.z += (std::fabs(uz) > 0.05f ? (uz > 0 ? 1.0f : -1.0f) : (sp.z > -0.3f ? -1.0f : 1.0f)) * overX * 1.5f;
+    };
+    for (int round = 0; round < 4; ++round) {
+        bool moved = false;
+        for (std::size_t i = 0; i < out.size(); ++i)
+            for (std::size_t j = i + 1; j < out.size(); ++j) {
+                float dx = out[j].x - out[i].x, dz = out[j].z - out[i].z;
+                const float d = std::hypot(dx, dz);
+                // Room round someone going down or on the floor (their reach that way; eased as they get up): they
+                // stay, the other steps back.
+                const Agent* ai = find(people[i].id);
+                const Agent* aj = find(people[j].id);
+                const bool fi = ai && ai->room > 0, fj = aj && aj->room > 0;
+                const bool hi = ai && ai->anchored, hj = aj && aj->anchored;  // (held where they went down)
+                float need = gap;
+                if (fi) need = std::max(need, floorNeed(ai->reach.scaled(ai->room), ai->floorFacing, dx, dz, clearPad(*ai)));
+                if (fj) need = std::max(need, floorNeed(aj->reach.scaled(aj->room), aj->floorFacing, -dx, -dz, clearPad(*aj)));
+                if (d >= need) continue;
+                if (d < 1e-4f) {
+                    dx = people[i].id < people[j].id ? 1.0f : -1.0f;  // on the same spot: apart sideways
+                    dz = 0;
+                } else {
+                    dx /= d;
+                    dz /= d;
+                }
+                const float push = need - d;
+                if (hi != hj) {
+                    pushOut(hi ? out[j] : out[i], hi ? dx : -dx, hi ? dz : -dz, push);
+                } else if (hi) {
+                    // (Two on the floor: neither moves; Mingle lets nobody go down in someone's room.)
+                } else {
+                    const float half = 0.5f * push;  // (as before: standing crowds unchanged to the bit)
+                    out[i].x -= dx * half;
+                    out[i].z -= dz * half;
+                    out[j].x += dx * half;
+                    out[j].z += dz * half;
+                }
+                moved = true;
+            }
+        for (auto& sp : out) {
+            const float wx = float(cam.halfWidth) * 0.92f * floorWiden(cam, sp.z);
+            sp.x = std::clamp(sp.x, -wx, wx);
+            sp.z = std::clamp(sp.z, cam.floorBack, kFloorZMax);
+        }
+        if (!moved) break;
+    }
+    // Last: everyone out of a floor dancer's room (a standing pair a little close is keepApart's to settle).
+    for (int round = 0; round < 3; ++round)
+        for (std::size_t i = 0; i < out.size(); ++i) {
+            const Agent* f = find(people[i].id);
+            if (!f || !f->anchored || f->room <= 0) continue;
+            for (std::size_t j = 0; j < out.size(); ++j) {
+                const Agent* o = find(people[j].id);
+                if (j == i || (o && o->anchored)) continue;
+                float dx = out[j].x - f->ax, dz = out[j].z - f->az;
+                const float d = std::hypot(dx, dz);
+                float need = floorNeed(f->reach.scaled(f->room), f->floorFacing, dx, dz, clearPad(*f));
+                // (someone waiting to go down themselves: far enough for their own reach too)
+                if (o && o->floor) need = std::max(need, floorNeed(o->reach, 0, -dx, -dz, kFloorKeep + 0.1f));
+                if (d >= need) continue;
+                if (d < 1e-4f) dx = 1, dz = 0;
+                else dx /= d, dz /= d;
+                pushOut(out[j], dx, dz, need - d);
+                const float wx = float(cam.halfWidth) * 0.92f * floorWiden(cam, out[j].z);
+                out[j].x = std::clamp(out[j].x, -wx, wx);
+                out[j].z = std::clamp(out[j].z, cam.floorBack, kFloorZMax);
+            }
+        }
+    for (std::size_t k = 0; k < people.size(); ++k)
+        if (Agent* a = find(people[k].id)) {
+            a->outX = out[k].x;
+            a->outZ = out[k].z;
+        }
+    // Room to go down (Choreographer::setFloorRoom): not while walking (mayGoDown); going down: whether everyone is
+    // out of the move's reach (turned as given); otherwise how far the nearest one is.
+    for (std::size_t k = 0; k < people.size(); ++k) {
+        Agent& a = *find(people[k].id);
+        float room = -1;
+        if (mayGoDown(a)) {
+            room = 1e6f;
+            // The longer they wait, the more of the last few cm is left to keepApart (it pushes the others out of a
+            // floor dancer's reach): up to 12 cm after about 8 s.
+            const float slack = std::min(0.12f, 0.015f * a.waitT);
+            for (const auto& o : agents_) {
+                if (o.id == a.id) continue;
+                if (a.anchored) {
+                    const float dx = o.x - a.ax, dz = o.z - a.az;
+                    if (std::hypot(dx, dz) < floorNeed(a.reach, a.floorFacing, dx, dz, kFloorKeep) - (o.anchored ? 0.0f : slack))
+                        room = 0;
+                } else {
+                    room = std::min(room, std::hypot(o.x - a.x, o.z - a.z));
+                }
+            }
+        }
+        out[k].floorRoom = room;
+        a.clearNow = room > 0;
     }
     return out;
 }
@@ -1136,7 +1449,8 @@ Lean hairLean(HairStyle h) {
         case H::Short: case H::SidePart: case H::Waves: case H::Spiky: case H::Mohawk:
             return Lean::Masc;
         case H::Bob: case H::Layers: case H::HalfUp: case H::Braid: case H::Bangs: case H::Pixie: case H::Pigtails:
-        case H::Bun: case H::SidePony: case H::SpaceBuns:
+        case H::Bun: case H::SidePony: case H::SpaceBuns: case H::Curls: case H::BigCurls:
+        case H::HugeCurls:
             return Lean::FemOnly;  // never on a masculine character (Peter, 2026-11-21)
         case H::Long: case H::Ponytail: case H::TopKnot:
             return Lean::Fem;
@@ -1370,7 +1684,8 @@ DancerSpec generateDancer(Style dance, std::uint32_t seed) {
     };
     // Everyday: feminine, masculine, either.
     add({{H::Long, 3}, {H::Bob, 2.5f}, {H::Ponytail, 2.5f}, {H::Layers, 2}, {H::HalfUp, 1.5f}, {H::Bangs, 1.2f},
-         {H::Bun, 1.2f}, {H::Braid, 1}, {H::Pixie, 1}, {H::SidePony, 0.8f}, {H::Pigtails, 0.8f}, {H::TopKnot, 0.6f}});
+         {H::Bun, 1.2f}, {H::Braid, 1}, {H::Pixie, 1}, {H::SidePony, 0.8f}, {H::Pigtails, 0.8f}, {H::TopKnot, 0.6f},
+         {H::Curls, 1.2f}, {H::BigCurls, 0.7f}, {H::HugeCurls, 0.25f}});  // (the long curls: 2026-11-27)
     add({{H::Short, 3}, {H::SidePart, 2}, {H::Quiff, 1.5f}, {H::Buzz, 1.5f}, {H::Undercut, 1.2f}, {H::Shaved, 0.8f},
          {H::SlickBack, 0.8f}, {H::Waves, 0.6f}, {H::Balding, 0.6f}, {H::ManBun, 0.5f}, {H::Bald, 0.4f},
          {H::Mullet, 0.2f}, {H::Bowl, 0.2f}});
@@ -1378,13 +1693,13 @@ DancerSpec generateDancer(Style dance, std::uint32_t seed) {
          {H::Spiky, 0.3f}, {H::Mohawk, 0.2f}});
     // Each style's flavor.
     switch (style) {
-        case St::Disco: add({{H::Afro, 3}, {H::Curly, 2}, {H::Shag, 1.5f}, {H::Long, 1}, {H::Layers, 0.5f}, {H::TopKnot, 0.5f}, {H::Pompadour, 0.5f}}); break;
-        case St::HipHop: add({{H::Coils, 2}, {H::Waves, 2}, {H::Afro, 1.5f}, {H::Braid, 1.5f}, {H::Buzz, 1}, {H::Bald, 1}, {H::SpaceBuns, 0.8f}, {H::Pigtails, 0.5f}, {H::Undercut, 0.5f}}); break;
+        case St::Disco: add({{H::Afro, 3}, {H::Curly, 2}, {H::BigCurls, 1.5f}, {H::HugeCurls, 1.2f}, {H::Curls, 0.8f}, {H::Shag, 1.5f}, {H::Long, 1}, {H::Layers, 0.5f}, {H::TopKnot, 0.5f}, {H::Pompadour, 0.5f}}); break;
+        case St::HipHop: add({{H::Coils, 2}, {H::Curls, 0.8f}, {H::BigCurls, 0.5f}, {H::Waves, 2}, {H::Afro, 1.5f}, {H::Braid, 1.5f}, {H::Buzz, 1}, {H::Bald, 1}, {H::SpaceBuns, 0.8f}, {H::Pigtails, 0.5f}, {H::Undercut, 0.5f}}); break;
         case St::Pop: add({{H::Ponytail, 1}, {H::Anime, 1}, {H::Pigtails, 0.8f}, {H::SidePony, 0.8f}, {H::SpaceBuns, 0.8f}, {H::Quiff, 0.8f}, {H::Bangs, 0.6f}, {H::Pixie, 0.6f}, {H::Curtains, 0.6f}}); break;
         case St::Robot: add({{H::SlickBack, 1.5f}, {H::Bald, 1}, {H::Bowl, 1}, {H::Buzz, 1}, {H::Shaved, 1}, {H::Bun, 0.8f}, {H::Bob, 0.6f}, {H::Ponytail, 0.6f}, {H::Spiky, 0.6f}, {H::Mohawk, 0.4f}}); break;
         case St::Rave: add({{H::SpaceBuns, 1.5f}, {H::Pigtails, 1.2f}, {H::Spiky, 1}, {H::Mohawk, 1}, {H::Anime, 1}, {H::Pixie, 0.8f}, {H::Undercut, 0.8f}, {H::Shaved, 0.5f}}); break;
-        case St::Retro: add({{H::Afro, 3}, {H::Shag, 2}, {H::Pompadour, 2}, {H::Mullet, 1.2f}, {H::Curtains, 1}, {H::Bangs, 1}, {H::SlickBack, 0.8f}, {H::Bowl, 0.6f}, {H::Quiff, 0.6f}}); break;
-        case St::Chill: add({{H::HalfUp, 0.5f}, {H::Layers, 0.5f}, {H::Bun, 0.5f}, {H::Curly, 0.3f}}); break;
+        case St::Retro: add({{H::Afro, 3}, {H::Shag, 2}, {H::BigCurls, 1.2f}, {H::HugeCurls, 1}, {H::Pompadour, 2}, {H::Mullet, 1.2f}, {H::Curtains, 1}, {H::Bangs, 1}, {H::SlickBack, 0.8f}, {H::Bowl, 0.6f}, {H::Quiff, 0.6f}}); break;
+        case St::Chill: add({{H::HalfUp, 0.5f}, {H::Layers, 0.5f}, {H::Bun, 0.5f}, {H::Curls, 0.5f}, {H::Curly, 0.3f}}); break;
         default: break;  // house: everyday hair
     }
     const bool hatOn = L.hat == Hat::Cap || L.hat == Hat::Beanie || L.hat == Hat::Top;
@@ -1478,6 +1793,23 @@ DancerSpec generateDancer(Style dance, std::uint32_t seed) {
     return spec;
 }
 
+void DancerRun::restyle(DancerSpec spec) {
+    spec.guestId = spec_.guestId;
+    const bool newStyle = spec.style != spec_.style || spec.snap != spec_.snap || spec.likes != spec_.likes;
+    spec_ = std::move(spec);
+    sk_ = makeSkeleton(spec_.look);
+    headExtSet_ = false;
+    legRatio_ = (sk_.thigh + sk_.shin) / (makeSkeleton(Look{}).thigh + makeSkeleton(Look{}).shin);
+    poseToFloats(restPose(sk_), rest_);
+    if (newStyle) {
+        ChoreoOptions o = choreo_.options();
+        o.style = spec_.style;
+        o.sharp = spec_.snap;
+        o.likes = spec_.likes;
+        choreo_ = dance::Choreographer(o);
+    }
+}
+
 DancerRun::DancerRun(DancerSpec spec, std::uint32_t seed, double t, double beat, double hold)
     : spec_(std::move(spec)),
       sk_(makeSkeleton(spec_.look)),
@@ -1493,6 +1825,7 @@ DancerRun::DancerRun(DancerSpec spec, std::uint32_t seed, double t, double beat,
       start_(t),
       hold_(hold) {
     choreo_.hello(beat);
+    legRatio_ = (sk_.thigh + sk_.shin) / (makeSkeleton(Look{}).thigh + makeSkeleton(Look{}).shin);
     pose_ = restPose(sk_);
     poseToFloats(pose_, rest_);
     // The personality: everyone dances the same routines a little differently.
@@ -1575,18 +1908,29 @@ namespace {
 std::pair<float, float> avoidShares(const DancerRun& a, const DancerRun& b) {
     const float sa = std::hypot(a.vx(), a.vz()), sb = std::hypot(b.vx(), b.vz());
     const float wa = (0.08f + sa) / (0.16f + sa + sb);
+    // Someone on the floor isn't pushed (2026-11-27): the other one takes it all.
+    const bool fa = a.anchored() >= 0.5f || a.clearing(), fb = b.anchored() >= 0.5f || b.clearing();
+    if (fa != fb) return fa ? std::pair<float, float>{0.0f, 1.0f} : std::pair<float, float>{1.0f, 0.0f};
     return {wa, 1 - wa};
+}
+// How close two dancers may come (centers): bodies, or a floor dancer's reach towards the other one.
+float apartNeed(const DancerRun& a, const DancerRun& b, float dx, float dz, float base, float pad) {
+    float need = base;
+    const float ha = a.clearing() ? 1.0f : a.anchored(), hb = b.clearing() ? 1.0f : b.anchored();
+    if (ha > 0) need = std::max(need, ha * floorNeed(a.floorReachNow(), a.facing(), dx, dz, pad));
+    if (hb > 0) need = std::max(need, hb * floorNeed(b.floorReachNow(), b.facing(), -dx, -dz, pad));
+    return need;
 }
 }  // namespace
 
 void avoidEachOther(const std::vector<DancerRun*>& runs) {
-    const float R = 2 * kBodyRadius;
     for (std::size_t i = 0; i < runs.size(); ++i)
         for (std::size_t j = i + 1; j < runs.size(); ++j) {
             DancerRun& A = *runs[i];
             DancerRun& B = *runs[j];
             if (!A.placed() || !B.placed()) continue;
             const float dx = B.x() - A.x(), dz = B.z() - A.z();  // A -> B
+            const float R = apartNeed(A, B, dx, dz, 2 * kBodyRadius, kFloorKeep);
             const float wx = A.vx() - B.vx(), wz = A.vz() - B.vz();  // A's velocity relative to B
             const float a = wx * wx + wz * wz, b = wx * dx + wz * dz, c = dx * dx + dz * dz - R * R;
             if (a < 1e-6f || b <= 0 || c < 0) continue;  // not closing in (overlaps: keepApart)
@@ -1627,7 +1971,8 @@ void keepApart(const std::vector<DancerRun*>& runs) {
                 if (!A.placed() || !B.placed()) continue;
                 float dx = B.x() - A.x(), dz = B.z() - A.z();
                 const float d = std::hypot(dx, dz);
-                if (d >= kMinApart) continue;
+                const float need = apartNeed(A, B, dx, dz, kMinApart, kFloorKeep);
+                if (d >= need) continue;
                 if (d < 1e-4f) {  // on top of each other: apart sideways
                     dx = 1;
                     dz = 0;
@@ -1635,7 +1980,8 @@ void keepApart(const std::vector<DancerRun*>& runs) {
                     dx /= d;
                     dz /= d;
                 }
-                const float deficit = kMinApart - d;
+                // (Round someone on the floor at most 0.8 cm a pass, about 1.4 units/s: pushed out, no pop.)
+                const float deficit = std::max(kMinApart - d, std::min(need - d, 0.008f));
                 const auto [sa, sb] = avoidShares(A, B);
                 A.nudge(-dx * deficit * sa, -dz * deficit * sa);
                 B.nudge(dx * deficit * sb, dz * deficit * sb);
@@ -1663,8 +2009,21 @@ void DancerRun::step(double t, double dt, const MusicState& m, float energy, con
     if (!leaving() && hold_ > 0 && t - start_ >= hold_) leave(t, m.beat, 2.0);
     // Wander to the spot at a walking pace (critically damped spring, at most 0.75 units/s).
     const float w = 2.6f, d = float(std::clamp(dt, 0.0, 0.1));
-    const float ax = w * w * (tx_ - x_) - 2 * w * vx_ + avoidX_, az = w * w * (tz_ - z_) - 2 * w * vz_ + avoidZ_;
+    float ax = w * w * (tx_ - x_) - 2 * w * vx_ + avoidX_, az = w * w * (tz_ - z_) - 2 * w * vz_ + avoidZ_;
     avoidX_ = avoidZ_ = 0;
+    // On the floor (2026-11-27): the spot held where they went down, no steering; any walk eases out (~0.3 s).
+    {
+        const float g = pose_.ground;
+        const float want = g <= 0.25f ? 0.0f : g >= 0.6f ? 1.0f : (g - 0.25f) / 0.35f;
+        floorHold_ = floorFixes.hold ? want : 0.0f;
+    }
+    if (floorHold_ > 0) {
+        ax *= 1 - floorHold_;
+        az *= 1 - floorHold_;
+        const float k = std::exp(-floorHold_ * d / 0.1f);
+        vx_ *= k;
+        vz_ *= k;
+    }
     vx_ += ax * d;
     vz_ += az * d;
     const float speed = std::sqrt(vx_ * vx_ + vz_ * vz_), maxSpeed = 0.75f;
@@ -1679,8 +2038,27 @@ void DancerRun::step(double t, double dt, const MusicState& m, float energy, con
     const double age = t - start_;
     const Routine* own = choreo_.routineAt(m.beat);
     const bool greeting = !leaving() && age < 1.0 && own && own->full == findMove("wave");
-    const bool free = !leaving() && !greeting;  // the stage may direct this dancer
+    // The stage may direct this dancer (not while busting a move: their own routines, whoever they are with).
+    const bool free = !leaving() && !greeting && !choreo_.bustMoveAt(danceBeat(m.beat) + 2, false);
     usedLeader_ = free && dir.leader && !dir.react;
+    // Room to go down (the stage's say; own moves only: following someone or watching, the own floor moves wait).
+    {
+        const bool own = !free || (!usedLeader_ && !dir.react);
+        const float room = dir.floorRoom > 1e29f ? dir.floorRoom : leaving() || greeting || !own ? -1.0f : dir.floorRoom;
+        choreo_.setFloorRoom(room > 1e29f ? room : room / legRatio_);
+        // Waiting for room where the stage holds them: the crowd keeps out of the reach already.
+        clearing_ = false;
+        if (room >= 0 && room < 1e29f && floorHold_ < 0.5f) {
+            const int pm = choreo_.floorPending();
+            if (pm >= 0 && moveLibrary()[std::size_t(pm)].clip >= 0) {
+                clearing_ = true;
+                reachNow_ = clipInfo(moveLibrary()[std::size_t(pm)].clip).reach.scaled(legRatio_);
+            } else if (choreo_.bustMoveAt(danceBeat(m.beat), true) && !choreo_.bustMoveAt(danceBeat(m.beat), false)) {
+                clearing_ = true;
+                reachNow_ = bustMoveReach().scaled(legRatio_);
+            }
+        }
+    }
     // The moves run on this dancer's own beat (a little behind or ahead of the music, drifting, with its own feel).
     MusicState mh = m;
     mh.beat = danceBeat(m.beat);
@@ -1694,9 +2072,9 @@ void DancerRun::step(double t, double dt, const MusicState& m, float energy, con
         desc_ = watchName(m.beat, seed_, spec_.style, choreo_.options().mocap > 0);
         source = 1;
     } else if (usedLeader_) {
-        next = dir.leader->pose(mh, sk_, dir.delay, dir.mirror);
+        next = dir.leader->pose(mh, sk_, 0, dir.mirror);
         key = "lead" + std::to_string(dir.leader->options().seed) + (dir.mirror ? "m" : "");  // the dancer seed: unique, unlike a reused address
-        desc_ = dir.leader->describe(m.beat - dir.delay) + (dir.mirror ? " (mirrored)" : "");
+        desc_ = dir.leader->describe(m.beat) + (dir.mirror ? " (mirrored)" : "");
         source = 2;
     }
     if (free && !dir.role.empty()) desc_ = dir.role + ": " + desc_;
@@ -1710,7 +2088,7 @@ void DancerRun::step(double t, double dt, const MusicState& m, float energy, con
         // of the clock the routines were planned to).
         auto at = [&](double delay) {
             if (source == 1) return watchPose(mh.beat - delay, seed_, spec_.style, sk_, choreo_.options().mocap > 0);
-            if (source == 2) return dir.leader->pose(mh, sk_, dir.delay + delay, dir.mirror);
+            if (source == 2) return dir.leader->pose(mh, sk_, delay, dir.mirror);
             return choreo_.pose(mh, sk_, delay);
         };
         float part[kPoseFloats];
@@ -1720,11 +2098,32 @@ void DancerRun::step(double t, double dt, const MusicState& m, float energy, con
             for (int i = from; i <= to; ++i) raw[i] = part[i];
         };
         const double a = humanAmt_;
+        float base[kPoseFloats];
+        const bool fade = raw[51] > 0 && floorFixes.fade;
+        if (fade) std::copy(raw, raw + kPoseFloats, base);
         take(a * pers_.headLag, 12, 14);
         take(a * std::max(0.0f, pers_.armLag + pers_.armLagAsym), 15, 17);
         take(a * std::max(0.0f, pers_.armLag - pers_.armLagAsym), 18, 20);
+        // On the floor the hands and head bear weight: no lag (faded in with `ground`).
+        if (fade) {
+            const float g = std::clamp(raw[51], 0.0f, 1.0f);
+            for (int i = 12; i <= 20; ++i) raw[i] += (base[i] - raw[i]) * g;
+        }
     }
-    humanize(raw, mh.beat, t);
+    // Humanising (gains, effort, hand wander, posture) faded out on the floor: a planted hand doesn't wander.
+    if (raw[51] > 0 && floorFixes.fade) {
+        float base[kPoseFloats];
+        std::copy(raw, raw + kPoseFloats, base);
+        humanize(raw, mh.beat, t);
+        const float g = std::clamp(raw[51], 0.0f, 1.0f);
+        for (int i = 0; i < kPoseFloats; ++i) raw[i] += (base[i] - raw[i]) * g;
+    } else {
+        humanize(raw, mh.beat, t);
+    }
+    // Floor work's pelvis quaternion (47..50) kept on the same side as the last output (q and -q are the same turn),
+    // so the filters below never blend across a sign flip. Standing moves: identity, untouched.
+    if (haveOut_ && raw[47] * lastOut_[47] + raw[48] * lastOut_[48] + raw[49] * lastOut_[49] + raw[50] * lastOut_[50] < 0)
+        for (int i = 47; i <= 50; ++i) raw[i] = -raw[i];
     const float fdt = float(std::max(1e-4, std::min(0.1, dt)));
     if (key != sourceKey_) {
         if (haveOut_)
@@ -1741,7 +2140,10 @@ void DancerRun::step(double t, double dt, const MusicState& m, float energy, con
         inertVel_[i] += (-wn * wn * inertOff_[i] - 2 * wn * inertVel_[i]) * fdt;
         inertOff_[i] += inertVel_[i] * fdt;
         out[i] = raw[i] + inertOff_[i];
-        outVel_[i] = haveOut_ ? (out[i] - lastOut_[i]) / fdt : 0.0f;
+        // (bodyYaw the short way: a source's heading may jump by whole turns, a loop's seam or a crossfade's end,
+        // invisible by itself; taken as a speed at the next switch it whipped them round 2-7 times. 2026-11-27.)
+        const float dOut = i == 2 ? std::remainder(out[i] - lastOut_[i], 6.2831853f) : out[i] - lastOut_[i];
+        outVel_[i] = haveOut_ ? dOut / fdt : 0.0f;
         lastOut_[i] = out[i];
     }
     haveOut_ = true;
@@ -1755,7 +2157,8 @@ void DancerRun::step(double t, double dt, const MusicState& m, float energy, con
                             (1 + 2 * z * wn * fdt + wn * wn * fdt * fdt);
             followVel_[i] = v;
             follow_[i] += v * fdt;
-            out[i] = follow_[i];
+            // (Floor work: none, faded with `ground`; the spring keeps following.)
+            out[i] = out[51] > 0 && floorFixes.fade ? follow_[i] + (out[i] - follow_[i]) * std::clamp(out[51], 0.0f, 1.0f) : follow_[i];
         }
     } else {
         for (int i = 0; i < kPoseFloats; ++i) {
@@ -1776,13 +2179,39 @@ void DancerRun::step(double t, double dt, const MusicState& m, float energy, con
         facing_ = target;
         facingSet_ = true;
     }
-    facing_ += (target - facing_) * float(std::min(1.0, dt * 5.0));
+    // (On the floor the turn is held: the stage gave it before they went down.)
+    if (floorHold_ > 0) facing_ += (target - facing_) * (float(std::min(1.0, dt * 5.0)) * (1 - 0.85f * floorHold_));
+    else facing_ += (target - facing_) * float(std::min(1.0, dt * 5.0));
     pose_.bodyYaw += facing_;
     if (free) pose_.headYaw += dir.look;
     stepFeet(m.beat, dt, moving);
     faceAccents(pose_, m.beat, t, seed_, energy);
     // Amplitude: blend towards rest when quiet (energy < 1 shrinks the moves).
-    if (energy < 0.999f) pose_ = mix(restPose(sk_), pose_, std::clamp(energy, 0.0f, 1.0f));
+    // (Not floor work: towards a standing rest pose would lift planted hands; faded with `ground`.)
+    // (Not the heading: it holds the stage facing and any turn, an absolute angle; scaled it snapped by 2 pi (1 - e)
+    // whenever it crossed +-pi. Spin glitches 2026-11-27.)
+    if (energy < 0.999f) {
+        const float e = std::clamp(energy, 0.0f, 1.0f), g = std::clamp(pose_.ground, 0.0f, 1.0f);
+        const float yaw = pose_.bodyYaw;
+        pose_ = mix(restPose(sk_), pose_, g > 0 && floorFixes.fade ? e + (1 - e) * g : e);
+        pose_.bodyYaw = yaw;
+    }
+    // Floor work: the upper body on the floor where the move has it there, never through it, the hair and hat neither,
+    // planted hands on it (nothing standing).
+    if (pose_.ground > 0 && !headExtSet_) {
+        headExt_ = headExtent(spec_.look, sk_);
+        headExtSet_ = true;
+    }
+    groundPose(sk_, pose_, &headExt_);
+    if (floorFixes.pins) pinContacts(dt);
+    // The reach playing (the stage keeps neighbors out of it).
+    if (pose_.ground > 0.05f) {
+        const Routine* rr = usedLeader_ ? dir.leader->routineAt(mh.beat) : choreo_.routineAt(mh.beat);
+        if (rr && rr->full >= 0 && moveLibrary()[std::size_t(rr->full)].clip >= 0) {
+            const ClipInfo& ci = clipInfo(moveLibrary()[std::size_t(rr->full)].clip);
+            if (ci.floorWork) reachNow_ = ci.reach.scaled(legRatio_);
+        }
+    }
     // Entrance: hop in with an overshooting pop. Exit: shrink in the last 0.35 s.
     const float in = float(age / 0.55);
     scale_ = easeOutBack(in);
@@ -1798,6 +2227,7 @@ void DancerRun::step(double t, double dt, const MusicState& m, float energy, con
         }
     }
     stepHair(dt);
+    stepHairSim(dt);
 }
 
 void DancerRun::stepHair(double dt) {
@@ -1849,6 +2279,356 @@ void DancerRun::stepHair(double dt) {
     }
 }
 
+// ---- hair physics (Peter, 2026-11-27; docs/dancers-design.md "Hair physics")
+namespace {
+// Tuning (character units, seconds; scaled by the dancer's size where it matters).
+constexpr float kHairRate = 120.0f;       // sub-steps a second (at least; 2 a frame at 60 fps)
+constexpr float kHairGravity = 6.0f;      // units / s^2 (a 1-unit dancer)
+constexpr float kHairDrag = 1.5f;         // 1 / s, air drag on the chain points
+constexpr float kHairShapeWn = 30.0f;     // rad/s: how hard a chain's root link keeps its rest direction
+constexpr float kHairTipSoft = 0.5f;      // the tip link's share of that stiffness (softer down the chain: whip)
+constexpr float kHairShapeZeta = 0.25f;   // damping of a link's motion relative to the one above it
+constexpr float kHairMaxSpeed = 5.0f;     // units / s: the most a point moves relative to the one above it
+constexpr float kHairFollow = 0.65f;
+constexpr float kHairCosBend = 0.866f, kHairSinBend = 0.5f;  // a joint bends at most 30 degrees       // below the first link, how much a link carries on its parent's direction
+constexpr float kHairConeSoft = 0.3f;  // a link past its cone (HairChainDef::cone) turns this much of the way back a sub-step
+constexpr float kLagWn = 22.0f, kLagZeta = 0.3f;    // the volumes' shift behind the head (3.5 Hz)
+constexpr float kTurnWn = 15.7f, kTurnZeta = 0.35f;  // and their turn (2.5 Hz)
+constexpr float kLagDrag = 2.0f, kTurnDrag = 4.0f;  // 1 / s: air drag on them (a steady spin trails them a little)
+constexpr float kLagMax = 0.3f;           // head radii
+constexpr float kTurnMax = 0.35f;         // radians
+
+Frame lerpFrame(const Frame& a, const Frame& b, float t) {
+    Frame f;
+    f.o = lerp(a.o, b.o, t);
+    const V3 y = normalize(lerp(a.y, b.y, t), b.y);
+    V3 z = lerp(a.z, b.z, t);
+    z = normalize(z - y * dot(z, y), b.z);
+    f.x = cross(y, z);
+    f.y = y;
+    f.z = z;
+    return f;
+}
+// The turn from frame a to frame b (world axis times about sin(angle)).
+V3 turnBetween(const Frame& a, const Frame& b) {
+    return (cross(a.x, b.x) + cross(a.y, b.y) + cross(a.z, b.z)) * 0.5f;
+}
+V3 rotateBy(V3 v, V3 axisAngle) {
+    const float ang = length(axisAngle);
+    if (ang < 1e-8f) return v;
+    const V3 n = axisAngle * (1.0f / ang);
+    const float c = std::cos(ang), s = std::sin(ang);
+    return v * c + cross(n, v) * s + n * (dot(n, v) * (1 - c));
+}
+void orthonormalize(Frame& f) {
+    f.y = normalize(f.y);
+    f.z = normalize(f.z - f.y * dot(f.z, f.y), {0, 0, 1});
+    f.x = cross(f.y, f.z);
+}
+HairCollider toStage(const HairCollider& c, V3 place, float k) {
+    HairCollider w = c;
+    w.a = place + c.a * k;
+    w.b = place + c.b * k;
+    w.r0 = c.r0 * k;
+    w.r1 = c.r1 * k;
+    return w;
+}
+HairCollider lerpCollider(const HairCollider& a, const HairCollider& b, float t) {
+    HairCollider c = b;
+    c.a = lerp(a.a, b.a, t);
+    c.b = lerp(a.b, b.b, t);
+    c.x = lerp(a.x, b.x, t);
+    c.z = lerp(a.z, b.z, t);
+    return c;
+}
+// Where on the link p0-p1 (0..1) it comes closest to the segment q0-q1 (closest points of two segments).
+float linkClosest(V3 p0, V3 p1, V3 q0, V3 q1) {
+    const V3 d1 = p1 - p0, d2 = q1 - q0, r = p0 - q0;
+    const float a = dot(d1, d1), e = dot(d2, d2), f = dot(d2, r);
+    if (a < 1e-12f) return 0.0f;
+    const float c = dot(d1, r);
+    if (e < 1e-12f) return std::clamp(-c / a, 0.0f, 1.0f);
+    const float b = dot(d1, d2), den = a * e - b * b;
+    float s = den > 1e-12f ? std::clamp((b * f - c * e) / den, 0.0f, 1.0f) : 0.0f;
+    const float t = (b * s + f) / e;
+    if (t < 0) s = std::clamp(-c / a, 0.0f, 1.0f);
+    else if (t > 1) s = std::clamp((b - c) / a, 0.0f, 1.0f);
+    return s;
+}
+HairCollider shrunk(HairCollider c, float by) {
+    c.r0 = std::max(0.0f, c.r0 - by);
+    c.r1 = std::max(0.0f, c.r1 - by);
+    return c;
+}
+}  // namespace
+
+void DancerRun::hairBody(HairCollider out[kHairColliders]) const { hairColliders(spec_.look, sk_, pose_, out); }
+
+void DancerRun::stepHairSim(double dt) {
+    HairSim& S = sim_;
+    const float k = scale_;
+    if (!hairPhysics() || k < 0.05f) {
+        S.set = false;
+        hairOut_ = HairState{};
+        return;
+    }
+    if (!S.defsSet) {
+        // The chains this look has, as buildBody lays them out (head frame), and how far each passes into the body
+        // as designed, at rest (the long hair's middle runs down the back inside the torso's outline, a pigtail past
+        // the shoulder, a tail's top along the head): each collider shrunk that much for that chain, so the rest look
+        // stays as designed and only what moves into the hair pushes it.
+        const DancePose rp = restPose(sk_);
+        BodyOut rest;
+        HairState restHair;  // (still: the chains straight from root to rest tip)
+        restHair.bendLong = longHair_;
+        buildBody(spec_.look, sk_, rp, Frame{}, 1.0f, rest, longHair_ ? &restHair : nullptr);
+        S.chains = std::min(rest.hairChainCount, kHairChains);
+        HairCollider col[kHairColliders];
+        hairColliders(spec_.look, sk_, rp, col);
+        const Frame h = headFrame(sk_, rp);
+        for (int c = 0; c < S.chains; ++c) {
+            S.def[c] = rest.hairChains[c];
+            const HairChainDef& d = S.def[c];
+            for (int j = 0; j < kHairColliders; ++j) {
+                float in = 0;
+                for (int it = 0; it < 60; ++it, in += 0.005f) {
+                    float worst = -1;
+                    for (int i = 1; i <= 2 * d.segs; ++i)
+                        worst = std::max(worst, colliderDepth(shrunk(col[j], in),
+                                                              h.point(lerp(d.a, d.b, float(i) / float(2 * d.segs))), d.radius));
+                    if (worst < -0.004f) break;
+                }
+                S.shrink[c][j] = in;
+            }
+        }
+        S.defsSet = true;
+    }
+    const V3 place{x_, lift_, z_};
+    Frame H = headFrame(sk_, pose_);
+    H.o = place + H.o * k;
+    HairCollider col[kHairColliders];
+    hairColliders(spec_.look, sk_, pose_, col);
+    for (HairCollider& c : col) c = toStage(c, place, k);
+    const float R = sk_.headR;
+    const V3 down{0, -1, 0};
+    auto goalDir = [&](const HairChainDef& d, const Frame& hf, float* firm) {
+        // The rest direction, bent towards straight down by `droop`. As the head turns over (the rest direction
+        // from down to up) the shape gives way to hanging straight down (`firm` 1 -> 0, the pull weaker): upside down
+        // the hair falls off the head.
+        const V3 rest = hf.dir(normalize(d.b - d.a));
+        const float u = std::clamp((dot(rest, down) + 0.2f) / 0.8f, 0.0f, 1.0f);
+        const float w = u * u * (3 - 2 * u);
+        *firm = 0.35f + 0.65f * w;
+        return normalize(normalize(rest + down * d.droop, down) * w + down * (1 - w), down);
+    };
+    const bool reset = !S.set || dt > 0.1 || length(H.o - S.head.o) > 0.5f * k;
+    if (reset) {
+        for (int c = 0; c < S.chains; ++c) {
+            const HairChainDef& d = S.def[c];
+            float firm;
+            const V3 dir = goalDir(d, H, &firm);
+            const float L = length(d.b - d.a) * k / float(d.segs);
+            S.x[c][0] = H.o + H.dir(d.a) * k;
+            for (int i = 1; i <= d.segs; ++i) S.x[c][i] = S.x[c][i - 1] + dir * L;
+            for (int i = 0; i <= d.segs; ++i) S.xp[c][i] = S.x[c][i];
+        }
+        S.jp = H.o;
+        S.jv = S.lw = V3{};
+        S.lag = H;
+        S.set = true;
+    } else if (std::fabs(S.k - k) > 1e-7f) {
+        // A change of size (the entrance pop, the crowd scale): the last step's state resized about its placement, so
+        // growing doesn't fling the hair.
+        const float r = k / S.k;
+        auto rs = [&](V3 p) { return S.place + (p - S.place) * r; };
+        for (int c = 0; c < S.chains; ++c)
+            for (int i = 0; i <= S.def[c].segs; ++i) {
+                S.x[c][i] = rs(S.x[c][i]);
+                S.xp[c][i] = rs(S.xp[c][i]);
+            }
+        S.head.o = rs(S.head.o);
+        S.jp = rs(S.jp);
+        for (HairCollider& c : S.col) {
+            c.a = rs(c.a);
+            c.b = rs(c.b);
+            c.r0 *= r;
+            c.r1 *= r;
+        }
+    }
+    const float h = float(std::clamp(dt, 0.0, 0.1));
+    if (!reset && h > 1e-6f) {
+        const int n = std::clamp(int(std::ceil(h * kHairRate)), 1, 12);  // sub-steps
+        const float sh = h / float(n);
+        const Frame H0 = S.head;
+        const V3 vHead = (H.o - H0.o) * (1.0f / h), wHead = turnBetween(H0, H) * (1.0f / h);
+        const float g = kHairGravity * k;
+        const float drag = std::max(0.0f, 1.0f - kHairDrag * sh);
+        for (int step = 1; step <= n; ++step) {
+            const float f = float(step) / float(n);
+            const Frame hs = lerpFrame(H0, H, f);
+            HairCollider cs[kHairColliders];
+            for (int j = 0; j < kHairColliders; ++j) cs[j] = lerpCollider(S.col[j], col[j], f);
+            // The volumes' lag: a point after the head's center, a frame after its turn (springs relative to the
+            // head's own motion, so a steady glide or turn leaves only a small lag).
+            S.jv = S.jv + ((hs.o - S.jp) * (kLagWn * kLagWn) - (S.jv - vHead) * (2 * kLagZeta * kLagWn) - S.jv * kLagDrag) * sh;
+            S.jp = S.jp + S.jv * sh;
+            S.lw = S.lw + (turnBetween(S.lag, hs) * (kTurnWn * kTurnWn) - (S.lw - wHead) * (2 * kTurnZeta * kTurnWn) -
+                           S.lw * kTurnDrag) * sh;
+            S.lag.x = rotateBy(S.lag.x, S.lw * sh);
+            S.lag.y = rotateBy(S.lag.y, S.lw * sh);
+            S.lag.z = rotateBy(S.lag.z, S.lw * sh);
+            orthonormalize(S.lag);
+            // The chains.
+            for (int c = 0; c < S.chains; ++c) {
+                const HairChainDef& d = S.def[c];
+                V3* x = S.x[c];
+                V3* xp = S.xp[c];
+                const float L = length(d.b - d.a) * k / float(d.segs), rad = d.radius * k;
+                float firm;
+                const V3 dir0 = goalDir(d, hs, &firm);
+                // Verlet: inertia, drag, gravity. Each point's motion relative to the one above it is damped (hair
+                // is lossy: a swing dies out in a second or so instead of ringing), and held to a sane speed (a pose
+                // that jumps flings the hair, it doesn't throw it over the head).
+                V3 vel[kHairChainPts];
+                vel[0] = (hs.o + hs.dir(d.a) * k) - x[0];
+                for (int i = 1; i <= d.segs; ++i) vel[i] = x[i] - xp[i];
+                xp[0] = x[0];
+                x[0] = x[0] + vel[0];
+                const float vmax = kHairMaxSpeed * k * sh;
+                for (int i = 1; i <= d.segs; ++i) {
+                    const float soft = d.segs > 1 ? float(i - 1) / float(d.segs - 1) : 0.0f;
+                    const float wn = kHairShapeWn * d.stiff * (1.0f - (1.0f - kHairTipSoft) * soft);
+                    V3 rel = vel[i] - vel[i - 1];
+                    rel = rel * std::max(0.0f, 1.0f - 2.0f * kHairShapeZeta * d.damp * wn * sh);
+                    const float rm = length(rel);
+                    if (rm > vmax) rel = rel * (vmax / rm);
+                    vel[i] = vel[i - 1] + rel;
+                    xp[i] = x[i];
+                    x[i] = x[i] + vel[i] * drag + down * (g * sh * sh);
+                }
+                for (int i = 1; i <= d.segs; ++i) {
+                    // The shape: towards the rest direction (below the first link partly carrying on the parent's
+                    // direction, so a bend travels down the chain), softer towards the tip.
+                    V3 dir = dir0;
+                    if (i >= 2)
+                        dir = normalize(dir0 * (1 - kHairFollow) + normalize(x[i - 1] - x[i - 2], dir0) * kHairFollow, dir0);
+                    const float soft = d.segs > 1 ? float(i - 1) / float(d.segs - 1) : 0.0f;
+                    const float wn = kHairShapeWn * d.stiff * (1.0f - (1.0f - kHairTipSoft) * soft) / std::sqrt(hairAmt_);
+                    const float s = std::min(0.5f, wn * wn * sh * sh) * firm;
+                    x[i] = x[i] + ((x[i - 1] + dir * L) - x[i]) * s;
+                }
+                // The colliders this chain can reach this step (a quick test against the whole chain's reach).
+                HairCollider near[kHairColliders];
+                bool nearArm[kHairColliders] = {};
+                int nearN = 0;
+                const float reach = L * float(d.segs) + rad;
+                for (int j = 0; j < kHairColliders; ++j) {
+                    if (j == kColHead && !d.head) continue;
+                    const HairCollider cj = shrunk(cs[j], S.shrink[c][j] * k);
+                    const V3 ab = cj.b - cj.a;
+                    const float t = std::clamp(dot(x[0] - cj.a, ab) / std::max(dot(ab, ab), 1e-12f), 0.0f, 1.0f);
+                    const float spread = (j == kColTorso ? std::max(cj.sx, cj.sz) : 1.0f) * std::max(cj.r0, cj.r1);
+                    if (length(x[0] - (cj.a + ab * t)) < reach + spread) {
+                        nearArm[nearN] = j >= kColArms;
+                        near[nearN++] = cj;
+                    }
+                }
+                // Pushed out: no velocity into the body, a little friction along it.
+                auto push = [&](int at, V3 nrm, float by) {
+                    x[at] = x[at] + nrm * by;
+                    const V3 v = x[at] - xp[at];
+                    const float vn = dot(v, nrm);
+                    xp[at] = x[at] - ((v - nrm * vn) * 0.8f + nrm * std::max(0.0f, vn));
+                };
+                // The link from the point above to point i (an arm can pass between two points), where it comes
+                // closest to each collider's axis, then the point itself. The first link's upper half grows out of
+                // the head and lies on it.
+                auto collideLink = [&](int i) {
+                    for (int j = 0; j < nearN; ++j) {
+                        // (A long column's first link hangs by the shoulder: an arm raised there passes through it
+                        // rather than flick the column round from its root.)
+                        if (i == 1 && d.cone > 0 && nearArm[j]) continue;
+                        const HairCollider& cj = near[j];
+                        float u = linkClosest(x[i - 1], x[i], cj.a, cj.b);
+                        if (i == 1) u = std::max(u, 0.5f);
+                        for (const float at : {u, 1.0f}) {
+                            V3 nrm;
+                            const float depth = colliderDepth(cj, lerp(x[i - 1], x[i], at), rad, &nrm);
+                            if (depth <= 0) continue;
+                            if (i == 1) {  // the root is fixed: turn the link about it
+                                push(i, nrm, std::min(depth / at, 3.0f * depth));
+                            } else {  // move both ends, so the point on the link moves out by `depth`
+                                const float w = (1 - at) * (1 - at) + at * at;
+                                push(i - 1, nrm, depth * (1 - at) / w);
+                                push(i, nrm, depth * at / w);
+                            }
+                        }
+                    }
+                };
+                for (int i = 1; i <= d.segs; ++i) {
+                    // Lengths (follow the leader, root to tip), no sharp kinks (a joint bends at most 30 degrees: hair
+                    // curves, it doesn't fold), then out of the body and above the floor.
+                    V3 dirI = normalize(x[i] - x[i - 1], dir0);
+                    if (i >= 2) {
+                        const V3 up = normalize(x[i - 1] - x[i - 2], dir0);
+                        const float c = dot(dirI, up);
+                        if (c < kHairCosBend) {
+                            const V3 side = normalize(dirI - up * c, std::fabs(up.x) < 0.9f ? V3{1, 0, 0} : V3{0, 0, 1});
+                            dirI = up * kHairCosBend + side * kHairSinBend;
+                        }
+                    }
+                    if (d.cone > 0) {  // within the cone about the rest direction (head frame)
+                        const V3 rd = hs.dir(normalize(d.b - d.a));
+                        // (Upside down the cone opens, more so near the root: the hair falls off the head.)
+                        const float inv = (1.0f - firm) / 0.65f, f = float(i) / float(d.segs);
+                        const float most = std::min(2.9f, d.cone * (1.0f + 1.1f * inv)) * (f + (1.0f - f) * 0.5f * inv);
+                        const float c = dot(dirI, rd);
+                        if (c < std::cos(most)) {
+                            const V3 side = normalize(dirI - rd * c, std::fabs(rd.x) < 0.9f ? V3{1, 0, 0} : V3{0, 0, 1});
+                            dirI = normalize(lerp(dirI, rd * std::cos(most) + side * std::sin(most), kHairConeSoft), rd);
+                        }
+                    }
+                    x[i] = x[i - 1] + dirI * L;
+                    collideLink(i);
+                    const float above = std::max(rad, d.floor * k);
+                    if (x[i].y < above) {
+                        x[i].y = above;
+                        xp[i].y = std::min(xp[i].y, above);
+                    }
+                }
+                // Once more, tip to root, collisions only: a push further down can move a point back in.
+                for (int i = d.segs; i >= 1; --i) collideLink(i);
+            }
+        }
+        // Held to a sensible lag (a spin trails the volumes, it doesn't wind them round).
+        const V3 lt = S.jp - H.o;
+        const float lm = length(lt), lmax = kLagMax * R * k;
+        if (lm > lmax) S.jp = H.o + lt * (lmax / lm);
+        const V3 tr = turnBetween(H, S.lag);
+        const float tm = length(tr);
+        if (tm > std::sin(kTurnMax)) {
+            const V3 want = tr * (kTurnMax / std::max(tm, 1e-6f));
+            S.lag.x = rotateBy(H.x, want);
+            S.lag.y = rotateBy(H.y, want);
+            S.lag.z = rotateBy(H.z, want);
+        }
+    }
+    S.head = H;
+    S.place = place;
+    S.k = k;
+    for (int j = 0; j < kHairColliders; ++j) S.col[j] = col[j];
+    // Out: character space (as buildBody's pose and placement), the lag in the head frame.
+    hairOut_.chains = S.chains;
+    hairOut_.bendLong = longHair_;
+    for (int c = 0; c < S.chains; ++c)
+        for (int i = 0; i <= S.def[c].segs; ++i) hairOut_.pts[c][i] = (S.x[c][i] - place) * (1.0f / k);
+    const V3 lt = (S.jp - H.o) * (1.0f / k), tr = turnBetween(H, S.lag);
+    // (Hair 2: twice the lag, still held to the limits.)
+    const float more = std::min(hairAmt_, 2.0f);
+    hairOut_.lagT = V3{dot(lt, H.x), dot(lt, H.y), dot(lt, H.z)} * more;
+    hairOut_.lagR = V3{dot(tr, H.x), dot(tr, H.y), dot(tr, H.z)} * more;
+}
+
 void DancerRun::stepFeet(double beat, double dt, float moving) {
     // Body frame <-> stage floor. buildBody: the body frame is the placement (x_, z_, scale_) moved by (bodyX, bodyZ)
     // and turned by bodyYaw (local x -> (cos, -sin), local z -> (sin, cos) in stage x, z).
@@ -1865,7 +2645,7 @@ void DancerRun::stepFeet(double beat, double dt, float moving) {
     V3* foot[2] = {&pose_.footL, &pose_.footR};
     std::pair<float, float> home[2] = {toFloor(*foot[0]), toFloor(*foot[1])};
     // Walking when traveling (not while popping in or out); eased in and out.
-    const float want = (moving > 0.12f && scale_ > 0.6f) ? 1.0f : 0.0f;
+    const float want = (moving > 0.12f && scale_ > 0.6f && pose_.ground < 0.5f) ? 1.0f : 0.0f;  // (not on the floor)
     walk_ += (want - walk_) * float(std::min(1.0, dt * 4.0));
     const bool anySwing = feet_[0].swinging || feet_[1].swinging;
     if (!feetPlaced_ || (walk_ < 0.02f && !anySwing)) {
@@ -1934,11 +2714,155 @@ void DancerRun::stepFeet(double beat, double dt, float moving) {
     }
 }
 
+void DancerRun::pinContacts(double dt) {
+    // Planted contacts (2026-11-27, docs/dancers-design.md "Floor moves held still"): a hand, foot, knee or the head the
+    // source dancer had planted is held where it came down (stage x, z): the feet's and hands' targets moved back to
+    // it, the knees and head (and hands out of reach) by shifting the whole body (at most kMaxShift). A plant takes
+    // hold where the contact is when it starts (no jump), lets go with the source's weight, and gives up (eased out)
+    // where it can't be held.
+    constexpr float kMaxShift = 0.15f, kShiftSpeed = 0.6f, kHandGiveUp = 0.08f, kFootGiveUp = 0.12f, kRootGiveUp = 0.2f;
+    const float fdt = float(std::clamp(dt, 1e-4, 0.1));
+    const float g = std::clamp(pose_.ground, 0.0f, 1.0f);
+    const float src[7] = {pose_.pinHandL, pose_.pinHandR, pose_.pinFootL, pose_.pinFootR,
+                          pose_.pinKneeL, pose_.pinKneeR, pose_.pinHead};
+    const float k = std::max(scale_, 0.05f);
+    bool any = std::fabs(rootX_) + std::fabs(rootZ_) > 1e-6f;
+    for (int i = 0; i < 7; ++i) any = any || src[i] * g > 0.02f || pins_[i].on;
+    if (!any) return;
+    auto applyShift = [&](float dx, float dz) {  // stage units
+        pose_.bodyX += dx / k;
+        pose_.bodyZ += dz / k;
+    };
+    applyShift(rootX_, rootZ_);
+    // Where each contact is now (stage x, z): the hand and foot targets, the knees and the head as the rig puts them.
+    auto stageOf = [&](V3 q) { return std::pair<float, float>{x_ + k * q.x, z_ + k * q.z}; };
+    auto bodyPoint = [&](V3 f) {
+        const float c = std::cos(pose_.bodyYaw), sn = std::sin(pose_.bodyYaw);
+        return V3{pose_.bodyX + f.x * c + f.z * sn, f.y, pose_.bodyZ - f.x * sn + f.z * c};
+    };
+    auto where = [&](int i) {
+        switch (i) {
+            case 0: return stageOf(chestFrame(sk_, pose_).point(pose_.handL));
+            case 1: return stageOf(chestFrame(sk_, pose_).point(pose_.handR));
+            case 2: return stageOf(bodyPoint(pose_.footL));
+            case 3: return stageOf(bodyPoint(pose_.footR));
+            case 4: return stageOf(kneeAt(sk_, pose_, 0));
+            case 5: return stageOf(kneeAt(sk_, pose_, 1));
+            default: return stageOf(headFrame(sk_, pose_).o);
+        }
+    };
+    float w[7];
+    for (int i = 0; i < 7; ++i) {
+        Pin& p = pins_[i];
+        const float want = src[i] * g;
+        if (want < 0.02f) {  // let go (the source's weight eased it out)
+            p = Pin{};
+            w[i] = 0;
+            continue;
+        }
+        if (!p.on && !p.gaveUp) {
+            const auto at = where(i);
+            p.on = true;
+            p.x = at.first;
+            p.z = at.second;
+            p.amt = 1;
+        }
+        if (p.gaveUp) p.amt = std::max(0.0f, p.amt - fdt / 0.15f);
+        w[i] = p.on ? want * p.amt : 0.0f;
+        if (p.on && p.gaveUp && p.amt <= 0) p.on = false;
+    }
+    // The body's shift: the knees and the head.
+    {
+        float ex = 0, ez = 0, ws = 0;
+        for (int i = 4; i < 7; ++i) {
+            if (w[i] <= 0) continue;
+            const auto at = where(i);
+            const float dx = pins_[i].x - at.first, dz = pins_[i].z - at.second;
+            if (!pins_[i].gaveUp && std::hypot(dx, dz) > kRootGiveUp) pins_[i].gaveUp = true;
+            ex += w[i] * dx;
+            ez += w[i] * dz;
+            ws += w[i];
+        }
+        float dx, dz;
+        if (ws > 0) {
+            dx = ex / std::max(1.0f, ws);
+            dz = ez / std::max(1.0f, ws);
+        } else {  // nothing held by the body: the shift eases back
+            const float back = 1 - std::exp(-fdt / 0.4f);
+            dx = -rootX_ * back;
+            dz = -rootZ_ * back;
+        }
+        const float step = std::hypot(dx, dz), most = (ws > 0 ? kShiftSpeed : 0.3f) * fdt;
+        if (step > most) dx *= most / step, dz *= most / step;
+        float nx = rootX_ + dx, nz = rootZ_ + dz;
+        const float len = std::hypot(nx, nz);
+        if (len > kMaxShift) nx *= kMaxShift / len, nz *= kMaxShift / len;
+        applyShift(nx - rootX_, nz - rootZ_);
+        rootX_ = nx;
+        rootZ_ = nz;
+    }
+    // Feet: back to where they came down (body frame).
+    const float c = std::cos(pose_.bodyYaw), sn = std::sin(pose_.bodyYaw);
+    for (int side = 0; side < 2; ++side) {
+        const int i = 2 + side;
+        if (w[i] <= 0) continue;
+        const auto at = where(i);
+        const float dx = (pins_[i].x - at.first) / k, dz = (pins_[i].z - at.second) / k;
+        if (!pins_[i].gaveUp && std::hypot(dx, dz) * k > kFootGiveUp) pins_[i].gaveUp = true;
+        V3& f = side == 0 ? pose_.footL : pose_.footR;
+        f.x += (dx * c - dz * sn) * w[i];
+        f.z += (dx * sn + dz * c) * w[i];
+    }
+    // Hands: the target moved back in the chest frame, within the arm's reach.
+    for (int side = 0; side < 2; ++side) {
+        if (w[side] <= 0) continue;
+        const Frame chest = chestFrame(sk_, pose_);
+        const auto at = where(side);
+        const V3 e{(pins_[side].x - at.first) / k * w[side], 0, (pins_[side].z - at.second) / k * w[side]};
+        V3& h = side == 0 ? pose_.handL : pose_.handR;
+        V3 nh = h + V3{dot(e, chest.x), dot(e, chest.y), dot(e, chest.z)};
+        const V3 shoulder{(side == 0 ? 1.0f : -1.0f) * sk_.shoulderHalf, sk_.shoulderY, 0};
+        const float reach = 0.995f * (sk_.upperArm + sk_.forearm);
+        const V3 r = nh - shoulder;
+        if (length(r) > reach) nh = shoulder + r * (reach / length(r));
+        const V3 lost = chest.point(nh) - chest.point(h) - e;  // what the arm couldn't reach
+        if (!pins_[side].gaveUp && std::hypot(lost.x, lost.z) * k > kHandGiveUp) pins_[side].gaveUp = true;
+        h = nh;
+    }
+}
+
+void DancerRun::floorInfo(MinglePerson& p, double beat) const {
+    p.floor = 0;
+    if (leaving()) return;
+    const bool on = pose_.ground >= 0.3f || floorHold_ > 0.05f;
+    if (on) {
+        p.floor = 2;
+        p.reach = reachNow_;
+        return;
+    }
+    if (choreo_.bustMoveAt(danceBeat(beat), true)) {
+        p.floor = 1;
+        p.reach = bustMoveReach().scaled(legRatio_);
+        return;
+    }
+    const int m = choreo_.floorPending();
+    if (m >= 0 && moveLibrary()[std::size_t(m)].clip >= 0) {
+        p.floor = 1;
+        p.reach = clipInfo(moveLibrary()[std::size_t(m)].clip).reach.scaled(legRatio_);
+    }
+}
+
+float floorNeed(const FloorReach& r, float facing, float dx, float dz, float pad) {
+    // Angle from the floor dancer's front (+z turned by `facing`) towards (dx, dz), + towards their left (+x).
+    const float a = std::atan2(dx, dz) - facing;
+    return r.toward(a) + pad;
+}
+
 void DancerRun::build(BodyOut& out) const {
     if (scale_ <= 1e-3f) return;
     Frame place;
     place.o = {x_, lift_, z_};
-    buildBody(spec_.look, sk_, pose_, place, scale_, out);
+    buildBody(spec_.look, sk_, pose_, place, scale_, out, hairPhysics() && sim_.set ? &hairOut_ : nullptr);
 }
 
 std::string DancerRun::describe(double) const { return desc_; }

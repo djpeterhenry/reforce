@@ -75,6 +75,10 @@ private:
     uint32_t meshIndices_ = 0;
     MTL::Buffer* mesh_ = nullptr;     // unique capsule vertices
     MTL::Buffer* meshIdx_ = nullptr;  // 16-bit triangle indices
+    // The tube mesh (a capsule with rings along its band): long hair that bends.
+    uint32_t tubeIndices_ = 0;
+    MTL::Buffer* tube_ = nullptr;
+    MTL::Buffer* tubeIdx_ = nullptr;
     std::vector<MTL::Buffer*> ring_;
     std::size_t ringNext_ = 0;
     MTL::Texture* target_ = nullptr;

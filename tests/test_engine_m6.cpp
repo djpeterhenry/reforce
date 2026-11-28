@@ -826,6 +826,8 @@ TEST_CASE("slideshow settings from the panel map to settings.json keys") {
     // Syphon alpha (docs/syphon-alpha.md).
     CHECK(one(slideshowSaveEntries(Command::videoSet("syphonalpha", "on")), "reforce.Syphon.Alpha") == "1");
     CHECK(one(slideshowSaveEntries(Command::videoSet("syphonalpha", "off")), "reforce.Syphon.Alpha") == "0");
+    // The sync test flash is never saved (it must not come back on during a stream).
+    CHECK(slideshowSaveEntries(Command::videoSet("beatflash", "on")).entries().empty());
     CHECK(one(slideshowSaveEntries(Command::videoSet("windowvisuals", "on")), "reforce.Window.VisualsOnly") == "1");
     CHECK(one(slideshowSaveEntries(Command::videoSet("windowvisuals", "off")), "reforce.Window.VisualsOnly") == "0");
     CHECK(one(slideshowSaveEntries(Command::videoSet("keysimilarity", "120")), "reforce.Syphon.KeySimilarity") == "120");

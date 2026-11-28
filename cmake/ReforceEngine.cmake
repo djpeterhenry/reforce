@@ -145,6 +145,9 @@ if(REFORCE_BUILD_TESTS)
         tests/test_engine_arcade_chase.cpp
         tests/test_engine_dancers.cpp
         tests/test_engine_danceclips.cpp
+        tests/test_engine_hair.cpp
+        tests/test_engine_floorslide.cpp
+        tests/test_engine_spin.cpp
         tests/test_engine_body.cpp
         tests/test_hotkeys.cpp
         tests/test_packaging.cpp

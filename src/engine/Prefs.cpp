@@ -373,6 +373,9 @@ void Settings::apply(const PrefsTable& t) {
     dancerHeight = std::clamp(t.number("reforce.Dancer.Height", dancerHeight), 0.15, 0.9);
     dancerHuman = std::clamp(t.number("reforce.Dancer.Human", dancerHuman), 0.0, 2.0);
     dancerMocap = std::clamp(t.number("reforce.Dancer.Mocap", dancerMocap), 0.0, 1.0);
+    dancerFloorMoves = std::clamp(t.number("reforce.Dancer.FloorMoves", t.number("reforce.Dancer.Footwork", dancerFloorMoves)), 0.0, 4.0);
+    dancerHair = std::clamp(t.number("reforce.Dancer.Hair", dancerHair), 0.0, 2.0);
+    dancerLongHair = t.flag("reforce.Dancer.LongHair", dancerLongHair);
     guestsEnabled = t.flag("reforce.Guests.Enabled", guestsEnabled);
     guestsUrl = t.string("reforce.Guests.Url", guestsUrl);
     guestsKey = t.string("reforce.Guests.Key", guestsKey);

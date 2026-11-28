@@ -13,11 +13,14 @@
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
+#include <string>
 #include <vector>
 
 #include "engine/Dancers.hpp"
 #include "engine/Perf.hpp"
 #include "render/DancerPipeline.hpp"
+#include "render/ImageFiles.hpp"
 
 using namespace reforce;
 using namespace reforce::engine::dance;
@@ -296,6 +299,129 @@ TEST_CASE("dancers: generated characters (every fabric, print and sunglasses sha
     MESSAGE("9 generated dancers (" << p.lastParts() << " parts) + floor at 1080p: " << sum / 30 << " ms GPU");
     CHECK(drew);
     PERF_BUDGET(sum / 30 < 5.0);  // ~1.7 ms alone; 3.35 ms seen with ctest -j8 sharing the GPU
+    out->release();
+    q->release();
+}
+
+TEST_CASE("dancers: long hair that bends: drawn with the tube mesh; still, as the straight tube; bent, the hair moves") {
+    if (!device()) return;
+    const int W = 640, H = 640;
+    render::DancerPipeline p(device(), W, H, {});
+    MTL::CommandQueue* q = device()->newCommandQueue();
+    MTL::Texture* out = makeOutput(W, H);
+    engine::DancerSpec spec = engine::generateDancer(engine::dance::Style::Jazz, 5);
+    spec.look.hairStyle = HairStyle::Long;
+    spec.look.hat = Hat::None;
+    spec.look.glasses = Glasses::None;
+    const Skeleton sk = makeSkeleton(spec.look);
+    // Close up, from behind and a little to the side (the hair fills the frame).
+    render::DancerStage st;
+    st.cam = engine::stageCamera(1.0, 0.95);
+    st.bodies.resize(1);
+    st.bodyCount = 1;
+    Frame place;
+    place.o = {0, 0, 0};
+    place = place.rotatedY(2.6f);
+    place.o = {0, 0, 0};
+    auto render = [&](const BodyOut& body) {
+        st.bodies[0] = body;
+        fill(out, 0, 0, 0);
+        encodeOnce(p, q, out, st);
+        return read(out);
+    };
+    auto differ = [](const std::vector<std::uint8_t>& a, const std::vector<std::uint8_t>& b) {
+        int n = 0;
+        for (std::size_t i = 0; i < a.size(); i += 4)
+            n += std::abs(int(a[i]) - int(b[i])) + std::abs(int(a[i + 1]) - int(b[i + 1])) +
+                     std::abs(int(a[i + 2]) - int(b[i + 2])) > 24;
+        return n;
+    };
+    auto unbent = [](BodyOut b) {
+        for (BodyPart& part : b.parts) part.bent = false;
+        return b;
+    };
+    auto drawn = [](const std::vector<std::uint8_t>& a) {
+        int n = 0;
+        for (std::size_t i = 0; i < a.size(); i += 4) n += a[i] + a[i + 1] + a[i + 2] > 0;
+        return n;
+    };
+    // Still: the bend changes nothing (only the tube mesh's extra rings: a few edge pixels).
+    HairState still;
+    still.bendLong = true;
+    BodyOut rest;
+    buildBody(spec.look, sk, restPose(sk), place, 1.0f, rest, &still);
+    const auto a = render(rest), b = render(unbent(rest));
+    const int body = drawn(a);
+    MESSAGE("still: " << differ(a, b) << " of " << body << " body pixels differ");
+    CHECK(body > 10000);
+    CHECK(differ(a, b) * 200 < body);
+    // Spun: the columns swing out and the drawn hair follows them (unlike the straight tube with the same parts).
+    engine::DancerRun run(spec, 5, 0.0, 0.0, 0.0);
+    for (int i = 0; i < 60; ++i) run.step(i / 60.0, 1.0 / 60, MusicState{}, 1.0f);
+    DancePose spin = restPose(sk);
+    for (int i = 0; i < 50; ++i) {
+        spin.bodyYaw = float(i) / 60.0f * 9.0f;
+        run.stepHairWithPose(spin, 1.0 / 60);
+    }
+    spin.bodyYaw = 0;  // (the hair as the spin left it, the body facing as before)
+    BodyOut bent;
+    buildBody(spec.look, sk, spin, place, 1.0f, bent, &run.hairState());
+    const auto c = render(bent), d = render(unbent(bent));
+    MESSAGE("spun: " << differ(c, d) << " of " << drawn(c) << " body pixels differ from the straight tube");
+    CHECK(differ(c, d) * 20 > drawn(c));
+    out->release();
+    q->release();
+}
+
+// Not part of the suite: still views of the long styles, rigid (LongHair 0) and bending (1), each settled standing,
+// from the front, 3/4 and behind, written as PNGs (REFORCE_REST_VIEWS=dir).
+// Run: REFORCE_REST_VIEWS=/tmp/x reforce_render_tests -tc="*rest views*" --no-skip
+TEST_CASE("dancers: long hair that bends: rest views" * doctest::skip()) {
+    const char* dir = std::getenv("REFORCE_REST_VIEWS");
+    if (!device() || !dir) return;
+    const int W = 520, H = 520;
+    render::DancerPipeline p(device(), W, H, {});
+    MTL::CommandQueue* q = device()->newCommandQueue();
+    MTL::Texture* out = makeOutput(W, H);
+    render::DancerStage st;
+    st.cam = engine::stageCamera(1.0, 1.0, engine::kFloorZMin, 0.75);
+    st.bodies.resize(1);
+    st.bodyCount = 1;
+    const struct {
+        const char* name;
+        HairStyle style;
+        engine::dance::Style dance;
+    } looks[] = {{"long", HairStyle::Long, engine::dance::Style::Jazz},
+                 {"layers", HairStyle::Layers, engine::dance::Style::House},
+                 {"bangs", HairStyle::Bangs, engine::dance::Style::Pop},
+                 {"hugecurls", HairStyle::HugeCurls, engine::dance::Style::Disco}};
+    for (const auto& l : looks) {
+        engine::DancerSpec spec = engine::generateDancer(l.dance, 3);
+        spec.look.hairStyle = l.style;
+        spec.look.hat = Hat::None;
+        const Skeleton sk = makeSkeleton(spec.look);
+        for (int bend = 0; bend < 2; ++bend) {
+            engine::DancerRun run(spec, 3, 0.0, 0.0, 0.0);
+            run.setLongHair(bend == 1);
+            for (int i = 0; i < 60; ++i) run.step(i / 60.0, 1.0 / 60, MusicState{}, 1.0f);
+            for (int i = 0; i < 300; ++i) run.stepHairWithPose(restPose(sk), 1.0 / 60);
+            const char* views[] = {"front", "34", "back"};
+            const float yaw[] = {0.0f, 0.8f, 3.1416f};
+            for (int v = 0; v < 3; ++v) {
+                Frame place;
+                place = place.rotatedY(yaw[v]);
+                place.o = {0, 0, 0.2f};
+                BodyOut body;
+                buildBody(spec.look, sk, restPose(sk), place, 1.0f, body, &run.hairState());
+                st.bodies[0] = body;
+                fill(out, 0, 0, 0);
+                encodeOnce(p, q, out, st);
+                const auto px = read(out);
+                const std::string path = std::string(dir) + "/" + l.name + "_" + views[v] + "_" + (bend ? "after" : "before") + ".png";
+                CHECK(render::writePngBgra8(path, px.data(), W, H, std::size_t(W) * 4));
+            }
+        }
+    }
     out->release();
     q->release();
 }

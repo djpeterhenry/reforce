@@ -9,7 +9,7 @@
 
 import createDancerModule from './dancer.js';
 
-const FLOATS = 76;          // engine::kDancerInstFloats
+const FLOATS = 100;         // engine::kDancerInstFloats
 const TEXELS = FLOATS / 4;  // instance rows: one RGBA32F texel per float4
 const MAX_PARTS = 512;
 
@@ -20,13 +20,14 @@ uniform highp sampler2D uInst;
 uniform mat4 uViewProj;
 uniform vec4 uEye;       // xyz, proj11
 uniform vec4 uViewport;  // width, height, outline px
+uniform int uBase;       // the first instance of this draw (the bent parts come last)
 layout(location = 0) in vec3 aDir;
 layout(location = 1) in float aEnd;
 out vec3 vWorld;
 out vec3 vN;
 out vec3 vLocal;
 flat out int vIid;
-vec4 row(int k) { return texelFetch(uInst, ivec2(k, gl_InstanceID), 0); }
+vec4 row(int k) { return texelFetch(uInst, ivec2(k, gl_InstanceID + uBase), 0); }
 vec3 capsuleLocal(out vec3 nl) {
   vec4 geo = row(9);
   float r = mix(geo.y, geo.z, aEnd);
@@ -35,6 +36,36 @@ vec3 capsuleLocal(out vec3 nl) {
   else nl = d;
   return vec3(d.x * r, aEnd * geo.x + d.y * r, d.z * r);
 }
+// Long hair that bends: as DancerPipeline bendHair (keep in step).
+void bendHair(vec3 local, vec3 nl, inout vec3 w, inout vec3 n) {
+  vec4 geo = row(9);
+  vec3 m0 = row(0).xyz, m1 = row(1).xyz, m2 = row(2).xyz;
+  float sx = length(m0), sz = length(m2);
+  vec3 fx = m0 / sx, fy = m1, fz = m2 / sz;
+  vec3 q = vec3(local.x * sx, local.y, local.z * sz);
+  float y0 = row(19).w, span = geo.x - y0;
+  if (q.y <= y0 || span < 1e-6) return;
+  float t = min((q.y - y0) / span, 1.0), extra = q.y - y0 - t * span, u = 1.0 - t;
+  float s = clamp(local.x / max(mix(geo.y, geo.z, aEnd), 1e-6), -1.0, 1.0);
+  vec3 p0 = vec3(0.0, y0, 0.0), p1 = vec3(0.0, y0 + span / 3.0, 0.0);
+  vec3 n0 = vec3(nl.x / sx, nl.y, nl.z / sz);
+  vec3 P = vec3(0.0), N = vec3(0.0);
+  for (int c = 0; c < 3; ++c) {
+    float wc = c == 0 ? 1.0 - abs(s) : c == 1 ? max(s, 0.0) : max(-s, 0.0);
+    vec3 anchor = c == 0 ? vec3(0.0, 0.0, row(20).w) : vec3(c == 1 ? row(21).w : -row(21).w, 0.0, row(22).w);
+    vec3 p2 = row(19 + c * 2).xyz, p3 = row(20 + c * 2).xyz;
+    vec3 B = p0 * (u * u * u) + p1 * (3.0 * u * u * t) + p2 * (3.0 * u * t * t) + p3 * (t * t * t);
+    vec3 dB = (p1 - p0) * (3.0 * u * u) + (p2 - p1) * (6.0 * u * t) + (p3 - p2) * (3.0 * t * t);
+    vec3 T = normalize(dB + vec3(0.0, 1e-7, 0.0));
+    vec3 k = vec3(T.z, 0.0, -T.x);
+    float c1 = max(1.0 + T.y, 1e-4);
+    vec3 off = vec3(q.x, 0.0, q.z) - anchor;
+    P += wc * (B + anchor + off * T.y + cross(k, off) + k * (dot(k, off) / c1) + T * extra);
+    N += wc * (n0 * T.y + cross(k, n0) + k * (dot(k, n0) / c1));
+  }
+  w = fx * P.x + fy * P.y + fz * P.z + row(3).xyz;
+  n = fx * N.x + fy * N.y + fz * N.z;
+}
 `;
 
 const VS_BODY = VS_COMMON + `
@@ -42,11 +73,13 @@ void main() {
   vec3 nl;
   vec3 local = capsuleLocal(nl);
   vec3 w = row(0).xyz * local.x + row(1).xyz * local.y + row(2).xyz * local.z + row(3).xyz;
+  vec3 n = row(4).xyz * nl.x + row(5).xyz * nl.y + row(6).xyz * nl.z;
+  if (row(19).w > 0.0) bendHair(local, nl, w, n);
   gl_Position = uViewProj * vec4(w, 1.0);
   vWorld = w;
-  vN = row(4).xyz * nl.x + row(5).xyz * nl.y + row(6).xyz * nl.z;
+  vN = n;
   vLocal = local;
-  vIid = gl_InstanceID;
+  vIid = gl_InstanceID + uBase;
 }`;
 
 const VS_OUTLINE = VS_COMMON + `
@@ -54,14 +87,16 @@ void main() {
   vec3 nl;
   vec3 local = capsuleLocal(nl);
   vec3 w = row(0).xyz * local.x + row(1).xyz * local.y + row(2).xyz * local.z + row(3).xyz;
-  vec3 n = normalize(row(4).xyz * nl.x + row(5).xyz * nl.y + row(6).xyz * nl.z);
+  vec3 n = row(4).xyz * nl.x + row(5).xyz * nl.y + row(6).xyz * nl.z;
+  if (row(19).w > 0.0) bendHair(local, nl, w, n);
+  n = normalize(n);
   vec4 c = uViewProj * vec4(w, 1.0);
   w += n * (uViewport.z * c.w * 2.0 / (uViewport.y * uEye.w));
   gl_Position = row(9).w > 0.5 ? uViewProj * vec4(w, 1.0) : vec4(0.0, 0.0, 2.0, 1.0);
   vWorld = w;
   vN = n;
   vLocal = local;
-  vIid = gl_InstanceID;
+  vIid = gl_InstanceID + uBase;
 }`;
 
 const FS_COMMON = `#version 300 es
@@ -419,10 +454,11 @@ void main() {
 }`;
 
 // render/DancerPipeline capsuleMesh: a unit sphere split at the equator, the lower half at end 0 and the upper half
-// at end 1. Counter-clockwise from outside.
-function capsuleMesh(segments = 32, rings = 12) {
+// at end 1 (`bandRings` rings between them: the tube mesh, long hair that bends). Counter-clockwise from outside.
+function capsuleMesh(segments = 32, rings = 12, bandRings = 0) {
   const rs = [];
   for (let i = 0; i <= rings; ++i) { const a = -Math.PI / 2 + (Math.PI / 2) * i / rings; rs.push([Math.sin(a), Math.cos(a), 0]); }
+  for (let i = 1; i <= bandRings; ++i) rs.push([0, 1, i / (bandRings + 1)]);
   for (let i = 0; i <= rings; ++i) { const a = (Math.PI / 2) * i / rings; rs.push([Math.sin(a), Math.cos(a), 1]); }
   const cols = segments + 1;
   const verts = new Float32Array(rs.length * cols * 4);
@@ -487,19 +523,23 @@ export async function createDancerView(canvas, opts = {}) {
 
   const body = compile(gl, VS_BODY, FS_BODY);
   const outline = compile(gl, VS_OUTLINE, FS_OUTLINE);
-  const mesh = capsuleMesh();
-  const vao = gl.createVertexArray();
-  gl.bindVertexArray(vao);
-  const vb = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, vb);
-  gl.bufferData(gl.ARRAY_BUFFER, mesh.verts, gl.STATIC_DRAW);
-  gl.enableVertexAttribArray(0);
-  gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 16, 0);
-  gl.enableVertexAttribArray(1);
-  gl.vertexAttribPointer(1, 1, gl.FLOAT, false, 16, 12);
-  const ib = gl.createBuffer();
-  gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, mesh.indices, gl.STATIC_DRAW);
+  // The capsule mesh, and the tube mesh for the bent parts (long hair that bends).
+  const meshVao = (mesh) => {
+    const vao = gl.createVertexArray();
+    gl.bindVertexArray(vao);
+    const vb = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vb);
+    gl.bufferData(gl.ARRAY_BUFFER, mesh.verts, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 16, 0);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 1, gl.FLOAT, false, 16, 12);
+    const ib = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, mesh.indices, gl.STATIC_DRAW);
+    return { vao, count: mesh.indices.length };
+  };
+  const capsule = meshVao(capsuleMesh()), tube = meshVao(capsuleMesh(32, 12, 24));
   const tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGBA32F, TEXELS, MAX_PARTS);
@@ -507,7 +547,8 @@ export async function createDancerView(canvas, opts = {}) {
   const loc = (p, n) => gl.getUniformLocation(p, n);
   const U = {};
   for (const [name, p] of [['b', body], ['o', outline]])
-    U[name] = { inst: loc(p, 'uInst'), vp: loc(p, 'uViewProj'), eye: loc(p, 'uEye'), viewport: loc(p, 'uViewport'), beat: loc(p, 'uBeat') };
+    U[name] = { inst: loc(p, 'uInst'), vp: loc(p, 'uViewProj'), eye: loc(p, 'uEye'), viewport: loc(p, 'uViewport'), beat: loc(p, 'uBeat'),
+                base: loc(p, 'uBase') };
 
   let bpm = opts.bpm || 120, raf = 0, keysText = '', stopped = false;
   const seed = opts.seed || 7;
@@ -536,7 +577,8 @@ export async function createDancerView(canvas, opts = {}) {
     if (!w || !h) return;
     if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
     const t = performance.now() / 1000 - t0;
-    const n = Math.min(mod._dancer_frame(t, bpm), MAX_PARTS);
+    const all = mod._dancer_frame(t, bpm), n = Math.min(all, MAX_PARTS);
+    const bent = all <= MAX_PARTS ? mod._dancer_bent() : 0;  // the last `bent` parts: drawn with the tube mesh
     gl.viewport(0, 0, w, h);
     gl.clearColor(0, 0, 0, 0);
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -554,7 +596,6 @@ export async function createDancerView(canvas, opts = {}) {
     const vp = mul(perspective(fov, aspect, 0.05, 30), lookAt(eye, target));
     const proj11 = 1 / Math.tan(fov / 2);
     gl.enable(gl.DEPTH_TEST);
-    gl.bindVertexArray(vao);
     gl.activeTexture(gl.TEXTURE0);
     for (const [prog, u, cull] of [[body, U.b, false], [outline, U.o, true]]) {
       gl.useProgram(prog);
@@ -564,7 +605,12 @@ export async function createDancerView(canvas, opts = {}) {
       gl.uniform4f(u.viewport, w, h, 2.2 * dpr, 0);  // outline width in device pixels
       if (u.beat) gl.uniform1f(u.beat, t * bpm / 60);
       if (cull) { gl.enable(gl.CULL_FACE); gl.cullFace(gl.FRONT); } else gl.disable(gl.CULL_FACE);
-      gl.drawElementsInstanced(gl.TRIANGLES, mesh.indices.length, gl.UNSIGNED_SHORT, 0, n);
+      for (const [m, base, count] of [[capsule, 0, n - bent], [tube, n - bent, bent]]) {
+        if (count <= 0) continue;
+        gl.bindVertexArray(m.vao);
+        gl.uniform1i(u.base, base);
+        gl.drawElementsInstanced(gl.TRIANGLES, m.count, gl.UNSIGNED_SHORT, 0, count);
+      }
     }
   }
 

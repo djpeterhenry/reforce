@@ -422,6 +422,13 @@ std::string Visualizer::setVideoParam(const std::string& key, const std::string&
         rlog("[reforce] Syphon alpha %s\n", syphonAlpha_ ? "on" : "off");
         return {};
     }
+    if (k == "beatflash") {  // sync test flash (beatFlashOn): not saved
+        if (v == "1" || v == "on" || v == "true" || v == "yes") beatFlash_ = true;
+        else if (v == "0" || v == "off" || v == "false" || v == "no") beatFlash_ = false;
+        else return "beatflash: on | off";
+        rlog("[reforce] sync test flash %s\n", beatFlash_ ? "on" : "off");
+        return {};
+    }
     if (k == "lightspair") {  // room lights: pair with the panels (start | cancel)
         if (v != "start" && v != "cancel") return "lightspair: start | cancel";
         if (!lightsOut_) return "lights: not in this instance (offline, or --background without --lights)";
@@ -665,6 +672,7 @@ void Visualizer::videoState(engine::VideoState& v, double t) const {
     v.beatSync = movieBeatSyncOn();
     v.spriteColor = movieColorOver_ ? "over" : "off";
     v.syphonAlpha = syphonAlpha_;
+    v.beatFlash = beatFlash_;
     v.windowVisuals = windowVisualsOnly_;
     v.lightsAvailable = lightsOut_ != nullptr;
     v.lightsOn = lights_.enabled;

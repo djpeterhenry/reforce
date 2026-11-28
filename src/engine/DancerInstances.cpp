@@ -59,6 +59,16 @@ void packDancerPart(const dance::BodyPart& p, const dance::BodyOut& body, float*
     if (p.material == dance::Material::Strands) std::memcpy(o + 68, p.clip2.data(), 4 * sizeof(float));
     else put(o + 68, fc.lips, 0);
     put(o + 72, fc.hair, 0);
+    if (p.bent) {
+        const dance::HairBend& b = body.bend;
+        const float w[6] = {b.y0, b.backZ, b.sideX, b.sideZ, 0, 0};
+        for (int c = 0; c < 3; ++c) {
+            put(o + 76 + c * 8, b.p2[c], w[c * 2]);
+            put(o + 80 + c * 8, b.p3[c], w[c * 2 + 1]);
+        }
+    } else {
+        std::memset(o + 76, 0, 24 * sizeof(float));
+    }
 }
 
 }  // namespace reforce::engine

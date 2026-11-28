@@ -1,8 +1,10 @@
+#include <map>
 // Dancers (PLAN 5P, docs/dancers-design.md): rig, IK, body parts, moves, styles, choreographer.
 #include <doctest/doctest.h>
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <vector>
 #include <set>
 #include <string>
@@ -247,7 +249,7 @@ TEST_CASE("dancers: the choreographer is deterministic, varied and changes on ba
     CHECK(differ > 1000);  // different seeds dance differently
 }
 
-TEST_CASE("dancers: a drop fires a jump; canon is a lagged copy") {
+TEST_CASE("dancers: a drop fires a jump; a delayed pose is a lagged copy") {
     const Skeleton sk = makeSkeleton(Look{});
     ChoreoOptions o;
     o.style = Style::House;
@@ -348,69 +350,6 @@ TEST_CASE("dancers: a run says hello, dances, and leaves after its hold") {
     CHECK(t < 13.0);  // the goodbye takes a couple of seconds
 }
 
-TEST_CASE("dancers: social mode is often social, sometimes the audience; pairs face each other") {
-    using namespace reforce::engine;
-    int social = 0, cypher = 0, show = 0;
-    for (long seg = 0; seg < 300; ++seg) {
-        const SocialMode m = pickSocialMode("auto", 4, seg, 99);
-        if (m == SocialMode::Show) ++show;
-        else ++social;
-        if (m == SocialMode::Cypher) ++cypher;
-        // never two show segments in a row
-        if (seg > 0 && m == SocialMode::Show) CHECK(pickSocialMode("auto", 4, seg - 1, 99) != SocialMode::Show);
-    }
-    CHECK(social > 180);
-    CHECK(show > 40);
-    CHECK(cypher > 20);
-    CHECK(pickSocialMode("off", 4, 3, 1) == SocialMode::Show);
-    CHECK(pickSocialMode("auto", 1, 3, 1) == SocialMode::Show);
-    for (long seg = 0; seg < 50; ++seg) CHECK(pickSocialMode("always", 2, seg, 5) != SocialMode::Show);
-    for (long seg = 0; seg < 50; ++seg) CHECK(pickSocialMode("always", 2, seg, 5) != SocialMode::Cypher);
-
-    const auto cam = stageCamera(16.0 / 9.0, 0.42);
-    // Partners: a pair faces each other (left one turned right), the second mirrors the first.
-    auto p = planStage(4, cam, SocialMode::Partner, 0);
-    REQUIRE(p.size() == 4);
-    CHECK(p[0].x < p[1].x);
-    CHECK(p[0].facing > 0.8f);
-    CHECK(p[1].facing < -0.8f);
-    CHECK(p[1].leader == 0);
-    CHECK(p[1].mirror);
-    CHECK(p[3].leader == 2);
-    // Five: a pair and a trio; the trio's back dancer faces forward.
-    p = planStage(5, cam, SocialMode::Side, 0);
-    CHECK(p[4].z < p[2].z);
-    CHECK(std::fabs(p[4].facing) < 0.9f);  // towards the trio (tilted at random), not sideways
-    // Call and response: one dances, the partner watches; they swap after 2 bars.
-    p = planStage(2, cam, SocialMode::Call, 0);
-    CHECK(p[0].react != p[1].react);
-    const bool first = p[0].react;
-    p = planStage(2, cam, SocialMode::Call, 2.0);
-    CHECK(p[0].react != first);
-    // Cypher: one soloist in front facing the audience, the rest behind facing them and cheering; the soloist turns
-    // over every 2 bars.
-    p = planStage(4, cam, SocialMode::Cypher, 4.0);
-    int solo = -1;
-    for (int i = 0; i < 4; ++i)
-        if (!p[std::size_t(i)].react) solo = i;
-    REQUIRE(solo >= 0);
-    CHECK(std::isnan(p[std::size_t(solo)].facing));
-    for (int i = 0; i < 4; ++i) {
-        if (i == solo) continue;
-        CHECK(p[std::size_t(i)].z < p[std::size_t(solo)].z);
-        CHECK(p[std::size_t(i)].other == solo);
-        // turned towards the soloist
-        const float want = std::atan2(p[std::size_t(solo)].x - p[std::size_t(i)].x, p[std::size_t(solo)].z - p[std::size_t(i)].z);
-        CHECK(std::fabs(p[std::size_t(i)].facing - std::clamp(want, -1.15f, 1.15f)) < 1e-4f);
-    }
-    CHECK(planStage(4, cam, SocialMode::Cypher, 6.0)[std::size_t(solo)].react);
-    for (const auto& s : planStage(5, cam, SocialMode::Cypher, 0)) {
-        const V3 sp = projectStage(cam, {s.x, 0, s.z});
-        CHECK(sp.x > 0.03f);
-        CHECK(sp.x < 0.97f);
-    }
-}
-
 TEST_CASE("dancers: a directed dancer turns smoothly and blends into reacting") {
     using namespace reforce::engine;
     DancerRun run(generateDancer(Style::HipHop, std::uint32_t(1)), 3, 0.0, 0.0, 0.0);
@@ -430,41 +369,6 @@ TEST_CASE("dancers: a directed dancer turns smoothly and blends into reacting") 
     }
     CHECK(run.facing() == doctest::Approx(1.0f).epsilon(0.02));
     CHECK(run.describe(t * 2).find("watching") != std::string::npos);
-}
-
-TEST_CASE("dancers: milling spots are scattered, apart, on the floor, and wander over time") {
-    using namespace reforce::engine;
-    const auto cam = stageCamera(16.0 / 9.0, 0.42);
-    for (int n = 1; n <= 6; ++n) {
-        double zSpread = 0;
-        int moved = 0;
-        auto prev = scatterSpots(n, cam, 0.0, 7, 0.62f);
-        for (int b = 0; b < 64; ++b) {
-            const auto p = scatterSpots(n, cam, double(b), 7, 0.62f);
-            float zmin = 9, zmax = -9;
-            for (int i = 0; i < n; ++i) {
-                const auto& q = p[std::size_t(i)];
-                CHECK(q.second >= kFloorZMin - 1e-4f);
-                CHECK(q.second <= kFloorZMax + 1e-4f);
-                const V3 s = projectStage(cam, {q.first, 0, q.second});
-                CHECK(s.x > 0.03f);
-                CHECK(s.x < 0.97f);
-                zmin = std::min(zmin, q.second);
-                zmax = std::max(zmax, q.second);
-                for (int j = i + 1; j < n; ++j) {
-                    const float dx = q.first - p[std::size_t(j)].first, dz = (q.second - p[std::size_t(j)].second) * 0.5f;
-                    CHECK(std::sqrt(dx * dx + dz * dz) > 0.5f);  // nobody on top of anybody (on screen)
-                }
-                const float dx = q.first - prev[std::size_t(i)].first, dz = q.second - prev[std::size_t(i)].second;
-                if (std::sqrt(dx * dx + dz * dz) > 0.25f) ++moved;
-            }
-            zSpread += zmax - zmin;
-            prev = p;
-        }
-        CAPTURE(n);
-        CHECK(moved >= n * 8);  // each wanders to a new spot every few bars
-        if (n >= 3) CHECK(zSpread / 64 > 0.3);  // not a line
-    }
 }
 
 TEST_CASE("dancers: every move is continuous, also where its cycle wraps") {
@@ -578,6 +482,10 @@ TEST_CASE("dancers: humanising makes a crew doing the same routine differ a litt
         DancerRun a(generateDancer(Style::Pop, std::uint32_t(0)), 21, 0.0, 0.0, 0.0), b(generateDancer(Style::Pop, std::uint32_t(0)), 22, 0.0, 0.0, 0.0);
         a.setHuman(human);
         b.setHuman(human);
+        // Hair motion off: this look (a long curly mane) hangs its curls on the hair chain, whose contacts turn the
+        // bodies' float-rounding difference (~1e-7) into ~1e-4, which is invisible but not "identical".
+        a.setHairMotion(0);
+        b.setHairMotion(0);
         a.setSlot(0, 0);
         b.setSlot(0, 0);
         DanceDirection dir;
@@ -784,31 +692,6 @@ TEST_CASE("dancers: walking dancers steer round each other (head-on swap, a four
     }
 }
 
-TEST_CASE("dancers: a milling crowd through every social mode never overlaps") {
-    using namespace reforce::engine;
-    const StageCamera cam = stageCamera(16.0 / 9.0, 0.42);
-    for (int n : {3, 6, 9, 12}) {
-        std::vector<std::unique_ptr<DancerRun>> runs;
-        for (int k = 0; k < n; ++k)
-            runs.push_back(std::make_unique<DancerRun>(generateDancer(Style(k % kStyleCount), std::uint32_t(k)),
-                                                       std::uint32_t(70 + k), 0.0, 0.0, 0.0));
-        CrowdStats st;
-        const SocialMode modes[] = {SocialMode::Show, SocialMode::Partner, SocialMode::Call, SocialMode::Side,
-                                    SocialMode::Cypher};
-        for (int i = 0; i < 60 * 120; ++i) {  // 2 minutes at 120 BPM: 60 bars, a mode change every 8
-            const double t = i / 60.0, bar = t * 2 / 4;
-            const SocialMode mode = modes[int(bar / 8) % 5];
-            const auto spots = planStage(n, cam, mode, bar, 9);
-            for (int k = 0; k < n; ++k) runs[std::size_t(k)]->setSlot(spots[std::size_t(k)].x, spots[std::size_t(k)].z);
-            stepCrowd(runs, t, st);
-        }
-        MESSAGE(n << " dancers: closest " << st.closestSteered << " by steering, " << st.closest << " in the end, "
-                  << st.shoves << " shoves in " << st.frames << " frames");
-        CHECK(st.closest > kMinApart - 0.01f);
-        CHECK(st.shoves < st.frames / 50);
-    }
-}
-
 TEST_CASE("dancers: a mingling crowd never overlaps") {
     using namespace reforce::engine;
     const StageCamera cam = stageCamera(16.0 / 9.0, 0.42);
@@ -879,10 +762,10 @@ TEST_CASE("dancers: generated characters vary, follow their style's wardrobe, an
                                 HairStyle::Buzz, HairStyle::Quiff, HairStyle::Undercut, HairStyle::Shaved,
                                 HairStyle::Mullet, HairStyle::Bowl, HairStyle::Pompadour})
                 CHECK_FALSE((d.feminine && L.hairStyle == h));
-            // Feminine only (Peter, 2026-11-21).
+            // Feminine only (Peter, 2026-11-21; the long curls 2026-11-27).
             for (HairStyle h : {HairStyle::Bob, HairStyle::Layers, HairStyle::HalfUp, HairStyle::Braid, HairStyle::Bangs,
                                 HairStyle::Pixie, HairStyle::Pigtails, HairStyle::Bun, HairStyle::SidePony,
-                                HairStyle::SpaceBuns})
+                                HairStyle::SpaceBuns, HairStyle::Curls, HairStyle::BigCurls, HairStyle::HugeCurls})
                 CHECK_FALSE((!d.feminine && L.hairStyle == h));
             bearded += L.beard != Beard::None;
             dressed += L.outfit == Outfit::Dress || L.outfit == Outfit::Skirt || L.outfit == Outfit::LongDress;
@@ -938,7 +821,7 @@ TEST_CASE("dancers: generated characters vary, follow their style's wardrobe, an
     CHECK(eyesSeen.size() == std::size_t(EyeShape::Count));
     CHECK(beardsSeen.size() == std::size_t(Beard::Count));
     CHECK(outfitsSeen.size() == std::size_t(kOutfitCount));
-    CHECK(hairSeen.size() == std::size_t(kHairStyleCount));  // every hairstyle
+    CHECK(hairSeen.size() == std::size_t(kHairStyleCount));
     MESSAGE("bearded " << bearded << ", in a dress or skirt " << dressed << " of " << N * kStyleCount);
     CHECK(bearded > N * kStyleCount / 10);  // masculine ones (half) often have one
     CHECK(dressed > N * kStyleCount / 12);
@@ -995,8 +878,9 @@ struct MingleSim {
     std::vector<reforce::engine::MinglePerson> people;
     std::vector<std::string> roles;
     std::vector<reforce::engine::StageSpot> spots;
+    std::uint32_t seed = 11;
     void step(const reforce::engine::StageCamera& cam, double beat, double dt) {
-        spots = mingle.plan(people, cam, beat, dt, 11);
+        spots = mingle.plan(people, cam, beat, dt, seed);
         roles.assign(people.size(), "");
         for (std::size_t i = 0; i < people.size(); ++i) {
             auto& p = people[i];
@@ -1021,6 +905,35 @@ struct MingleSim {
     }
 };
 }  // namespace
+
+TEST_CASE("dancers: mingle: partners copy each other only within a dance style (else face to face)") {
+    // (Peter, 2026-11-27.) Two crowds of six: all one style, and every other one a different style.
+    using namespace reforce::engine;
+    const auto cam = stageCamera(16.0 / 9.0, 0.42);
+    for (int mixed = 0; mixed < 2; ++mixed) {
+        MingleSim sim;
+        for (int i = 0; i < 6; ++i) {
+            sim.people.push_back({std::uint64_t(100 + i), 0, 0, 0, false});
+            sim.people.back().style = mixed ? i % 2 : 3;
+        }
+        const double dt = 1.0 / 60, bpm = 124;
+        long led = 0, ledAcross = 0, facing = 0;
+        for (int f = 0; f < 60 * 600; ++f) {
+            sim.step(cam, f * dt * bpm / 60, dt);
+            for (std::size_t i = 0; i < sim.people.size(); ++i) {
+                const auto& s = sim.spots[i];
+                if (s.leader >= 0 && s.leader != int(i)) {
+                    ++led;
+                    ledAcross += sim.people[std::size_t(s.leader)].style != sim.people[i].style;
+                }
+                facing += sim.roles[i] == "facing";
+            }
+        }
+        CHECK(ledAcross == 0);
+        CHECK(facing > 0);
+        if (!mixed) CHECK(led > 0);  // (the same style: partners as before)
+    }
+}
 
 TEST_CASE("dancers: mingle: everyone on their own clock; pairs and groups form and break up") {
     using namespace reforce::engine;
@@ -1101,7 +1014,7 @@ TEST_CASE("dancers: mingle: everyone on their own clock; pairs and groups form a
     CHECK(crowdedBeats <= 1);
 }
 
-TEST_CASE("dancers: mingle: people come and go, the clock may jump; sociable dancers spend longer in groups") {
+TEST_CASE("dancers: mingle: people come and go, the clock may jump") {
     using namespace reforce::engine;
     const auto cam = stageCamera(16.0 / 9.0, 0.42);
     MingleSim sim;
@@ -1128,28 +1041,76 @@ TEST_CASE("dancers: mingle: people come and go, the clock may jump; sociable dan
         for (const auto& r : sim.roles) late.insert(r);
     }
     CHECK(late.size() >= 3);
+}
 
-    // Personality: over many dancers, the most sociable third spends more time in groups than the least.
-    std::vector<std::pair<float, double>> soc;
-    for (std::uint32_t run = 0; run < 6; ++run) {
-        MingleSim s;
-        for (int i = 0; i < 6; ++i) s.people.push_back({std::uint64_t(1000 * (run + 1) + i), 0, 0, 0, false});
-        std::vector<double> inGroup(6);
-        for (int f = 0; f < 60 * 300; ++f) {
-            s.step(cam, f * 2.0 / 60, 1.0 / 60);
-            for (std::size_t i = 0; i < 6; ++i) inGroup[i] += s.mingle.groupSize(s.people[i].id) > 0;
+TEST_CASE("dancers: mingle: one personality for everyone, whatever their seed (Peter, 2026-11-27)") {
+    using namespace reforce::engine;
+    const auto cam = stageCamera(16.0 / 9.0, 0.42);
+    // Two floors seeded differently, dancers with different ids (a guest among them): the same personality.
+    MingleSim a, b;
+    a.seed = 11;
+    b.seed = 977;
+    a.people = {{1, 0, 0, 0, false}, {2, 0, 0, 0, false}};
+    b.people = {{123456789, 0, 0, 0, false}, {42, 0, 0, 0, false}};
+    b.people[1].vibe = MingleVibe::Crew;  // a guest's vibe is their choice, not a personality
+    for (int f = 0; f < 120; ++f) {
+        a.step(cam, f * 2.0 / 60, 1.0 / 60);
+        b.step(cam, f * 2.0 / 60, 1.0 / 60);
+    }
+    const Mingle::Traits want = Mingle::kPersonality;
+    for (const auto* s : {&a, &b})
+        for (const auto& p : s->people) {
+            const Mingle::Traits t = s->mingle.traits(p.id);
+            CHECK(t.sociable == want.sociable);
+            CHECK(t.restless == want.restless);
+            CHECK(t.showy == want.showy);
         }
-        for (std::size_t i = 0; i < 6; ++i) soc.push_back({s.mingle.traits(s.people[i].id).sociable, inGroup[i]});
+    // Middle of the road.
+    for (const float v : {want.sociable, want.restless, want.showy}) {
+        CHECK(v > 0.3f);
+        CHECK(v < 0.7f);
     }
-    std::sort(soc.begin(), soc.end());
-    double lo = 0, hi = 0;
-    const std::size_t third = soc.size() / 3;
-    for (std::size_t i = 0; i < third; ++i) {
-        lo += soc[i].second;
-        hi += soc[soc.size() - 1 - i].second;
+    CHECK(a.mingle.traits(999).sociable == 0);  // not on the floor
+}
+
+// How a mingling crowd spends its time (docs/dancers-design.md "Mingle only, one personality"): 24 runs of 10 minutes
+// at 124 BPM (walkers as in MingleSim) for 6 and 12 dancers.
+TEST_CASE("dancers: mingle: measure the shares of time alone, in pairs and groups, and activities" * doctest::skip()) {
+    using namespace reforce::engine;
+    const auto cam = stageCamera(16.0 / 9.0, 0.42);
+    for (const int n : {6, 12}) {
+        double in[7] = {}, frames = 0, changes = 0;
+        std::map<std::string, double> roleTime;
+        for (std::uint32_t run = 0; run < 24; ++run) {
+            MingleSim sim;
+            sim.seed = 11 + run * 7919u;
+            for (int i = 0; i < n; ++i) sim.people.push_back({std::uint64_t(100 * (run + 1) + i), 0, 0, 0, false});
+            std::vector<std::string> prev(static_cast<std::size_t>(n));
+            const double dt = 1.0 / 60, bpm = 124;
+            for (double t = 0; t < 600; t += dt) {
+                sim.step(cam, t * bpm / 60, dt);
+                for (std::size_t i = 0; i < std::size_t(n); ++i) {
+                    const int gs = std::min(6, sim.mingle.groupSize(sim.people[i].id));
+                    in[gs] += 1;
+                    frames += 1;
+                    roleTime[gs > 0 ? std::string("(in a group)") : sim.roles[i]] += 1;
+                    const std::string now = gs > 0 ? std::string("group") : sim.roles[i];
+                    if (t > 0 && now != prev[i]) changes += 1;
+                    prev[i] = now;
+                }
+            }
+        }
+        char buf[256];
+        std::snprintf(buf, sizeof buf, "%d dancers: alone %.1f %%, pairs %.1f %%, threes %.1f %%, fours %.1f %%; %.2f changes of activity a dancer-minute",
+                      n, 100 * in[0] / frames, 100 * in[2] / frames, 100 * in[3] / frames, 100 * in[4] / frames,
+                      changes / (frames / 3600));
+        std::string line = buf;
+        for (const auto& [r, f] : roleTime) {
+            std::snprintf(buf, sizeof buf, "; %s %.1f %%", r.c_str(), 100 * f / frames);
+            line += buf;
+        }
+        MESSAGE(line);
     }
-    MESSAGE("in groups: least sociable third " << lo / third / 60 << " s, most " << hi / third / 60 << " s of 300");
-    CHECK(hi > lo * 1.2);
 }
 
 TEST_CASE("dancers: hanging hair swings with the dance, smoothly and within bounds") {
@@ -1323,3 +1284,407 @@ TEST_CASE("dancers: no hair pokes out of a hat, every hairstyle under every hat,
         }
     }
 }
+
+TEST_CASE("dancers: mingle: busting a move, the group makes room and watches in an arc; the floor dancer stays put") {
+    // Peter, 2026-11-27 (a guest's "Bust a move"; docs/dancers-design.md "Floor moves held still, room to go down"):
+    // the others in their group make room and watch them, dancing; others nearby just clear the move's reach.
+    using namespace reforce::engine;
+    const auto cam = stageCamera(16.0 / 9.0, 0.42);
+    const double dt = 1.0 / 60, bpm = 124;
+    MingleSim sim;
+    for (int i = 0; i < 7; ++i) sim.people.push_back({std::uint64_t(100 + i), 0, 0, 0, false});
+    sim.people[0].with = 101;
+    sim.people[3].with = 100;  // someone who wants to dance with them
+    double t = 0;
+    for (; t < 60; t += dt) sim.step(cam, t * bpm / 60, dt);
+    REQUIRE(sim.mingle.together(100, 101));
+    const int size = sim.mingle.groupSize(100);
+    std::vector<std::uint64_t> group;
+    for (std::uint64_t o = 101; o <= 106; ++o)
+        if (sim.mingle.together(100, o)) group.push_back(o);
+    dance::FloorReach reach;  // a routine's: 0.75 to the front, 0.45 behind
+    for (int d = 0; d < 8; ++d) reach.dir[d] = 0.6f + 0.15f * std::cos(float(d) * 0.785398f);
+    reach.max = 0.75f;
+    sim.people[0].bustMove = true;
+    sim.people[0].floor = 1;
+    sim.people[0].reach = reach;
+    sim.step(cam, t * bpm / 60, dt);
+    const float x0 = sim.people[0].x, z0 = sim.people[0].z;
+    int frames = 0, inside = 0, notFacing = 0, notWatching = 0, grew = 0;
+    float moved = 0;
+    for (const double start = t, end = t + 60; t < end; t += dt) {
+        if (t > start + 4) sim.people[0].floor = 2;  // down from the next 8-bar point
+        sim.step(cam, t * bpm / 60, dt);
+        moved = std::max(moved, std::hypot(sim.people[0].x - x0, sim.people[0].z - z0));
+        grew += sim.mingle.groupSize(100) > size;
+        if (t < start + 6) continue;  // (time to step back)
+        ++frames;
+        for (std::size_t k = 1; k < sim.people.size(); ++k) {
+            const auto& o = sim.people[k];
+            const float dx = o.x - x0, dz = o.z - z0;
+            inside += std::hypot(dx, dz) < floorNeed(reach, sim.spots[0].facing, dx, dz, kFloorKeep);
+        }
+        for (const auto id : group) {
+            const std::size_t k = std::size_t(id - 100);
+            const auto& o = sim.people[k];
+            notFacing += std::fabs(std::remainder(o.facing - std::atan2(x0 - o.x, z0 - o.z), 6.2831853f)) > 0.35f;
+            notWatching += !sim.spots[k].react || sim.spots[k].other != 0;
+        }
+    }
+    MESSAGE("busting a move in a group of " << size << ": moved " << moved << ", neighbors inside the reach " << inside
+                                            << " of " << frames * 6 << ", group not facing " << notFacing << ", not watching "
+                                            << notWatching);
+    CHECK(moved < 1e-4f);
+    CHECK(inside * 100 < frames * 6);  // (someone passing behind, now and then)
+    CHECK(grew == 0);
+    CHECK(notFacing < frames * int(group.size()) / 20);
+    CHECK(notWatching == 0);
+    CHECK(sim.mingle.together(100, 101));  // still their group
+    // Done: their own social life again; the room goes.
+    sim.people[0].bustMove = false;
+    sim.people[0].floor = 0;
+    int together = 0;
+    for (const double end = t + 120; t < end; t += dt) {
+        sim.step(cam, t * bpm / 60, dt);
+        together += sim.mingle.together(100, 101);
+    }
+    CHECK(together > 0);
+}
+
+TEST_CASE("dancers: mingle: a partner doesn't mirror a floor move: they make room and watch (kFollowerMirrorsFloor)") {
+    // Peter, 2026-11-27 (still deciding; kFollowerMirrorsFloor flips it back to copying).
+    using namespace reforce::engine;
+    const auto cam = stageCamera(16.0 / 9.0, 0.42);
+    const double dt = 1.0 / 60, bpm = 124;
+    dance::FloorReach reach;
+    for (float& d : reach.dir) d = 0.6f;
+    reach.max = 0.6f;
+    int checked = 0;
+    for (std::uint64_t base : {100u, 200u, 300u, 400u}) {
+        MingleSim sim;
+        for (int i = 0; i < 4; ++i) sim.people.push_back({base + std::uint64_t(i), 0, 0, 0, false});
+        int leader = -1, follower = -1;
+        double t = 0;
+        for (; t < 300 && leader < 0; t += dt) {
+            sim.step(cam, t * bpm / 60, dt);
+            for (std::size_t k = 0; k < sim.spots.size(); ++k)
+                if (sim.spots[k].leader >= 0 && sim.spots[k].mirror) {
+                    leader = sim.spots[k].leader;
+                    follower = int(k);
+                }
+        }
+        if (leader < 0) continue;
+        auto& L = sim.people[std::size_t(leader)];
+        L.bustMove = true;
+        L.floor = 2;  // (on the floor)
+        L.reach = reach;
+        for (const double end = t + 10; t < end; t += dt) sim.step(cam, t * bpm / 60, dt);
+        const auto& f = sim.spots[std::size_t(follower)];
+        CHECK(f.leader == (kFollowerMirrorsFloor ? leader : -1));
+        if (!kFollowerMirrorsFloor) {
+            CHECK(f.react);
+            CHECK(f.other == leader);
+            const auto& fp = sim.people[std::size_t(follower)];
+            CHECK(std::hypot(fp.x - L.x, fp.z - L.z) > reach.max + kFloorKeep - 0.01f);
+        }
+        ++checked;
+    }
+    CHECK(checked > 0);
+}
+
+TEST_CASE("dancers: mingle: stream guests' social settings (Solo, Crew, dancing with someone)") {
+    using namespace reforce::engine;
+    const auto cam = stageCamera(16.0 / 9.0, 0.42);
+    const double dt = 1.0 / 60, bpm = 124;
+    auto crowd = [](MingleSim& sim, int n) {
+        for (int i = 0; i < n; ++i) sim.people.push_back({std::uint64_t(100 + i), 0, 0, 0, false});
+    };
+    auto idx = [](std::uint64_t id) { return std::size_t(id - 100); };
+
+    SUBCASE("someone picked: they walk over, stay together, and follow when the other moves on") {
+        MingleSim sim;
+        crowd(sim, 8);
+        sim.people[idx(101)].with = 105;
+        int frames = 0, together = 0;
+        for (double t = 0; t < 300; t += dt, ++frames) {
+            sim.step(cam, t * bpm / 60, dt);
+            if (t > 30) together += sim.mingle.together(101, 105);
+        }
+        const int counted = int((300 - 30) / dt);
+        CHECK(together > counted * 7 / 10);  // most of the time (walking back over after the other moves on)
+    }
+    SUBCASE("picking each other works too") {
+        MingleSim sim;
+        crowd(sim, 6);
+        sim.people[idx(100)].with = 104;
+        sim.people[idx(104)].with = 100;
+        int together = 0, frames = 0;
+        for (double t = 0; t < 200; t += dt) {
+            sim.step(cam, t * bpm / 60, dt);
+            if (t > 30) ++frames, together += sim.mingle.together(100, 104);
+        }
+        CHECK(together > frames * 8 / 10);
+    }
+    SUBCASE("Solo: never in a group; someone who picked them dances near them, watching") {
+        MingleSim sim;
+        crowd(sim, 8);
+        sim.people[idx(103)].vibe = MingleVibe::Solo;
+        sim.people[idx(102)].with = 103;
+        int grouped = 0, watching = 0, frames = 0;
+        float far = 0;
+        for (double t = 0; t < 300; t += dt) {
+            sim.step(cam, t * bpm / 60, dt);
+            grouped += sim.mingle.groupSize(103) > 0;
+            if (t > 30) {
+                ++frames;
+                watching += sim.mingle.watching(102) == 103;
+                const auto& a = sim.people[idx(102)];
+                const auto& b = sim.people[idx(103)];
+                far = std::max(far, std::hypot(a.x - b.x, a.z - b.z));
+            }
+        }
+        CHECK(grouped == 0);
+        CHECK(watching == frames);
+        CHECK(far < 1.6f);  // close by (they follow a wander at walking speed)
+    }
+    SUBCASE("switching to Solo leaves the group") {
+        MingleSim sim;
+        crowd(sim, 4);
+        sim.people[idx(100)].with = 101;
+        double t = 0;
+        for (; t < 60; t += dt) sim.step(cam, t * bpm / 60, dt);
+        REQUIRE(sim.mingle.together(100, 101));
+        sim.people[idx(100)].with = 0;
+        sim.people[idx(100)].vibe = MingleVibe::Solo;
+        sim.step(cam, t * bpm / 60, dt);
+        CHECK(sim.mingle.groupSize(100) == 0);
+    }
+    SUBCASE("Crew: in a group most of the time; Solo dancers never") {
+        MingleSim sim;
+        crowd(sim, 10);
+        sim.people[idx(100)].vibe = MingleVibe::Crew;
+        sim.people[idx(101)].vibe = MingleVibe::Crew;
+        int crew = 0, frames = 0, solo = 0;
+        for (int i = 2; i < 5; ++i) sim.people[std::size_t(i)].vibe = MingleVibe::Solo;
+        for (double t = 0; t < 400; t += dt) {
+            sim.step(cam, t * bpm / 60, dt);
+            for (int i = 2; i < 5; ++i) solo += sim.mingle.groupSize(std::uint64_t(100 + i)) > 0;
+            if (t > 40) ++frames, crew += sim.mingle.groupSize(100) > 0;
+        }
+        CHECK(solo == 0);
+        CHECK(crew > frames * 7 / 10);
+    }
+    SUBCASE("the one picked goes away: back to mingling") {
+        MingleSim sim;
+        crowd(sim, 5);
+        sim.people[idx(100)].with = 104;
+        double t = 0;
+        for (; t < 60; t += dt) sim.step(cam, t * bpm / 60, dt);
+        sim.people.pop_back();  // 104 leaves
+        for (; t < 120; t += dt) sim.step(cam, t * bpm / 60, dt);
+        for (const auto& s : sim.spots) {
+            CHECK(std::isfinite(s.x));
+            CHECK(s.other < int(sim.people.size()));
+        }
+    }
+    CHECK(parseMingleVibe("solo") == MingleVibe::Solo);
+    CHECK(parseMingleVibe("crew") == MingleVibe::Crew);
+    CHECK(parseMingleVibe("") == MingleVibe::Mingle);
+    CHECK(!parseMingleVibe("party"));
+}
+
+TEST_CASE("dancers: a new look in place keeps the dancer going; a new style dances that style") {
+    using namespace reforce::engine;
+    DancerSpec spec = generateDancer(Style::House, 7u);
+    spec.guestId = "g1";
+    DancerRun run(spec, 5, 0.0, 0.0, 60.0);
+    for (int i = 0; i < 120; ++i) run.step(i / 60.0, 1.0 / 60, grooveAt(i / 30.0), 1.0f);
+    DancerSpec next = generateDancer(Style::Break, 9u);
+    next.name = "Sam";
+    run.restyle(next);
+    CHECK(run.spec().guestId == "g1");
+    CHECK(run.name() == "Sam");
+    CHECK(run.choreographer().options().style == Style::Break);
+    CHECK(run.seed() == 5u);
+    for (int i = 120; i < 240; ++i) run.step(i / 60.0, 1.0 / 60, grooveAt(i / 30.0), 1.0f);
+    BodyOut out;
+    run.build(out);
+    CHECK(!out.parts.empty());
+    // A check-in again: the full stay from now.
+    run.stayFor(50.0, 60.0);
+    CHECK(!run.leaving());
+    run.step(100.0, 1.0 / 60, grooveAt(200), 1.0f);
+    CHECK(!run.leaving());
+    run.step(111.0, 1.0 / 60, grooveAt(222), 1.0f);
+    CHECK(run.leaving());
+}
+
+namespace {
+// A mingling crowd stepped as the Visualizer does (direction from the spots), for the crowd measurements below.
+struct CrowdProbe {
+    int jitters = 0, moving = 0, limbHits = 0, bodyFrames = 0, stuck = 0, turnFlips = 0;
+    float reach = 0;  // furthest a part end gets from its own dancer's axis, above the knees
+    std::vector<int> jitterBy;
+    std::map<std::string, int> jitterRole;  // role (and whether its spot is within kMinApart of another's spot)
+    int closeSpots = 0;  // frames with two spots closer than kMinApart
+};
+CrowdProbe probeCrowd(int n, const std::function<void(std::vector<reforce::engine::MinglePerson>&)>& social,
+                      double seconds, float coreR, std::uint32_t seed = 0) {
+    using namespace reforce::engine;
+    const StageCamera cam = stageCamera(16.0 / 9.0, 0.42);
+    std::vector<std::unique_ptr<DancerRun>> runs;
+    for (int k = 0; k < n; ++k)
+        runs.push_back(std::make_unique<DancerRun>(generateDancer(Style(k % kStyleCount), std::uint32_t(k) + seed * 31),
+                                                   std::uint32_t(70 + k) + seed * 977, 0.0, 0.0, 0.0));
+    Mingle mingle;
+    CrowdProbe pr;
+    pr.jitterBy.assign(std::size_t(n), 0);
+    const std::size_t nn = std::size_t(n);
+    std::vector<float> px(nn), pz(nn), vx(nn), vz(nn), pf(nn), df(nn);
+    std::vector<int> stuckFor(nn);
+    for (int i = 0; i < int(seconds * 60); ++i) {
+        const double t = i / 60.0;
+        std::vector<MinglePerson> people;
+        for (int k = 0; k < n; ++k) {
+            const auto& r = *runs[std::size_t(k)];
+            MinglePerson p{std::uint64_t(k + 1), r.x(), r.z(), r.facing(), r.placed()};
+            p.bustMove = r.inBustMove(t * 2);
+            p.style = int(r.spec().style);
+            r.floorInfo(p, t * 2);  // (as the Visualizer: floor moves get their room)
+            people.push_back(p);
+        }
+        social(people);
+        const auto spots = mingle.plan(people, cam, t * 2, 1.0 / 60, 9 + seed);
+        std::vector<DancerRun*> crowd;
+        for (auto& r : runs) crowd.push_back(r.get());
+        avoidEachOther(crowd);
+        for (int k = 0; k < n; ++k) {
+            auto& run = *runs[std::size_t(k)];
+            const auto& sp = spots[std::size_t(k)];
+            run.setSlot(sp.x, sp.z);
+            DanceDirection dir;
+            if (sp.leader >= 0 && sp.leader != k) dir.leader = &runs[std::size_t(sp.leader)]->choreographer();
+            dir.mirror = sp.mirror;
+            dir.react = sp.react;
+            dir.facing = sp.facing;
+            dir.look = sp.look;
+            dir.floorRoom = sp.floorRoom;
+            run.step(t, 1.0 / 60, grooveAt(t * 2), std::clamp(sp.effort, 0.3f, 1.0f), dir);
+        }
+        keepApart(crowd);
+        {
+            bool close = false;
+            for (int a = 0; a < n; ++a)
+                for (int b = a + 1; b < n; ++b)
+                    close |= std::hypot(spots[std::size_t(a)].x - spots[std::size_t(b)].x,
+                                        spots[std::size_t(a)].z - spots[std::size_t(b)].z) < kMinApart;
+            pr.closeSpots += close;
+        }
+        // Jitter: the step reverses (both steps big enough to see).
+        for (int k = 0; k < n; ++k) {
+            const auto& r = *runs[std::size_t(k)];
+            const float dx = r.x() - px[std::size_t(k)], dz = r.z() - pz[std::size_t(k)];
+            const float a = std::hypot(dx, dz), b = std::hypot(vx[std::size_t(k)], vz[std::size_t(k)]);
+            if (i > 1 && a > 0.0003f && b > 0.0003f) {
+                ++pr.moving;
+                if (dx * vx[std::size_t(k)] + dz * vz[std::size_t(k)] < -0.5f * a * b) {
+                    ++pr.jitters;
+                    float near = 9;
+                    for (int o = 0; o < n; ++o)
+                        if (o != k) near = std::min(near, std::hypot(spots[std::size_t(o)].x - spots[std::size_t(k)].x,
+                                                                     spots[std::size_t(o)].z - spots[std::size_t(k)].z));
+                    ++pr.jitterRole[std::string(spots[std::size_t(k)].role) + (near < kMinApart ? " (spot taken)" : "")];
+                    ++pr.jitterBy[std::size_t(k)];
+                }
+            }
+            // Stuck: a spot well away, hardly moving, for over a second.
+            const auto& sp = spots[std::size_t(k)];
+            if (std::hypot(sp.x - r.x(), sp.z - r.z()) > 0.15f && a < 0.0012f) {
+                if (++stuckFor[std::size_t(k)] == 60) ++pr.stuck;
+            } else {
+                stuckFor[std::size_t(k)] = 0;
+            }
+            // The body turning back and forth (a turn reversing within a frame, both noticeable).
+            const float f = r.facing(), d = std::remainder(f - pf[std::size_t(k)], 6.2831853f);
+            if (i > 1 && std::fabs(d) > 0.004f && std::fabs(df[std::size_t(k)]) > 0.004f && d * df[std::size_t(k)] < 0)
+                ++pr.turnFlips;
+            pf[std::size_t(k)] = f;
+            df[std::size_t(k)] = d;
+            px[std::size_t(k)] = r.x();
+            pz[std::size_t(k)] = r.z();
+            vx[std::size_t(k)] = dx;
+            vz[std::size_t(k)] = dz;
+        }
+        // Limbs in someone else's body: any part end inside another dancer's core (a cylinder round their axis, from
+        // the knees to the shoulders).
+        if (t > 5 && i % 6 == 0) {
+            std::vector<dance::BodyOut> outs(nn);
+            for (int k = 0; k < n; ++k) runs[std::size_t(k)]->build(outs[std::size_t(k)]);
+            ++pr.bodyFrames;
+            for (int a = 0; a < n; ++a) {
+                const auto& A = outs[std::size_t(a)];
+                for (const auto& p : A.parts)
+                    for (const dance::V3 e : {p.frame.o, p.frame.point({0, p.len, 0})}) {
+                        if (e.y > 0.3f * A.headTop)
+                            pr.reach = std::max(pr.reach, std::hypot(e.x - A.rootFloor.x, e.z - A.rootFloor.z));
+                        for (int b = 0; b < n; ++b) {
+                            if (b == a) continue;
+                            const auto& B = outs[std::size_t(b)];
+                            if (e.y < 0.3f * B.headTop || e.y > 0.75f * B.headTop) continue;
+                            if (std::hypot(e.x - B.rootFloor.x, e.z - B.rootFloor.z) < coreR) {
+                                ++pr.limbHits;
+                                goto nextPart;
+                            }
+                        }
+                    nextPart:;
+                    }
+            }
+        }
+    }
+    return pr;
+}
+}  // namespace
+
+TEST_CASE("dancers: a mingling crowd: no jitter, arms mostly clear of each other (also with guests' social settings)") {
+    using namespace reforce::engine;
+    // Peter, 2026-11-27: dancers jittered against each other (spots handed out closer than dancers may stand: walk
+    // there, pushed back, walk there...) and arms went into neighbors (reach about 0.48; pairs stood 0.52 apart).
+    // Before the fix: 0.2 % of moving steps reversing and limb ends in a neighbor 420 times in 1749 frames.
+    struct Case {
+        std::string name;
+        std::function<void(std::vector<MinglePerson>&)> social;
+        std::uint32_t seed;
+    };
+    const std::vector<Case> cases = {
+        {"8 mingling", [](auto&) {}, 0},
+        {"8 mingling (other seed)", [](auto&) {}, 3},
+        {"five pick one", [](auto& ps) { for (int k = 1; k < 6; ++k) ps[std::size_t(k)].with = 1; }, 0},
+        {"two near a Solo one", [](auto& ps) {
+             ps[0].vibe = MingleVibe::Solo;
+             ps[1].with = 1;
+             ps[2].with = 1;
+         }, 0},
+        {"three crew", [](auto& ps) { for (int k = 0; k < 3; ++k) ps[std::size_t(k)].vibe = MingleVibe::Crew; }, 0},
+    };
+    // Each case over four seeds (2026-11-27, one personality): reversing steps are heavy-tailed. Most runs have a few
+    // (8 mingling: median 14 in 3 minutes), but now and then two walkers stall against each other for a few seconds
+    // (e.g. head-on at the back of the floor, where keeping right pushes one into the back edge) and one run gets
+    // 50-130; over 64 seeds 0.40 per thousand before the change (4 runs over 1 per thousand), 0.43-0.51 after (5-8).
+    for (const auto& c : cases) {
+        CrowdProbe p;
+        for (const std::uint32_t s : {c.seed, c.seed + 10, c.seed + 20, c.seed + 30}) {
+            const CrowdProbe q = probeCrowd(8, c.social, 180, 0.1f, s);
+            p.jitters += q.jitters;
+            p.moving += q.moving;
+            p.limbHits += q.limbHits;
+            p.bodyFrames += q.bodyFrames;
+            p.stuck += q.stuck;
+            CHECK(q.stuck < 15);
+        }
+        MESSAGE(c.name << ": " << p.jitters << " reversing of " << p.moving << " moving steps, " << p.stuck
+                       << " stuck, limb ends in a neighbor " << p.limbHits << " in " << p.bodyFrames << " frames");
+        CHECK(p.jitters * 1000 < p.moving);
+        CHECK(p.limbHits * 8 < p.bodyFrames);
+    }
+}
+

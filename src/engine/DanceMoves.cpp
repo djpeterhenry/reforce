@@ -1223,10 +1223,13 @@ constexpr std::uint32_t S(OldStyle s) {
 constexpr std::uint32_t kAll = (1u << kStyleCount) - 1;
 using St = OldStyle;
 
-// Mocap: the chance that a pick on an 8-bar point of the phrase starts a routine (16 bars, or an 8-bar half) rather
-// than basic moves. Peter (2026-11-21): routines about 60 % of the time (first half). Every routine fills 16 bars,
-// basics run until the next 8-bar point, so the share is 2p / (1 + p): 0.43 gives 60 %.
-constexpr float kRoutineChance = 0.43f;
+// Mocap: routines' share of the dancing. Peter (2026-11-21): routines about 60 % of the time. A pick on an 8-bar point
+// starts a routine with a chance p that allows for how long the candidates are (E: their weighted length in 8-bar
+// units, 2 for whole routines, 1 for 8-bar ones, which play once since 2026-11-27): the share pE / (pE + 1 - p) is
+// kRoutineShare when p = s / (s + (1 - s) E). kRoutineChance (whole routines, E = 2) is the watchers' too.
+constexpr float kRoutineShare = 0.6f;
+constexpr float kRoutineChance = kRoutineShare / (kRoutineShare + (1 - kRoutineShare) * 2);  // 0.43
+inline float routineChance(float e) { return kRoutineShare / (kRoutineShare + (1 - kRoutineShare) * std::max(1.0f, e)); }
 
 std::vector<MoveDef> kMoves = {
     // name, part, beats, styles, energy, fn
@@ -1426,7 +1429,91 @@ Choreographer::Choreographer(const ChoreoOptions& o) : opts_(o), feel_(styleFeel
     rng_ = hash32(o.seed * 2654435761U + 17);
 }
 
+namespace {
+constexpr float kFloorGap = 0.35f;  // room round a floor move's reach: a neighbor's body and a little air
+bool needsRoom(int move) {
+    const MoveDef& d = kMoves[std::size_t(move)];
+    return d.clip >= 0 && clipInfo(d.clip).floorWork;
+}
+}  // namespace
+
+Routine Choreographer::filler(double start, double end, const MusicState& g, bool dropHit, double until) {
+    noFloor_ = true;
+    Routine f = pickOne(start, std::min(end, until), g, dropHit);
+    noFloor_ = false;
+    f.end = f.end > start + 1e-6 ? std::min(f.end, until) : until;
+    return f;
+}
+
 Routine Choreographer::pick(double start, double end, const MusicState& g, bool dropHit) {
+    // No stage (tests, the web preview) or trying a move: as before.
+    if (floorRoom_ > 1e29f || tryMove_ >= 0) {
+        pendMove_ = -1;
+        return pickOne(start, end, g, dropHit);
+    }
+    auto fits = [&](int move) { return floorRoom_ >= clipInfo(kMoves[std::size_t(move)].clip).reach.max + kFloorGap; };
+    const bool bustStart = std::fabs(start - bustFrom_) < 1e-6;
+    if (bustStart) pendMove_ = -1;  // (the bust takes over)
+    if (pendMove_ >= 0) {
+        // A floor move waiting for room: on its next 4-bar (basic) or 8-bar (routine) point once it fits; standing
+        // moves until then.
+        const double grid = kMoves[std::size_t(pendMove_)].beats >= 32 ? 32.0 : 16.0;
+        const double pos = phrasePos(start, g), off = std::remainder(pos, grid);
+        if (std::fabs(off) < 0.25 && !bustStart) {
+            ++pendTries_;
+            const bool anyway = pendTries_ >= kFloorLastResort;
+            if (fits(pendMove_) || anyway) {
+                forceMove_ = pendMove_;
+                pendMove_ = -1;
+                ++(anyway && !fits(forceMove_) ? floorCounts_.forced : floorCounts_.waited);
+                countDelay(pendTries_);
+                return pickOne(start, end, g, false);
+            }
+        }
+        if (pendMove_ >= 0) {
+            double next = start - std::fmod(pos, grid) + grid;
+            if (next - start < 0.25) next += grid;
+            return filler(start, end, g, dropHit, std::min(next, bustFrom_ > start ? bustFrom_ : 1e18));
+        }
+    }
+    Routine r = pickOne(start, end, g, dropHit);
+    if (r.full < 0 || !needsRoom(r.full) || fits(r.full)) {
+        if (r.full >= 0 && needsRoom(r.full) && !bustStart && !(start > bustFrom_ && start < bustTo_)) {
+            ++floorCounts_.now;
+            countDelay(0);
+        }
+        if (bustStart) {
+            countDelay(bustWaits_);
+            bustWaits_ = 0;
+        }
+        return r;
+    }
+    if (bustStart) {
+        // A bust without room yet: on the next 8-bar point (kFloorLastResort of them at most: then anyway).
+        if (bustWaits_ >= kFloorLastResort) {
+            countDelay(bustWaits_);
+            ++floorCounts_.forced;
+            bustWaits_ = 0;
+            return r;
+        }
+        ++bustWaits_;
+        ++floorCounts_.bustDelays;
+        bustFrom_ += 32;
+        bustTo_ += 32;
+        return filler(start, end, g, dropHit, bustFrom_);
+    }
+    if (start > bustFrom_ && start < bustTo_) return r;  // (the bust's second routine: the room is held already)
+    pendMove_ = r.full;
+    pendMirror_ = r.mirror;
+    pendTries_ = 0;
+    const double grid = kMoves[std::size_t(pendMove_)].beats >= 32 ? 32.0 : 16.0;
+    const double pos = phrasePos(start, g);
+    double next = start - std::fmod(pos, grid) + grid;
+    if (next - start < 0.25) next += grid;
+    return filler(start, end, g, dropHit, std::min(next, bustFrom_ > start ? bustFrom_ : 1e18));
+}
+
+Routine Choreographer::pickOne(double start, double end, const MusicState& g, bool dropHit) {
     Routine r;
     r.start = start;
     r.end = end;
@@ -1445,23 +1532,44 @@ Routine Choreographer::pick(double start, double end, const MusicState& g, bool 
         return std::max(0.33f, 1.0f - 0.02f * off);
     };
     // Routines (16 bars, or an 8-bar half) start only on an 8-bar point of the phrase (bar 1 or 9) and then play
-    // whole; anywhere else a basic move (4 bars) fills in until the next 8-bar point.
-    const bool onEight = std::fabs(std::remainder(phrasePos(start, g), 32.0)) < 1e-6;
+    // whole; anywhere else a basic move (4 bars) fills in until the next 8-bar point. Within a quarter beat: the
+    // dancer's own beat drifts a little against the music (humanize), and an exact test let almost no routine start
+    // live (Peter, 2026-11-27: nothing should keep dancers from starting routines as easily as basics).
+    const bool onEight = std::fabs(std::remainder(phrasePos(start, g), 32.0)) < 0.25;
     // A mocap move of this style with energy `want` (weighted by energy and tempo, never the last one); -1: none.
     // On an 8-bar point a routine or basics is a deliberate choice (kRoutineChance: routines half the time), not the
     // libraries' sizes (by count it was about a third); then the move within that group by energy and tempo.
+    // Bust a move (bustMove): only whole break routines with floor work in them, whatever the style, cut at its end.
+    const bool bustMode = start >= bustFrom_ - 1e-6 && start < bustTo_ - 1e-6;
+    // Floor moves are break moves like any other (Peter, 2026-11-27: "into the normal break cycle without special
+    // distribution weighting"): reforce.Dancer.FloorMoves (default 1) is their weight, no say of the music.
     auto chooseClip = [&](std::uint8_t wantE, bool only) {
         auto weight = [&](std::size_t i) {
             const MoveDef& m = kMoves[i];
-            if (m.clip < 0 || !(m.styles & sb) || int(i) == lastFull_) return 0.0f;
-            if (m.beats >= 32 && !onEight) return 0.0f;
+            if (m.clip < 0 || int(i) == lastFull_) return 0.0f;
+            const ClipInfo& ci = clipInfo(m.clip);
+            const int tier = ci.tier;
+            if (bustMode ? !(ci.floorWork && ci.genre == "BR" && m.beats >= 64) : !(m.styles & sb)) return 0.0f;
+            // (Standing in for a floor move waiting for room: no floor work, no routines.)
+            if (noFloor_ && (ci.floorWork || m.beats >= 32)) return 0.0f;
+            // (Bust a move plans its own starts, its 8-bar points as the dancer's beat had them then.)
+            if (m.beats >= 32 && !onEight && !bustMode) return 0.0f;
             if (only && !(m.energy & wantE)) return 0.0f;
-            return ((m.energy & wantE) ? 1.0f : 0.15f) * tempo(clipInfo(m.clip).bpm);
+            float w = ((m.energy & wantE) ? 1.0f : 0.15f) * tempo(clipInfo(m.clip).bpm);
+            if (bustMode) return w;
+            // Floor moves by their tier's weight (standing moves 1).
+            (void)tier;
+            return w * clipWeight(m.clip);
         };
         float groups[2] = {0, 0};  // basic, routine
         for (std::size_t i = 0; i < kMoves.size(); ++i) groups[kMoves[i].beats >= 32 ? 1 : 0] += weight(i);
         int group = -1;  // -1: either
-        if (groups[0] > 0 && groups[1] > 0) group = unit(s) < kRoutineChance ? 1 : 0;
+        if (groups[0] > 0 && groups[1] > 0) {
+            float eighths = 0;  // the routine candidates' weighted length, in 8-bar units
+            for (std::size_t i = 0; i < kMoves.size(); ++i)
+                if (kMoves[i].beats >= 32) eighths += weight(i) * float(kMoves[i].beats) / 32.0f;
+            group = unit(s) < routineChance(eighths / groups[1]) ? 1 : 0;
+        }
         auto w = [&](std::size_t i) {
             return group < 0 || (kMoves[i].beats >= 32 ? 1 : 0) == group ? weight(i) : 0.0f;
         };
@@ -1475,17 +1583,29 @@ Routine Choreographer::pick(double start, double end, const MusicState& g, bool 
         }
         return -1;
     };
+    // A mocap pick: noted (the last one, a floor routine), mirrored half the time, on the grid; cut at floor time's end.
+    auto mocapPick = [&](int move) {
+        r.full = move;
+        lastFull_ = r.full;
+        r.mirror = unit(s) < 0.5f;
+        alignClip(r, g, false);
+        if (bustMode) r.end = std::min(r.end, bustTo_);
+        else if (r.start < bustFrom_ && r.end > bustFrom_) r.end = bustFrom_;  // a bust cuts in on its point
+        return r;
+    };
+    if (forceMove_ >= 0) {  // a floor move that waited for room, as it was chosen
+        const int m = forceMove_;
+        forceMove_ = -1;
+        mocapPick(m);
+        r.mirror = pendMirror_;
+        return r;
+    }
     if (dropHit) {
         // The drop (Peter, 2026-11-21: "replace jumps with high-energy mocap move"): a hype mocap move from the drop,
-        // by the Mocap share; else the hand-made jump.
-        if (opts_.mocap > 0 && unit(s) < opts_.mocap) {
-            r.full = chooseClip(Hype, true);
-            if (r.full >= 0) {
-                lastFull_ = r.full;
-                r.mirror = unit(s) < 0.5f;
-                alignClip(r, g, false);
-                return r;
-            }
+        // by the Mocap share (a break dancer's may be a floor move); else the hand-made jump. (None while busting a move.)
+        if (bustMode || (opts_.mocap > 0 && unit(s) < opts_.mocap)) {
+            const int m = chooseClip(Hype, !bustMode);
+            if (m >= 0) return mocapPick(m);
         }
         r.full = findMove("jump");
         r.amp = 1.2f;
@@ -1498,16 +1618,15 @@ Routine Choreographer::pick(double start, double end, const MusicState& g, bool 
         alignClip(r, g, true);
         return r;
     }
+    if (bustMode) {
+        const int m = chooseClip(want, false);
+        if (m >= 0) return mocapPick(m);
+    }
     // A mocap move of this style (reforce.Dancer.Mocap); weighted like the procedural ones by energy, never the same
     // one twice in a row. Plays at least its whole length.
     if (opts_.mocap > 0 && unit(s) < opts_.mocap) {
-        r.full = chooseClip(want, false);
-        if (r.full >= 0) {
-            lastFull_ = r.full;
-            r.mirror = unit(s) < 0.5f;
-            alignClip(r, g, false);
-            return r;
-        }
+        const int m = chooseClip(want, false);
+        if (m >= 0) return mocapPick(m);
     }
     auto weightOf = [&](int i, int last) {
         const MoveDef& m = kMoves[std::size_t(i)];
@@ -1571,12 +1690,12 @@ void Choreographer::alignClip(Routine& r, const MusicState& g, bool tried) const
     const double phraseBeats = 64;  // 16 bars
     const double p0 = r.start - phrasePos(r.start, g);  // the phrase line at or before the start
     r.aligned = true;
-    // Tried in the panel, or a routine (started on an 8-bar point): from its own bar 1, whole. Every routine fills 16
-    // bars: an 8-bar half plays twice (a style with few whole routines, street jazz, still dances routines half the
-    // time).
+    // Tried in the panel, or a routine (started on an 8-bar point): from its own bar 1, whole, once. An 8-bar half
+    // plays once and something else follows on the next 8-bar point (Peter, 2026-11-27: no repeats; it used to fill 16
+    // bars by playing twice).
     if (tried || len >= 32) {
         r.origin = r.start;
-        r.end = r.start + (tried ? 1e6 : std::max(len, phraseBeats));
+        r.end = r.start + (tried ? 1e6 : len);
         return;
     }
     // A basic move: on the 4-bar grid of the phrase (joining mid-cycle when picked off it).
@@ -1589,6 +1708,29 @@ void Choreographer::alignClip(Routine& r, const MusicState& g, bool tried) const
         r.end = std::min(r.origin + cycles * len, nextPhrase);
         if (r.end - r.start < 4) r.end = std::min(r.end + len, nextPhrase);
     }
+}
+
+void Choreographer::bustMove(int bars) { bustAsk_ = std::clamp(bars, 16, 256); }
+
+bool Choreographer::bustMoveAt(double beat, bool pending) const {
+    return (pending && bustAsk_ > 0) || (beat >= bustFrom_ - (pending ? 1e18 : 0.0) && beat < bustTo_);
+}
+
+Choreographer::BustPhase Choreographer::bustPhase(double beat, double* beats) const {
+    double b = 0;
+    BustPhase ph = BustPhase::None;
+    if (beat >= bustFrom_ && beat < bustTo_) {  // (asked again while on: ignored, so still On)
+        ph = BustPhase::On;
+        b = bustTo_ - beat;
+    } else if (bustAsk_ > 0) {
+        ph = BustPhase::Waiting;
+        b = -1;
+    } else if (beat < bustFrom_ && beat < bustTo_) {
+        ph = bustWaits_ > 0 ? BustPhase::Room : BustPhase::Waiting;
+        b = bustFrom_ - beat;
+    }
+    if (beats) *beats = b;
+    return ph;
 }
 
 void Choreographer::tryMove(int move) {
@@ -1645,11 +1787,35 @@ void Choreographer::advance(const MusicState& g) {
             if (routines_.empty() || tryMove_ >= 0) routines_.push_back(pick(start, start + 8, g, false));
         }
     }
-    const bool dropNow = tryMove_ < 0 && g.drop > 0.9 && beat - lastDropBeat_ > 16;
+    if (bustAsk_ > 0) {
+        // Bust a move: from the next 8-bar point, at least a beat ahead (routines are scheduled a beat ahead).
+        double to = 32 - std::fmod(phrasePos(beat, g), 32.0);
+        if (to < 1) to += 32;
+        const bool waving = !routines_.empty() && routines_.back().full == findMove("wave") && routines_.back().end > 1e5;
+        const double start = beat + to;  // (on the phrase grid exactly: a dancer's own beat is off the whole beats)
+        if (!waving && !bustMoveAt(beat, false)) {
+            bustFrom_ = start;
+            bustTo_ = start + 4.0 * bustAsk_;
+            while (!routines_.empty() && routines_.back().start >= start) routines_.pop_back();
+            if (!routines_.empty()) routines_.back().end = std::min(routines_.back().end, start);
+        }
+        bustAsk_ = 0;
+    }
+    // (A bust's routines play whole: no drop cuts in.)
+    const bool dropNow = tryMove_ < 0 && !bustMoveAt(beat, false) && g.drop > 0.9 && beat - lastDropBeat_ > 16;
     if (dropNow) {
         lastDropBeat_ = beat;
-        const double start = std::round(beat);
-        while (!routines_.empty() && routines_.back().start >= start) routines_.pop_back();
+        double start = std::round(beat);
+        // (A routine already fading in stays, cut to nothing: its fade carries on under the drop's. Dropped, its
+        // share of the pose vanished in a frame. Spin glitches 2026-11-27.)
+        while (!routines_.empty() && routines_.back().start >= start) {
+            const Routine& b = routines_.back();
+            if (beat > b.start - kBlend && beat >= b.created) {
+                start = b.start;
+                break;
+            }
+            routines_.pop_back();
+        }
         if (!routines_.empty()) routines_.back().end = start;
         routines_.push_back(pick(start, start + 2, g, true));
         routines_.back().created = beat;
@@ -1675,8 +1841,37 @@ void Choreographer::advance(const MusicState& g) {
     int guard = 0;
     // Schedule a beat ahead, so the crossfade into the next routine can start before its bar line.
     while (routines_.back().end <= beat + 1.0 && guard++ < 64) {
-        const double start = routines_.back().end;
-        routines_.push_back(pick(start, nextEnd(start), g, false));
+        double start = routines_.back().end;
+        // Within a quarter beat of an 8-bar point (the dancer's own beat drifts a little against the music): start
+        // exactly on it, so a routine can start there (onEight) and a bust lines up. (A basic floor move waiting
+        // for room: its 4-bar points too.)
+        // A bust's start or end there moves with it: planned on an earlier frame's grid (the dancer's beat drifts),
+        // it sat a few hundredths of a beat off, and every routine picked between the two was cut to nothing, again
+        // and again, every frame (spin glitches 2026-11-27). Never shortening the last routine under a beat.
+        const double snapGrid = pendMove_ >= 0 && kMoves[std::size_t(pendMove_)].beats < 32 ? 16.0 : 32.0;
+        const double off = std::remainder(phrasePos(start, g), snapGrid);
+        if (std::fabs(off) < 0.25 && std::fabs(off) > 1e-9 && start - off >= routines_.back().start + 1.0) {
+            const double was = start;
+            start -= off;
+            routines_.back().end = start;
+            if (std::fabs(bustFrom_ - was) < 0.25) {
+                bustTo_ += start - bustFrom_;
+                bustFrom_ = start;
+            } else if (std::fabs(bustTo_ - was) < 0.25) {
+                bustTo_ = start;
+            }
+        }
+        Routine r = pick(start, nextEnd(start), g, false);
+        // Never a routine under a beat (cut at a bust's start or a floor move's point just ahead): the last one plays
+        // on until then instead. (Always on by at least that much: a routine of nothing never comes back.)
+        if (r.end < start + 1.0 - 1e-6) {
+            if (r.end > start + 1e-6) {
+                routines_.back().end = r.end;
+                continue;
+            }
+            r.end = start + 1.0;
+        }
+        routines_.push_back(r);
     }
     while (routines_.size() > 2 && routines_[1].end < beat - 64) routines_.pop_front();
     lastPhrase_ = g.phrase;
@@ -1728,13 +1923,10 @@ DancePose Choreographer::pose(const MusicState& g, const Skeleton& sk, double de
     if (!cur) return restPose(sk);
     // Crossfade over 2 x kBlend beats centered on each change (from half a beat before the bar line to half a beat
     // after), with a smootherstep so it eases in and out. A routine that cut in (a drop) fades in only from then.
-    const Routine* prev = nullptr;
-    const Routine* next = nullptr;
+    std::size_t at = 0;
     for (std::size_t i = 0; i < routines_.size(); ++i)
-        if (&routines_[i] == cur) {
-            if (i > 0) prev = &routines_[i - 1];
-            if (i + 1 < routines_.size()) next = &routines_[i + 1];
-        }
+        if (&routines_[i] == cur) at = i;
+    const Routine* next = at + 1 < routines_.size() ? &routines_[at + 1] : nullptr;
     auto smoother = [](double x) {
         x = std::clamp(x, 0.0, 1.0);
         return float(x * x * x * (x * (x * 6 - 15) + 10));
@@ -1743,12 +1935,25 @@ DancePose Choreographer::pose(const MusicState& g, const Skeleton& sk, double de
         const double from = std::max(r.start - kBlend, r.created), to = r.start + kBlend;
         return to > from ? smoother((beat - from) / (to - from)) : 1.0f;
     };
-    DancePose p = evaluate(*cur, beat, sk);
-    if (next && beat > next->start - kBlend && beat >= next->created) {
-        p = mix(p, evaluate(*next, beat, sk), weightInto(*next));
-    } else if (prev && beat < cur->start + kBlend) {
-        p = mix(evaluate(*prev, beat, sk), p, weightInto(*cur));
-    }
+    // The heading's difference followed from the fade's start (spin glitches 2026-11-27: chosen the short way every
+    // frame, the blend jumped by 2 pi x w when the difference passed half a turn).
+    auto fade = [](const DancePose& a, const DancePose& b, float w, const Routine& into) {
+        DancePose p = mix(a, b, w);
+        const float d = b.bodyYaw - a.bodyYaw;
+        into.fadeYaw = into.fadeYawSet ? into.fadeYaw + std::remainder(d - into.fadeYaw, TAU) : std::remainder(d, TAU);
+        into.fadeYawSet = true;
+        p.bodyYaw = a.bodyYaw + into.fadeYaw * w;
+        return p;
+    };
+    // Fades that overlap stack (a routine under 2 x kBlend beats, a drop cutting in while the fade into the one
+    // playing still runs): from the oldest still fading out. (Only the last fade was blended before: a jump.)
+    std::size_t first = at;
+    while (first > 0 && at - first < 4 && beat < routines_[first].start + kBlend) --first;
+    DancePose p = evaluate(routines_[first], beat, sk);
+    for (std::size_t i = first + 1; i <= at; ++i)
+        p = fade(p, evaluate(routines_[i], beat, sk), weightInto(routines_[i]), routines_[i]);
+    if (next && beat > next->start - kBlend && beat >= next->created)
+        p = fade(p, evaluate(*next, beat, sk), weightInto(*next), *next);
     return mirror ? mirrored(p) : p;
 }
 
@@ -1782,8 +1987,9 @@ int reactionIndex(double beat, std::uint32_t seed) {
 }
 }  // namespace
 
-DancePose reactionPose(double beat, std::uint32_t seed, Style style, const Skeleton& sk) {
-    const Reaction& r = kReactions[reactionIndex(beat, seed)];
+namespace {
+DancePose reactionPoseOf(int index, double beat, Style style, const Skeleton& sk) {
+    const Reaction& r = kReactions[index];
     DancePose p = restPose(sk);
     MoveCtx c;
     c.amp = 0.9f;
@@ -1798,40 +2004,131 @@ DancePose reactionPose(double beat, std::uint32_t seed, Style style, const Skele
     A.fn(float(std::fmod(std::max(0.0, beat), double(A.beats))), c, p);
     return p;
 }
+}  // namespace
+
+DancePose reactionPose(double beat, std::uint32_t seed, Style style, const Skeleton& sk) {
+    return reactionPoseOf(reactionIndex(beat, seed), beat, style, sk);
+}
 
 namespace {
-// The calm basic move a watcher dances in the 4-bar slot of `beat` (-1: none).
-int watchMove(double beat, std::uint32_t seed, Style style) {
-    std::vector<int> calm, any;
+// What a watcher dances at `beat` (move -1: none): the style's standing mocap moves at any energy (Peter,
+// 2026-11-27: "I don't want to restrict the watchers' moves as much": calm basics only before), never floor work.
+// Per 16-bar block (from beat 0 of the watcher's clock), about as often as a dancer picks routines: a routine, whole;
+// an 8-bar one plays once and the second half is picked afresh (another 8-bar routine or basics; Peter: no forced
+// repeats, a random one is fine); else a basic move per 4 bars.
+struct WatchPick {
+    int move = -1;
+    double phase = 0;  // where in the move, beats
+};
+WatchPick watchMove(double beat, std::uint32_t seed, Style style) {
+    std::vector<int> basics, routines, halves;
     for (std::size_t i = 0; i < kMoves.size(); ++i) {
         const MoveDef& m = kMoves[i];
-        if (m.clip < 0 || m.beats != 16 || !(m.styles & styleBit(style))) continue;
-        any.push_back(int(i));
-        if (m.energy & Chill) calm.push_back(int(i));
+        if (m.clip < 0 || !(m.styles & styleBit(style))) continue;
+        if (clipInfo(m.clip).tier != kStanding || clipInfo(m.clip).floorWork) continue;  // watching: never on the floor
+        if (m.beats == 16) basics.push_back(int(i));
+        else if (m.beats >= 32) routines.push_back(int(i));
+        if (m.beats == 32) halves.push_back(int(i));
     }
-    const std::vector<int>& from = calm.empty() ? any : calm;
-    if (from.empty()) return -1;
-    const auto slot = std::uint32_t(std::max(0.0, std::floor(beat / 16.0)));
-    return from[hash32(seed * 0x2545f491U + slot * 0x9e3779b9U) % std::uint32_t(from.size())];
+    WatchPick w;
+    const double b = std::max(0.0, beat);
+    const auto block = std::uint32_t(std::floor(b / 64.0));
+    const double into = b - double(block) * 64.0;
+    std::uint32_t h = hash32(seed * 0x2545f491U + block * 0x85ebca6bU + 0x77u);
+    if (!routines.empty() && (basics.empty() || unit(h) < kRoutineChance)) {
+        const int first = routines[hash32(h ^ 0x9e3779b9U) % routines.size()];
+        if (kMoves[std::size_t(first)].beats >= 64 || into < 32) {
+            w.move = first;
+            w.phase = into;
+            return w;
+        }
+        std::uint32_t h2 = hash32(h ^ 0x6a09e667U);
+        if (basics.empty() || unit(h2) < routineChance(1)) {
+            w.move = halves[hash32(h2 ^ 0x3c6ef372U) % halves.size()];
+            w.phase = into - 32;
+            return w;
+        }
+    }
+    if (basics.empty()) return w;
+    const auto slot = std::uint32_t(std::floor(b / 16.0));
+    w.move = basics[hash32(seed * 0x2545f491U + slot * 0x9e3779b9U) % basics.size()];
+    w.phase = std::fmod(b, 16.0);
+    return w;
+}
+}  // namespace
+
+namespace {
+// The watch move picked at `at`, played on to `beat` (before `at`: the end of its cycle, so it arrives in motion).
+struct WatchSlot {
+    int move = -1, reaction = 0;
+    double phase = 0;  // at `at`
+};
+WatchSlot watchSlot(double at, std::uint32_t seed, Style style, bool mocap) {
+    const WatchPick w = mocap ? watchMove(at, seed, style) : WatchPick{};
+    WatchSlot s;
+    s.move = w.move;
+    s.phase = w.phase;
+    if (w.move < 0) s.reaction = reactionIndex(at, seed);
+    return s;
+}
+DancePose watchSlotPose(const WatchSlot& s, double at, double beat, Style style, const Skeleton& sk) {
+    if (s.move < 0) return reactionPoseOf(s.reaction, beat, style, sk);
+    const double len = std::max(1, kMoves[std::size_t(s.move)].beats);
+    double ph = std::fmod(s.phase + (beat - at), len);
+    if (ph < 0) ph += len;
+    DancePose p = restPose(sk);
+    MoveCtx c;
+    c.sk = &sk;
+    runMove(kMoves[std::size_t(s.move)], float(ph), c, p);
+    return p;
 }
 }  // namespace
 
 DancePose watchPose(double beat, std::uint32_t seed, Style style, const Skeleton& sk, bool mocap) {
-    const int m = mocap ? watchMove(beat, seed, style) : -1;
-    if (m < 0) return reactionPose(beat, seed, style, sk);
-    DancePose p = restPose(sk);
-    MoveCtx c;
-    c.sk = &sk;
-    double ph = std::fmod(beat, 16.0);
-    if (ph < 0) ph += 16.0;
-    runMove(kMoves[std::size_t(m)], float(ph), c, p);
-    return p;
+    // Crossfaded across a change of move (every 2 or 4 bars at most), as the choreographer fades its routines: a
+    // kWatchBlend beat either side, the heading's difference chosen at the fade's start and followed (spin glitches
+    // 2026-11-27: watchers switched with no blend).
+    constexpr double kWatchBlend = 1.0, kGrid = 8.0;  // (reactions change per 2 bars, watch moves per 4)
+    const double B = std::round(beat / kGrid) * kGrid;
+    if (B > 0 && std::fabs(beat - B) < kWatchBlend) {
+        const double before = B - 1e-4, after = B + 1e-4;
+        const WatchSlot a = watchSlot(before, seed, style, mocap), b = watchSlot(after, seed, style, mocap);
+        bool same = a.move == b.move && (a.move >= 0 || a.reaction == b.reaction);
+        if (same && a.move >= 0) {
+            const double len = std::max(1, kMoves[std::size_t(a.move)].beats);
+            same = std::fabs(std::remainder(a.phase + (after - before) - b.phase, len)) < 1e-3;
+        }
+        if (!same) {
+            auto smoother = [](double x) {
+                x = std::clamp(x, 0.0, 1.0);
+                return float(x * x * x * (x * (x * 6 - 15) + 10));
+            };
+            const double from = B - kWatchBlend;
+            auto diff = [&](double at) {
+                return watchSlotPose(b, after, at, style, sk).bodyYaw - watchSlotPose(a, before, at, style, sk).bodyYaw;
+            };
+            // (Followed from the fade's start in eighth beats: either may be spinning, up to ~1.5 turns a beat.)
+            float last = diff(from), d = std::remainder(last, TAU);
+            const int steps = int(std::ceil((beat - from) * 8 - 1e-9));
+            for (int i = 1; i <= steps; ++i) {
+                const float now = diff(std::min(beat, from + i / 8.0));
+                d += std::remainder(now - last, TAU);
+                last = now;
+            }
+            const DancePose pa = watchSlotPose(a, before, beat, style, sk), pb = watchSlotPose(b, after, beat, style, sk);
+            const float w = smoother((beat - from) / (2 * kWatchBlend));
+            DancePose p = mix(pa, pb, w);
+            p.bodyYaw = pa.bodyYaw + d * w;
+            return p;
+        }
+    }
+    return watchSlotPose(watchSlot(beat, seed, style, mocap), beat, beat, style, sk);
 }
 
 std::string watchName(double beat, std::uint32_t seed, Style style, bool mocap) {
-    const int m = mocap ? watchMove(beat, seed, style) : -1;
-    if (m < 0) return reactionName(beat, seed);
-    return std::string(kMoves[std::size_t(m)].name) + " (watching)";
+    const WatchPick w = mocap ? watchMove(beat, seed, style) : WatchPick{};
+    if (w.move < 0) return reactionName(beat, seed);
+    return std::string(kMoves[std::size_t(w.move)].name) + " (watching)";
 }
 
 std::string reactionName(double beat, std::uint32_t seed) {

@@ -11,12 +11,14 @@
 //   ink           print color, repeat     faceA  eye shape, brows, mouth style, beard
 //   faceB         lashes, freckles, blush, lipstick
 //   lips          lip color (hair: the second clip plane)  beard  beard color
+//   bend[6]       long hair that bends (BodyPart::bent, dance::HairBend; zero otherwise): the back, left and right
+//                 columns' p2, p3 (xyz); w: y0 (> 0: bent), the back anchor's z, the left anchor's x, z, -, -
 
 #include "engine/DancerRig.hpp"
 
 namespace reforce::engine {
 
-inline constexpr int kDancerInstFloats = 76;
+inline constexpr int kDancerInstFloats = 100;
 void packDancerPart(const dance::BodyPart& p, const dance::BodyOut& body, float* out);
 
 }  // namespace reforce::engine

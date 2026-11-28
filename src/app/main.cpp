@@ -67,6 +67,7 @@
 // Dancers (PLAN 5P): scene files in reforce.Dancer.package (content/), started with switch:dancer:NAME, next:dancer,
 //   kill:dancer, or a Theme. Test hook:
 //   --dancer-test STYLES  built-in characters from the first frame on, one per comma-separated dance style
+//   --name-tags           a name tag over every dancer, generated ones too (normally only guests have one)
 //                         (disco, hiphop, house, pop, robot, rave, retro, chill)
 //   --syphon-name NAME    our Syphon server name (default "reforce"; never subscribed to by our own
 //                         video inputs unless reforce.Syphon.AllowFeedback = 1)
@@ -86,6 +87,9 @@
 //   --lights              a --background instance drives the room lights (docs/lights.md) too (quit the live one's
 //                         lights first: both would fight over the panels)
 //   --rkbx-port PORT      a --background instance takes rkbx_link datagrams on PORT (e.g. a test feed; no MIDI)
+//   --guests-url URL      stream guests from this guest service (e.g. a local test one, http://127.0.0.1:8787), on
+//                         even in a --background instance; nothing remembered or saved (docs/guests.md "Testing").
+//                         --guests-key KEY: its read key
 //   --log-file PATH       log file (default ~/Library/Logs/reforce/reforce.log, rotated at 4 MB, 3 kept);
 //                         stderr is copied there, and still printed when it is a terminal. --no-log-file: off
 // Debug: --quit-after SEC  --minimize-after SEC  --fullscreen-after SEC
@@ -159,9 +163,10 @@ void usage() {
                  "               [--settings PATH | --no-settings] [--import-gforce-prefs [PATH]]\n"
                  "               [--deterministic] [--fps F] [--render-frames N] [--out DIR]\n"
                  "               [--save-frames A,B,...] [--save-every K]\n"
-                 "               [--video SOURCE] [--syphon-name NAME] [--solid-test SPEC] [--dancer-test STYLES]\n"
+                 "               [--video SOURCE] [--syphon-name NAME] [--solid-test SPEC] [--dancer-test STYLES] [--name-tags]\n"
                  "               [--ui-port N] [--ui-lan] [--no-ui] [--no-link]\n"
                  "               [--write-setting KEY=VALUE] [--allow-multiple] [--background] [--lights] [--rkbx-port PORT]\n"
+                 "               [--guests-url URL [--guests-key KEY]]\n"
                  "               [--log-file PATH | --no-log-file]\n"
                  "               [--quit-after SEC] [--minimize-after SEC] [--fullscreen-after SEC]\n"
                  "               [--stress] [--stress-interval SEC] [--perf-report SEC] [--eval-threads N]\n"
@@ -239,9 +244,11 @@ int main(int argc, char** argv) {
     std::string theme, videoSource, syphonName = "reforce";
     std::vector<render::SolidTestSpec> solidTests;  // --solid-test (phase-2 test hook)
     std::vector<std::string> dancerTests;            // --dancer-test (PLAN 5P test hook)
+    bool nameTagsAll = false;                        // --name-tags (test hook)
     std::vector<std::pair<std::string, std::string>> blends, sets, writeSettings;
     bool lightsFlag = false;  // --lights: a --background instance drives the room lights too
     int rkbxPort = 0;         // --rkbx-port: a --background instance listens for rkbx_link there (test feeds)
+    std::string guestsTestUrl, guestsTestKey;  // --guests-url / --guests-key: a test guest service
     bool allowMultiple = false, logToFile = true, background = false, haveSyphonName = false, haveUiPort = false;
     std::string logPath;
     auto splitKv = [](const std::string& s, std::pair<std::string, std::string>& out) {
@@ -295,9 +302,12 @@ int main(int argc, char** argv) {
         }
         else if (arg == "--allow-multiple") allowMultiple = true;
         else if (arg == "--background") background = true;
+        else if (arg == "--guests-url" && hasValue) guestsTestUrl = value();
+        else if (arg == "--guests-key" && hasValue) guestsTestKey = value();
         else if (arg == "--lights") lightsFlag = true;
         else if (arg == "--rkbx-port" && hasValue) rkbxPort = std::atoi(value().c_str());
         else if (arg == "--video" && hasValue) videoSource = value();
+        else if (arg == "--name-tags") nameTagsAll = true;  // test hook: tags over generated dancers too
         else if (arg == "--dancer-test" && hasValue) {  // test hook (PLAN 5P)
             std::string v = value(), cur;
             for (char c : v + ",") {
@@ -524,12 +534,17 @@ int main(int argc, char** argv) {
         }
         vo.syncBuilds = deterministic;  // FlowField builds finish inside the switch: reproducible frames
         vo.network = !deterministic && !background;  // stream guests (web/Guests): never offline or in a test instance
+        if (!deterministic) {  // ... unless pointed at a test service
+            vo.guestsTestUrl = guestsTestUrl;
+            vo.guestsTestKey = guestsTestKey;
+        }
         // Room lights (docs/lights.md): the live instance's; a test instance only with --lights (both would fight).
         if (windowed && !deterministic && (!background || lightsFlag))
             vo.lightsConfig = fs::path(settingsPath).parent_path() / "nanoleaf.json";
         vo.evalThreads = evalThreads;
         vo.solidTests = solidTests;
         vo.dancerTests = dancerTests;
+        vo.nameTagsAll = nameTagsAll;
         auto vis = std::make_unique<app::Visualizer>(device, vo);
 
         // Scenes: the CLI names are the starting configs; otherwise the slideshow
@@ -550,6 +565,15 @@ int main(int argc, char** argv) {
                 if (err.empty()) std::fprintf(stderr, "[reforce] %d mocap dance moves from %s\n", engine::dance::clipCount(), moves.string().c_str());
                 else std::fprintf(stderr, "[reforce] mocap dance moves not loaded: %s\n", err.c_str());
             }
+            // Break floor work (docs/dancers-design.md "Break floor work"): after them; picked by their tier weights.
+            const fs::path floorMoves = dopts.contentDir / "Moves" / "aist_floor.moves";
+            if (engine::dance::clipCount() > 0 && fs::exists(floorMoves, ec)) {
+                const int before = engine::dance::clipCount();
+                const std::string err = engine::dance::loadClips(floorMoves.string(), true);
+                if (err.empty()) std::fprintf(stderr, "[reforce] %d floor moves from %s\n", engine::dance::clipCount() - before, floorMoves.string().c_str());
+                else std::fprintf(stderr, "[reforce] floor moves not loaded: %s\n", err.c_str());
+            }
+            engine::dance::setFloorWeights(float(prefs.dancerFloorMoves));
         }
         dopts.slideshow = slideshow;
         dopts.seed = seed;

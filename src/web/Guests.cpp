@@ -3,6 +3,7 @@
 #include "web/GuestBook.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -71,6 +72,14 @@ std::optional<GuestPoll> parseGuestPoll(std::string_view text, std::string* erro
     GuestPoll poll;
     if (const json::Value* s = root->get("seq"); s && s->isNumber()) poll.latest = std::int64_t(s->num);
     if (const json::Value* s = root->get("msgSeq"); s && s->isNumber()) poll.msgLatest = std::int64_t(s->num);
+    if (const json::Value* s = root->get("reqSeq"); s && s->isNumber()) poll.reqLatest = std::int64_t(s->num);
+    if (const json::Value* reqs = root->get("requests"); reqs && reqs->isArray()) {
+        for (const json::Value& q : reqs->array) {
+            const json::Value *seq = q.get("seq"), *id = q.get("id"), *kind = q.get("kind");
+            if (!seq || !seq->isNumber() || !id || !id->isString() || !kind || !kind->isString()) continue;
+            poll.requests.push_back({std::int64_t(seq->num), clean(id->str), clean(kind->str, 16)});
+        }
+    }
     std::vector<GuestArrival>& out = poll.arrivals;
     for (const json::Value& c : list->array) {
         const json::Value *seq = c.get("seq"), *id = c.get("id"), *name = c.get("name"), *dancer = c.get("dancer");
@@ -97,28 +106,41 @@ std::optional<GuestPoll> parseGuestPoll(std::string_view text, std::string* erro
             poll.messages.push_back(std::move(g));
         }
     }
+    if (const json::Value* soc = root->get("social"); soc && soc->isArray()) {
+        poll.hasSocial = true;
+        for (const json::Value& e : soc->array) {
+            const json::Value *id = e.get("id"), *vibe = e.get("vibe"), *with = e.get("with");
+            if (!id || !id->isString()) continue;
+            GuestSocial g;
+            g.id = clean(id->str);
+            g.vibe = vibe && vibe->isString() ? clean(vibe->str, 16) : std::string();
+            g.with = with && with->isString() ? clean(with->str) : std::string();
+            poll.social.push_back(std::move(g));
+        }
+    }
     return poll;
 }
 
 namespace {
-// The memory file: the service URL, then the last check-in seq and the last message seq handed over.
-std::pair<std::int64_t, std::int64_t> recall(const std::string& path, const std::string& url) {
-    if (path.empty()) return {-1, -1};
+// The memory file: the service URL, then the last check-in, message and request seqs handed over.
+std::tuple<std::int64_t, std::int64_t, std::int64_t> recall(const std::string& path, const std::string& url) {
+    if (path.empty()) return {-1, -1, -1};
     std::FILE* f = std::fopen(path.c_str(), "r");
-    if (!f) return {-1, -1};
+    if (!f) return {-1, -1, -1};
     char u[1024] = {};
-    long long seq = -1, msg = -1;
-    const int n = std::fscanf(f, "%1023s %lld %lld", u, &seq, &msg);
+    long long seq = -1, msg = -1, req = -1;
+    const int n = std::fscanf(f, "%1023s %lld %lld %lld", u, &seq, &msg, &req);
     std::fclose(f);
-    if (n < 2 || url != u) return {-1, -1};
-    return {std::int64_t(seq), n >= 3 ? std::int64_t(msg) : -1};
+    if (n < 2 || url != u) return {-1, -1, -1};
+    return {std::int64_t(seq), n >= 3 ? std::int64_t(msg) : -1, n >= 4 ? std::int64_t(req) : -1};
 }
-void remember(const std::string& path, const std::string& url, std::int64_t seq, std::int64_t msg) {
+void remember(const std::string& path, const std::string& url, std::int64_t seq, std::int64_t msg, std::int64_t req) {
     if (path.empty()) return;
     const std::string tmp = path + ".tmp";
     std::FILE* f = std::fopen(tmp.c_str(), "w");
     if (!f) return;
-    std::fprintf(f, "%s %lld %lld\n", url.c_str(), static_cast<long long>(seq), static_cast<long long>(msg));
+    std::fprintf(f, "%s %lld %lld %lld\n", url.c_str(), static_cast<long long>(seq), static_cast<long long>(msg),
+                 static_cast<long long>(req));
     std::fclose(f);
     std::rename(tmp.c_str(), path.c_str());
 }
@@ -152,11 +174,61 @@ void GuestFeed::configure(bool on, const std::string& baseUrl, double interval, 
     cv_.notify_all();
 }
 
+namespace {
+
+// Ids are the service's own (hex); anything else is percent-encoded.
+void appendId(std::string& f, const std::string& id) {
+    for (unsigned char c : id) {
+        if (std::isalnum(c) || c == '-' || c == '_' || c == '.') {
+            f.push_back(char(c));
+        } else {
+            char buf[4];
+            std::snprintf(buf, sizeof buf, "%%%02X", c);
+            f += buf;
+        }
+    }
+}
+
+}  // namespace
+
+void GuestFeed::setFloor(const std::vector<std::string>& ids) {
+    std::string f;
+    for (const auto& id : ids) {
+        if (!f.empty()) f += ',';
+        appendId(f, id);
+    }
+    std::lock_guard<std::mutex> lock(mu_);
+    floor_ = std::move(f);
+}
+
+std::string bustParam(const std::vector<GuestBust>& busts) {
+    std::string f;
+    for (const auto& b : busts) {
+        if (!f.empty()) f += ',';
+        appendId(f, b.id);
+        f += b.state == GuestBust::State::On ? ":on" : b.state == GuestBust::State::Room ? ":room" : ":wait";
+        if (b.seconds >= 0) f += ':' + std::to_string(std::lround(b.seconds));
+    }
+    return f;
+}
+
+void GuestFeed::setBusts(const std::vector<GuestBust>& busts) {
+    std::string f = bustParam(busts);
+    std::lock_guard<std::mutex> lock(mu_);
+    busts_ = std::move(f);
+}
+
 GuestFeed::Batch GuestFeed::take() {
     std::lock_guard<std::mutex> lock(mu_);
     Batch out;
     out.arrivals.swap(pending_);
     out.messages.swap(pendingMessages_);
+    out.requests.swap(pendingRequests_);
+    if (socialFresh_) {
+        out.social = social_;
+        out.hasSocial = true;
+        socialFresh_ = false;
+    }
     return out;
 }
 
@@ -166,7 +238,7 @@ std::string GuestFeed::status() const {
 }
 
 void GuestFeed::run() {
-    std::int64_t after = -1, msgAfter = -1;
+    std::int64_t after = -1, msgAfter = -1, reqAfter = -1;
     std::uint64_t gen = ~std::uint64_t(0);
     std::unique_lock<std::mutex> lock(mu_);
     for (;;) {
@@ -174,9 +246,10 @@ void GuestFeed::run() {
         if (stop_) return;
         if (gen != generation_) {  // first poll of this service: carry on after what was handed over before
             gen = generation_;
-            std::tie(after, msgAfter) = recall(memoryPath_, url_);
+            std::tie(after, msgAfter, reqAfter) = recall(memoryPath_, url_);
         }
-        const std::string url = url_ + "/api/checkins?after=" + std::to_string(after) + "&msgAfter=" + std::to_string(msgAfter);
+        const std::string url = url_ + "/api/checkins?after=" + std::to_string(after) + "&msgAfter=" + std::to_string(msgAfter) +
+                                "&reqAfter=" + std::to_string(reqAfter) + "&floor=" + floor_ + "&bust=" + busts_;
         const double interval = interval_;
         const std::string key = key_;
         lock.unlock();
@@ -190,10 +263,11 @@ void GuestFeed::run() {
         if (gen == generation_) {
             if (got) {
                 status_ = "ok";
-                const std::int64_t before = after, msgBefore = msgAfter;
+                const std::int64_t before = after, msgBefore = msgAfter, reqBefore = reqAfter;
                 // The service started over (its tables were cleared): start over too.
                 if (got->latest >= 0 && got->latest < after) after = -1;
                 if (got->msgLatest >= 0 && got->msgLatest < msgAfter) msgAfter = -1;
+                if (got->reqLatest >= 0 && got->reqLatest < reqAfter) reqAfter = -1;
                 for (auto& a : got->arrivals) {
                     after = std::max(after, a.seq);
                     pending_.push_back(std::move(a));
@@ -203,9 +277,20 @@ void GuestFeed::run() {
                     msgAfter = std::max(msgAfter, m.seq);
                     pendingMessages_.push_back(std::move(m));
                 }
+                for (auto& q : got->requests) {
+                    if (q.seq <= reqAfter) continue;
+                    reqAfter = std::max(reqAfter, q.seq);
+                    pendingRequests_.push_back(std::move(q));
+                }
+                if (got->hasSocial) {
+                    social_ = std::move(got->social);
+                    socialFresh_ = true;
+                }
                 after = std::max(after, got->latest);
                 msgAfter = std::max(msgAfter, got->msgLatest);
-                if (after != before || msgAfter != msgBefore) remember(memoryPath_, url_, after, msgAfter);
+                reqAfter = std::max(reqAfter, got->reqLatest);
+                if (after != before || msgAfter != msgBefore || reqAfter != reqBefore)
+                    remember(memoryPath_, url_, after, msgAfter, reqAfter);
             } else {
                 status_ = err.empty() ? "error" : err;
             }

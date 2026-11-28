@@ -29,7 +29,19 @@ CHANNELS = ['bodyX', 'bodyZ', 'bodyYaw', 'hipX', 'hipY', 'hipZ', 'hipYaw', 'hipR
             'footYawL', 'footYawR', 'footPitchL', 'footPitchR',
             'elbowLx', 'elbowLy', 'elbowLz', 'elbowRx', 'elbowRy', 'elbowRz',
             'kneeLx', 'kneeLy', 'kneeLz', 'kneeRx', 'kneeRy', 'kneeRz']
-CH = {n: i for i, n in enumerate(CHANNELS)}
+# Floor work (docs/dancers-design.md "Break floor work"): the pelvis's whole turn as a quaternion in the body frame
+# (hipYaw / roll / pitch stay 0: Euler angles lock where a body lies on its side), and how far the upper body's lowest
+# point (hands, elbows, knees, shoulders, pelvis, the top of the head) is above the floor, / leg; then (2026-11-27)
+# each hand's, knee's and the head's own clearance (/ leg, 0 .. CONTACT_MAX): the engine plants a hand the source
+# dancer had on the floor (DancerRig groundPose).
+CONTACT_CHANNELS = ['floorHandL', 'floorHandR', 'floorKneeL', 'floorKneeR', 'floorHead']
+# Planted contacts (2026-11-27, "Floor moves held still"): 0 .. 1 how much each hand, foot, knee and the head is
+# planted on the floor in the source: near it and hardly moving across it (pins() below). The engine holds a planted
+# contact where it came down (DancerRun pinContacts): our retargeted hands and knees otherwise skate (proportions).
+PIN_CHANNELS = ['pinHandL', 'pinHandR', 'pinFootL', 'pinFootR', 'pinKneeL', 'pinKneeR', 'pinHead']
+FLOOR_CHANNELS = CHANNELS + ['hipQx', 'hipQy', 'hipQz', 'hipQw', 'clear'] + CONTACT_CHANNELS + PIN_CHANNELS
+CONTACT_MAX = 0.5  # (above it: off the floor; held there so the 8 bits are fine near the floor)
+CH = {n: i for i, n in enumerate(FLOOR_CHANNELS)}
 ANGLES = {'bodyYaw', 'hipYaw', 'hipRoll', 'hipPitch', 'chestYaw', 'chestRoll', 'chestPitch', 'headYaw', 'headRoll',
           'headPitch', 'footYawL', 'footYawR', 'footPitchL', 'footPitchR'}
 UP = np.array([0.0, 1.0, 0.0])
@@ -38,6 +50,8 @@ JOINT_LIMITS = [('hipYaw', -1.6, 1.6), ('hipRoll', -1.0, 1.0), ('hipPitch', -1.0
                 ('chestYaw', -1.3, 1.3), ('chestRoll', -1.0, 1.0), ('chestPitch', -1.0, 1.4),
                 ('headYaw', -1.5, 1.5), ('headRoll', -0.9, 0.9), ('headPitch', -1.2, 1.2)]
 HEAD_NEUTRAL_PITCH = 0.0  # set by calibrate_head()
+FLOOR_SMOOTH = 1.5     # floor work: frames (60 fps) the joints are smoothed over
+FLOOR_LR_SMOOTH = 4.0  # and the hips' and shoulders' left-right lines
 
 
 def nrm(v, eps=1e-9):
@@ -124,25 +138,58 @@ class Body:
                                      for a, b in bones]))
 
 
-def retarget(k, beat_frames):
-    """Keypoints (N, 17, 3) cm -> channels (N, C), plus the Body. `beat_frames`: frames per beat (smoothing)."""
+def quat_from(R):
+    """Rotation matrices (N, 3, 3) -> unit quaternions (N, 4) x y z w, signs kept continuous from frame to frame."""
+    from scipy.spatial.transform import Rotation
+    q = Rotation.from_matrix(R).as_quat()
+    for i in range(1, len(q)):
+        if np.dot(q[i], q[i - 1]) < 0: q[i] = -q[i]
+    return q
+
+
+def retarget(k, beat_frames, floor=False):
+    """Keypoints (N, 17, 3) cm -> channels (N, C), plus the Body. `beat_frames`: frames per beat (smoothing).
+    `floor`: floor work (FLOOR_CHANNELS): the pelvis follows the spine whichever way it points and its turn is a
+    quaternion; the body's heading is where the pelvis faces or, lying or bent over, where the head is."""
+    if floor:
+        # The tracking jitters on the floor (the hips' width wobbles by half when upside down): the joints smoothed
+        # over a few frames (about a 64th note), the hips' and shoulders' left-right lines over more below.
+        k = gaussian_filter1d(k, FLOOR_SMOOTH, axis=0, mode='nearest')
     b = Body(k)
     n = len(k)
-    out = np.zeros((n, len(CHANNELS)))
+    out = np.zeros((n, len(FLOOR_CHANNELS if floor else CHANNELS)))
     hipMid = (k[:, LHIP] + k[:, RHIP]) / 2
     shoMid = (k[:, LSHO] + k[:, RSHO]) / 2
     spine = nrm(shoMid - hipMid)
-    # Pelvis: across the hip joints; leans with the spine a little (its tilt forward isn't measured).
-    Rp = frames_from(k[:, LHIP] - k[:, RHIP], nrm(0.65 * UP + 0.35 * spine))
-    Rc = frames_from(k[:, LSHO] - k[:, RSHO], spine)
+    # Pelvis: across the hip joints; leans with the spine a little (its tilt forward isn't measured). Floor work: with
+    # the spine (a body upside down or lying has no "up" to lean from).
+    if floor:
+        lr = lambda a, c: gaussian_filter1d(nrm(k[:, a] - k[:, c]), FLOOR_LR_SMOOTH, axis=0, mode='nearest')
+        Rp = frames_from(lr(LHIP, RHIP), spine)
+        Rc = frames_from(lr(LSHO, RSHO), spine)
+    else:
+        Rp = frames_from(k[:, LHIP] - k[:, RHIP], nrm(0.65 * UP + 0.35 * spine))
+        Rc = frames_from(k[:, LSHO] - k[:, RSHO], spine)
     earMid = (k[:, LEAR] + k[:, REAR]) / 2
     ex = nrm(k[:, LEAR] - k[:, REAR])
     fwd = orth(k[:, NOSE] - earMid, ex)
     Rh = frames_from(ex, np.cross(nrm(fwd), ex))  # y = z cross x
     # Body: the pelvis's heading and ground position, smoothed over about a beat (twists stay in the hips).
     pf = Rp[:, :, 2].copy()
-    yawP = np.unwrap(np.arctan2(pf[:, 0], pf[:, 2]))
-    yawB = gaussian_filter1d(yawP, 0.5 * beat_frames, mode='nearest')
+    if floor:
+        # Facing, plus the spine's lie: either is horizontal when the other isn't (lying on the back the pelvis faces
+        # up and the spine points along the floor; upside down the spine points down). Its angle smoothed (unwrapped),
+        # weighted by the vector's length, so a moment where both are short doesn't turn the body. (Smoothed as a
+        # vector it shrank in a fast turn and its angle whipped round: up to 3.8 turns/s where the dancer turned 1.4.
+        # Spin glitches 2026-11-27.)
+        v = pf + spine
+        a = np.unwrap(np.arctan2(v[:, 0], v[:, 2]))
+        w = np.hypot(v[:, 0], v[:, 2])
+        sw = gaussian_filter1d(w, 0.5 * beat_frames, mode='nearest')
+        yawB = gaussian_filter1d(a * w, 0.5 * beat_frames, mode='nearest') / np.maximum(sw, 1e-9)
+    else:
+        yawP = np.unwrap(np.arctan2(pf[:, 0], pf[:, 2]))
+        yawB = gaussian_filter1d(yawP, 0.5 * beat_frames, mode='nearest')
     posB = gaussian_filter1d(hipMid[:, [0, 2]], 0.5 * beat_frames, axis=0, mode='nearest')
     Rb = rot_y(yawB)
     bodyO = np.stack([posB[:, 0], np.full(n, b.ankleRest), posB[:, 1]], -1)  # ankle-rest height: foot y 0 on floor
@@ -154,8 +201,11 @@ def retarget(k, beat_frames):
     out[:, CH['hipX']] = hp[:, 0] / b.leg
     out[:, CH['hipY']] = (hipMid[:, 1] - b.hipRest) / b.leg
     out[:, CH['hipZ']] = hp[:, 2] / b.leg
-    y, r, p = euler_yzx(np.einsum('nji,njk->nik', Rb, Rp))
-    out[:, CH['hipYaw']], out[:, CH['hipRoll']], out[:, CH['hipPitch']] = y, r, p
+    if floor:
+        out[:, CH['hipQx']:CH['hipQw'] + 1] = quat_from(np.einsum('nji,njk->nik', Rb, Rp))
+    else:
+        y, r, p = euler_yzx(np.einsum('nji,njk->nik', Rb, Rp))
+        out[:, CH['hipYaw']], out[:, CH['hipRoll']], out[:, CH['hipPitch']] = y, r, p
     y, r, p = euler_yzx(np.einsum('nji,njk->nik', Rp, Rc))
     out[:, CH['chestYaw']], out[:, CH['chestRoll']], out[:, CH['chestPitch']] = y, r, p
     y, r, p = euler_yzx(np.einsum('nji,njk->nik', Rc, Rh))
@@ -202,9 +252,87 @@ def retarget(k, beat_frames):
     # tracking flipping (a head read as turned backwards); clamped, such a flip shows as a jump, which build_moves
     # bridges. Never near +-pi, so no wrap-around inside a move.
     out[:, CH['bodyYaw']] = np.unwrap(out[:, CH['bodyYaw']])
+    if floor:  # the face tracking flips upside down, the toes guess from the knee: smoothed (a 16th of a beat)
+        for n in ('headYaw', 'headRoll', 'headPitch', 'footYawL', 'footYawR'):
+            out[:, CH[n]] = gaussian_filter1d(np.clip(out[:, CH[n]], -1.5, 1.5), beat_frames / 8, mode='nearest')
     for n, lo, hi in JOINT_LIMITS:
         out[:, CH[n]] = np.clip(out[:, CH[n]], lo, hi)
+    if floor:
+        out[:, CH['clear']] = clearance(k, b, Rh)
+        for n, h in zip(CONTACT_CHANNELS, contacts(k, b)):
+            out[:, CH[n]] = np.clip(h, 0, CONTACT_MAX)
+        for n, w in zip(PIN_CHANNELS, pins(k, b, beat_frames)):
+            out[:, CH[n]] = w
     return out, b
+
+
+# Floor contact: how far a part's center is above the floor when it touches (cm, about a person's), and the floor
+# under the source: the ankle's center sits about 0.09 leg above it.
+CONTACT = [(LWRI, 4), (RWRI, 4), (LELB, 4), (RELB, 4), (LKNE, 5), (RKNE, 5), (LSHO, 7), (RSHO, 7)]
+
+
+def clearance(k, b, Rh):
+    """Per frame, how far the upper body's lowest point is above the floor (/ leg): hands, elbows, knees,
+    shoulders, the pelvis and the top of the head (above the ears along the head's up)."""
+    floor = b.ankleRest - 0.09 * b.leg
+    hs = [k[:, j, 1] - r for j, r in CONTACT]
+    hs.append((k[:, LHIP, 1] + k[:, RHIP, 1]) / 2 - 10)
+    hs.append((k[:, LEAR, 1] + k[:, REAR, 1]) / 2 + 0.13 * b.leg * Rh[:, 1, 1])
+    return np.maximum(0, (np.min(hs, axis=0) - floor) / b.leg)
+
+
+def contacts(k, b):
+    """Per frame, the wrists', knees' and the head's own clearance above the floor (/ leg, as `clearance`: the
+    part's contact surface; the head a ball of 0.12 leg round the ears' middle)."""
+    floor = b.ankleRest - 0.09 * b.leg
+    out = [(k[:, j, 1] - r - floor) / b.leg for j, r in CONTACT[:2] + CONTACT[4:6]]
+    out.append(((k[:, LEAR, 1] + k[:, REAR, 1]) / 2 - 0.12 * b.leg - floor) / b.leg)
+    return out
+
+
+# Planted (pins): down within PIN_NEAR leg and moving under PIN_SLOW leg lengths a beat across the floor to plant;
+# stays planted while within PIN_NEAR_OUT and under PIN_SLOW_OUT (hysteresis); a plant shorter than PIN_MIN beats is
+# none. The weight eases in and out over PIN_EASE beats inside the plant (the contact has landed when it is held).
+PIN_NEAR, PIN_NEAR_OUT = 0.03, 0.06
+PIN_SLOW, PIN_SLOW_OUT = 0.12, 0.3
+PIN_MIN, PIN_EASE = 1 / 8, 1 / 16
+
+
+def pins(k, b, beat_frames):
+    """Per frame, 0 .. 1: how planted each hand, foot, knee and the head is (PIN_CHANNELS order): near the floor and
+    hardly moving across it, with hysteresis; eased in and out inside each plant."""
+    floor = b.ankleRest - 0.09 * b.leg
+    hands = [(k[:, j, 1] - r - floor) / b.leg for j, r in CONTACT[:2]]
+    feet = [(k[:, j, 1] - b.ankleRest) / b.leg for j in (LANK, RANK)]
+    knees = [(k[:, j, 1] - r - floor) / b.leg for j, r in CONTACT[4:6]]
+    earMid = (k[:, LEAR] + k[:, REAR]) / 2
+    head = (earMid[:, 1] - 0.12 * b.leg - floor) / b.leg
+    pts = [k[:, LWRI], k[:, RWRI], k[:, LANK], k[:, RANK], k[:, LKNE], k[:, RKNE], earMid]
+    out = []
+    for h, p in zip(hands + feet + knees + [head], pts):
+        xz = gaussian_filter1d(p[:, [0, 2]], 2, axis=0, mode='nearest')
+        speed = np.linalg.norm(np.gradient(xz, axis=0), axis=1) * beat_frames / b.leg  # leg lengths a beat
+        on = np.zeros(len(h), bool)
+        state = False
+        for i in range(len(h)):
+            state = (h[i] < PIN_NEAR_OUT and speed[i] < PIN_SLOW_OUT) if state else (h[i] < PIN_NEAR and speed[i] < PIN_SLOW)
+            on[i] = state
+        w = np.zeros(len(h))
+        i = 0
+        while i < len(h):
+            if not on[i]:
+                i += 1
+                continue
+            j = i
+            while j < len(h) and on[j]: j += 1
+            n = j - i
+            if n >= PIN_MIN * beat_frames:
+                d = np.minimum(np.arange(n) + 0.5, n - np.arange(n) - 0.5) / max(1.0, PIN_EASE * beat_frames)
+                x = np.clip(d, 0, 1)
+                w[i:j] = x * x * (3 - 2 * x)
+            i = j
+        out.append(w)
+    return out
 
 
 def calibrate_head(sample_clips):

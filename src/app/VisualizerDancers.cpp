@@ -61,7 +61,7 @@ bool Visualizer::dancerFileAllowed(const std::filesystem::path& path) {
 }
 
 // The most dancers on stage at once, guests and characters together: the renderer's budget (DancerPipeline's
-// shadows: 3 a dancer for 32, plus a few waving goodbye).
+// shadows: up to 4 a dancer for 32, plus a few waving goodbye).
 static constexpr int kStageCap = 32;
 
 bool Visualizer::startDancerSpec(engine::DancerSpec spec, double t, double hold) {
@@ -209,18 +209,11 @@ void Visualizer::startGuests(double t) {
             rlog("[reforce] guest \"%s\" checked in (blocked: not shown)\n", a.name.c_str());
             continue;
         }
-        if (guestBook_) {
+        if (guestBook_ && !guestsTest_) {
             const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
                                  std::chrono::system_clock::now().time_since_epoch()).count();
             const std::string err = guestBook_->save(a.id, a.name, a.sceneText, std::int64_t(now));
             if (!err.empty()) rlog("[reforce] guest \"%s\" not saved: %s\n", a.name.c_str(), err.c_str());
-        }
-        const bool here = std::any_of(liveDancers_.begin(), liveDancers_.end(), [&](const auto& d) {
-            return !d->leaving() && d->spec().guestId == a.id;
-        });
-        if (here) {
-            rlog("[reforce] guest \"%s\" checked in again (already dancing)\n", a.name.c_str());
-            continue;
         }
         const scene::SceneFile file = scene::parseSceneText(a.sceneText);
         const scene::CompiledConfig cfg = scene::compileConfig(file, scene::SceneType::Dancer);
@@ -228,8 +221,23 @@ void Visualizer::startGuests(double t) {
         for (const auto& w : spec.warnings) rlog("[reforce] guest \"%s\": %s\n", a.name.c_str(), w.c_str());
         spec.guestId = a.id;
         spec.random = false;
+        auto here = std::find_if(liveDancers_.begin(), liveDancers_.end(), [&](const auto& d) {
+            return !d->leaving() && d->spec().guestId == a.id;
+        });
+        if (here != liveDancers_.end()) {
+            // Checked in again (or changed their dancer on the page): the new look in place, and the full stay again.
+            rlog("[reforce] guest \"%s\" checked in again (already dancing: look updated)\n", a.name.c_str());
+            (*here)->restyle(std::move(spec));
+            (*here)->stayFor(t, guestsMinutes_ * 60.0);
+            continue;
+        }
         rlog("[reforce] guest \"%s\" is here\n", a.name.c_str());
         startDancerSpec(std::move(spec), t, guestsMinutes_ * 60.0);
+    }
+    // Social settings: the latest for everyone on the floor (the service sends them all with every poll).
+    if (batch.hasSocial) {
+        guestSocial_.clear();
+        for (const auto& s : batch.social) guestSocial_[s.id] = s;
     }
     // Messages: a speech bubble over the guest's dancer (who arrives in this batch or is on stage already).
     for (const web::GuestMessage& m : batch.messages) {
@@ -247,6 +255,16 @@ void Visualizer::startGuests(double t) {
                                            [&](const GuestBubble& b) { return b.run == r; }),
                             guestBubbles_.end());
         guestBubbles_.push_back({r, m.text, t});
+    }
+    // Requests (docs/guests.md): "bust" ("Bust a move") gives the guest's dancer two break routines with floor
+    // work). Ignored for a guest not on the floor, and any other kind.
+    for (const web::GuestRequest& q : batch.requests) {
+        if (!guestsOn_ || q.kind != "bust") continue;
+        auto run = std::find_if(liveDancers_.begin(), liveDancers_.end(),
+                                [&](const auto& d) { return !d->leaving() && d->spec().guestId == q.id; });
+        if (run == liveDancers_.end()) continue;
+        rlog("[reforce] guest \"%s\" asks to bust a move\n", (*run)->name().c_str());
+        (*run)->bustMove();
     }
 }
 
@@ -330,6 +348,40 @@ void Visualizer::stepDancers(double t, const audio::AudioFrame* audio) {
             ++it;
         }
     }
+    // The guests on stage, for the guest page's "on the floor" list (sent with the next poll).
+    if (guestFeed_) {
+        std::vector<std::string> floor;
+        for (const auto& d : liveDancers_)
+            if (!d->leaving() && !d->spec().guestId.empty()) floor.push_back(d->spec().guestId);
+        if (floor != guestFloorSent_) {
+            guestFeed_->setFloor(floor);
+            guestFloorSent_ = std::move(floor);
+        }
+        // ... and where their "Bust a move" stands (docs/guests.md "bust"), so the guest page shows it (in whole
+        // seconds: told again only when that changes).
+        const scene::SyncInput sync = syncInput();
+        const double bpm = sync.bpm > 0 ? sync.bpm : 110.0;
+        const double beat = sync.bpm > 0 ? sync.beat : t * 110.0 / 60.0;  // (as danceMusic)
+        std::vector<web::GuestBust> busts;
+        for (const auto& d : liveDancers_) {
+            if (d->leaving() || d->spec().guestId.empty()) continue;
+            double beats = 0;
+            using Phase = engine::dance::Choreographer::BustPhase;
+            const Phase ph = d->bustPhase(beat, &beats);
+            if (ph == Phase::None) continue;
+            web::GuestBust b;
+            b.id = d->spec().guestId;
+            b.state = ph == Phase::On ? web::GuestBust::State::On
+                      : ph == Phase::Room ? web::GuestBust::State::Room : web::GuestBust::State::Waiting;
+            b.seconds = beats < 0 ? -1.0 : beats * 60.0 / bpm;
+            busts.push_back(std::move(b));
+        }
+        std::string param = web::bustParam(busts);
+        if (param != guestBustSent_) {
+            guestFeed_->setBusts(busts);
+            guestBustSent_ = std::move(param);
+        }
+    }
     const double aspect = double(opts_.width) / double(opts_.height);
     {
         const int onStage = int(std::count_if(liveDancers_.begin(), liveDancers_.end(), [](const auto& d) { return !d->leaving(); }));
@@ -365,30 +417,32 @@ void Visualizer::stepDancers(double t, const audio::AudioFrame* audio) {
     std::vector<int> act;
     for (int k = 0; k < n; ++k)
         if (!liveDancers_[std::size_t(k)]->leaving()) act.push_back(k);
-    // Social mode (PLAN 5P.6): always mingle (Peter, 2026-11-21: "make mingle the only social mode I do"; the
-    // formations and crew sync modes are still in engine/Dancers and its tests, not used here).
-    const long segment = long(std::floor(m.bar / 8.0));
-    const engine::SocialMode mode =
-        engine::pickSocialMode("mingle", int(act.size()), segment, std::uint32_t(opts_.seed) ^ 0x5eed);
-    if (mode != socialMode_ && !act.empty())
-        rlog("[reforce] dancers: %s\n", engine::socialModeName(mode));
-    socialMode_ = mode;
-    std::vector<engine::StageSpot> spots;
-    if (mode == engine::SocialMode::Mingle) {
-        // Everyone on their own clock (engine::Mingle keeps who is with whom).
-        std::vector<engine::MinglePerson> people;
-        for (const int k : act) {
-            const auto& d = liveDancers_[std::size_t(k)];
-            // The id is the dancer's seed: unique within a run (startDancerSpec derives it from a counter, one-to-one)
-            // and the same in every run, so --deterministic renders repeat (a memory address did not).
-            people.push_back({std::uint64_t(d->seed()), d->x(), d->z(), d->facing(),
-                              d->placed()});
-        }
-        spots = mingle_.plan(people, stage_.cam, m.beat, dt, std::uint32_t(opts_.seed) ^ 0x3141u);
-    } else {
-        mingle_.clear();
-        spots = engine::planStage(int(act.size()), stage_.cam, mode, m.bar, std::uint32_t(opts_.seed) ^ 0x6d11u);
+    // Everyone mingles, each on their own clock (engine::Mingle keeps who is with whom). Mingle is the only social
+    // mode (Peter, 2026-11-21: "make mingle the only social mode I do"; the crew-wide formations were removed
+    // 2026-11-27).
+    std::vector<engine::MinglePerson> people;
+    std::map<std::string, std::uint64_t> guestSeed;  // guest id -> mingle id
+    for (const int k : act) {
+        const auto& d = liveDancers_[std::size_t(k)];
+        if (!d->spec().guestId.empty()) guestSeed[d->spec().guestId] = std::uint64_t(d->seed());
     }
+    for (const int k : act) {
+        const auto& d = liveDancers_[std::size_t(k)];
+        // The id is the dancer's seed: unique within a run (startDancerSpec derives it from a counter, one-to-one)
+        // and the same in every run, so --deterministic renders repeat (a memory address did not).
+        engine::MinglePerson p{std::uint64_t(d->seed()), d->x(), d->z(), d->facing(), d->placed()};
+        p.bustMove = d->inBustMove(m.beat);
+        p.style = int(d->spec().style);  // (partners copy only within a style)
+        d->floorInfo(p, m.beat);
+        // A stream guest's choices on the guest page (Solo / Mingle / Crew, who to dance with).
+        if (auto s = guestSocial_.find(d->spec().guestId); !d->spec().guestId.empty() && s != guestSocial_.end()) {
+            p.vibe = engine::parseMingleVibe(s->second.vibe).value_or(engine::MingleVibe::Mingle);
+            if (auto w = guestSeed.find(s->second.with); w != guestSeed.end()) p.with = w->second;
+        }
+        people.push_back(p);
+    }
+    const std::vector<engine::StageSpot> spots =
+        mingle_.plan(people, stage_.cam, m.beat, dt, std::uint32_t(opts_.seed) ^ 0x3141u);
     const float energy = m.locked ? 1.0f : 0.7f;  // unlocked: smaller, gentler moves
     // Nobody walks through anybody (engine::avoidEachOther / keepApart): steer before the step, separate after.
     std::vector<engine::DancerRun*> crowd;
@@ -399,21 +453,20 @@ void Visualizer::stepDancers(double t, const audio::AudioFrame* audio) {
         const engine::StageSpot& sp = spots[a];
         run.setSlot(sp.x, sp.z);
         engine::DanceDirection dir;
-        if (mode == engine::SocialMode::Show) {
-            dir.facing = sp.facing;
-        } else {
-            if (sp.leader >= 0 && sp.leader != int(a))
-                dir.leader = &liveDancers_[std::size_t(act[std::size_t(sp.leader)])]->choreographer();
-            dir.mirror = sp.mirror;
-            dir.react = sp.react;
-            dir.facing = sp.facing;
-            dir.look = sp.look;
-            if (*sp.role) {
-                dir.role = sp.role;
-                if (sp.other >= 0) dir.role += " " + liveDancers_[std::size_t(act[std::size_t(sp.other)])]->name();
-            }
+        if (sp.leader >= 0 && sp.leader != int(a))
+            dir.leader = &liveDancers_[std::size_t(act[std::size_t(sp.leader)])]->choreographer();
+        dir.mirror = sp.mirror;
+        dir.react = sp.react;
+        dir.facing = sp.facing;
+        dir.look = sp.look;
+        dir.floorRoom = sp.floorRoom;
+        if (*sp.role) {
+            dir.role = sp.role;
+            if (sp.other >= 0) dir.role += " " + liveDancers_[std::size_t(act[std::size_t(sp.other)])]->name();
         }
         run.setHuman(float(danceHuman_));
+        run.setHairMotion(float(danceHair_));
+        run.setLongHair(danceLongHair_);
         run.choreographer().setMocap(float(danceMocap_));
         run.choreographer().tryMove(danceTry_);
         run.step(t, dt, m, energy * std::clamp(sp.effort, 0.3f, 1.0f), dir);
@@ -421,6 +474,8 @@ void Visualizer::stepDancers(double t, const audio::AudioFrame* audio) {
     for (int k = 0; k < n; ++k)
         if (liveDancers_[std::size_t(k)]->leaving()) {
             liveDancers_[std::size_t(k)]->setHuman(float(danceHuman_));
+            liveDancers_[std::size_t(k)]->setHairMotion(float(danceHair_));
+            liveDancers_[std::size_t(k)]->setLongHair(danceLongHair_);
             liveDancers_[std::size_t(k)]->step(t, dt, m, energy);
         }
     engine::keepApart(crowd);
@@ -453,8 +508,9 @@ void Visualizer::stepNameTags(double dt) {
     {
         for (std::size_t k = 0; k < liveDancers_.size(); ++k) {
             const engine::DancerRun& d = *liveDancers_[k];
-            // Name tags (Peter, 2026-11-21): stream guests always (their file sets Name), generated dancers never.
-            const std::string& text = d.spec().tag;
+            // Name tags (Peter, 2026-11-21): stream guests always (their file sets Name), generated dancers never
+            // (unless --name-tags: every dancer, for trying things).
+            const std::string& text = d.spec().tag.empty() && opts_.nameTagsAll ? d.name() : d.spec().tag;
             auto bub = std::find_if(guestBubbles_.begin(), guestBubbles_.end(), [&](const GuestBubble& b) { return b.run == &d; });
             if (text.empty() && bub == guestBubbles_.end()) continue;
             auto it = std::find_if(nameTags_.begin(), nameTags_.end(), [&](const NameTag& g) { return g.run == &d; });
@@ -473,7 +529,11 @@ void Visualizer::stepNameTags(double dt) {
             const engine::dance::BodyOut& body = stage_.bodies[k];
             // Just above the top of the head, hair or hat, at the dancer's full size (the pop scales the tag).
             const float k1 = std::max(d.scale(), 0.05f);
-            const float top = (body.headTop - body.rootFloor.y) / k1 + 0.07f;
+            float top = (body.headTop - body.rootFloor.y) / k1 + 0.07f;
+            // In floor work the head goes down to the floor: the tag stays at least at about half the guest's
+            // standing height (the highest it has been).
+            g.standTop = std::max(g.standTop, top);
+            top = std::max(top, 0.55f * g.standTop);
             if (!g.placed) g.headY = top;
             g.headY += (top - g.headY) * float(1.0 - std::exp(-dt / 0.6));
             g.x = body.rootFloor.x;

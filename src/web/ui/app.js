@@ -1333,7 +1333,14 @@
   $('#boMinus').addEventListener('click', (e) => boNudge(e.shiftKey ? -1 : -5));
   $('#boPlus').addEventListener('click', (e) => boNudge(e.shiftKey ? 1 : 5));
   $('#boVal').addEventListener('dblclick', () => boNudge(-boValue));
+  // Sync test flash (not saved): the button shows the engine's state.
+  $('#boFlash').addEventListener('click', () => {
+    const on = $('#boFlash').getAttribute('aria-pressed') !== 'true';
+    $('#boFlash').setAttribute('aria-pressed', String(on));
+    vset('beatflash', on ? 'on' : 'off');
+  });
   function updateBeatOffset(v) {
+    if (v && typeof v.beatFlash === 'boolean') $('#boFlash').setAttribute('aria-pressed', String(v.beatFlash));
     if (!v || !Number.isFinite(Number(v.beatOffsetMs)) || Date.now() < boEditUntil) return;
     boValue = Math.round(Number(v.beatOffsetMs));
     boShow();
@@ -2002,7 +2009,7 @@
     for (const [id, lbl, key, fmt] of sliders) beatSlider($('#' + id), lbl, key, fmt);
   }
   // ------------------------------------------------------------ dancers (PLAN 5P)
-  // Floor, crew mode, lighting, size and outline go out as beatset (saved to settings.json); the live list shows who
+  // Floor, lighting, size and outline go out as beatset (saved to settings.json); the live list shows who
   // is dancing what.
   // The dance styles (engine/DanceMoves Style; the mocap genres, Peter 2026-11-21), in order.
   // [key, label, the "Random <Style>" dancer file that makes a new dancer of that style].
@@ -2028,7 +2035,7 @@
         <div class="chips" id="dnNew"></div>
       </div>
       <details class="dn-more" id="dnMore">
-        <summary title="Lighting, reflections, size, outline and how human the dancing looks">Look: light, reflections, size, outline, human</summary>
+        <summary title="Lighting, reflections, size, outline, how human the dancing looks and how the hair moves">Look: light, reflections, size, outline, human, hair</summary>
         <div class="rh-grid">
         <label class="field" title="How much the visuals light the dancers: 0 = a plain studio light, 1 = lit only by the colors on screen (they still never go darker than half the studio light). Saved to settings.json (reforce.Dancer.Lighting).">
           <span>Lit by visuals <b id="dnLightVal">0.75</b></span><input type="range" id="dnLight" min="0" max="1" step="0.05"></label>
@@ -2042,6 +2049,8 @@
           <span>Guests stay <b id="dnGuestMinVal">30 min</b></span><input type="range" id="dnGuestMin" min="1" max="60" step="1"></label>
         <label class="field" title="How human the dancing looks: 0 = every dancer exactly on the grid, 1 = each dancer has their own timing, size of moves and posture, with slow drifts and follow-through, 2 = sloppy. Saved to settings.json (reforce.Dancer.Human).">
           <span>Human <b id="dnHumanVal">1.00</b></span><input type="range" id="dnHuman" min="0" max="2" step="0.05"></label>
+        <label class="field" title="How hair moves: 0 = the classic swing (each hanging piece swings whole on two springs; short hair still), 1 = hair physics (ponytails, braids and long hair bend, whip and trail, rest on the shoulders and back and are pushed aside by the arms; curls, buns, spikes and short hair bounce and lag a little), 2 = looser. Saved to settings.json (reforce.Dancer.Hair).">
+          <span>Hair motion <b id="dnHairVal">1.00</b></span><input type="range" id="dnHair" min="0" max="2" step="0.05"></label>
         </div>
       </details>
       <details class="dn-more" id="dnMocap">
@@ -2071,9 +2080,6 @@
     if (alive) {
       $('.alive-list', alive).hidden = true;
       alive.append($('#dnList', box));
-      // The crew mode ("cypher", "partners", ...) after the count in the section's header.
-      const mode = Object.assign(document.createElement('span'), { id: 'dnMode', className: 'alive-mode' });
-      $('summary', alive).append(mode);
     }
     beatToggle($('#dnHide', box), 'dancehide');
     // One button per style: a new dancer of that style (its "Random <Style>" file).
@@ -2095,11 +2101,14 @@
       ['dnHeight', 'dnHeightVal', 'danceheight', (v) => Math.round(v * 100) + ' %'],
       ['dnOutline', 'dnOutlineVal', 'danceoutline', (v) => v.toFixed(2).replace(/\.?0+$/, '') + ' px'],
       ['dnHuman', 'dnHumanVal', 'dancehuman', (v) => v.toFixed(2)],
+      ['dnHair', 'dnHairVal', 'dancehair', (v) => v.toFixed(2)],
       ['dnMax', 'dnMaxVal', 'dancemax', (v) => String(Math.round(v))],
       ['dnGuestMin', 'dnGuestMinVal', 'guestminutes', (v) => Math.round(v) + ' min'],
     ]) beatSlider($('#' + id, box), lbl, key, fmt);
   }
   // Mocap move browser: pick a style, then step through its moves; Try sends beatset dancetry (everyone loops it).
+  // Break's floor moves are their own entry after it: "break floor" (low work on the hands, knees and hips).
+  const moveGroup = (m) => (m.tier && m.tier !== 'standing' ? `${m.style}:${m.tier}` : m.style);
   function setupMoveBrowser(box) {
     const genreSel = $('#dnTryGenre', box), moveSel = $('#dnTryMove', box), play = $('#dnTryPlay', box);
     const moves = library.danceMoves || [];
@@ -2108,13 +2117,16 @@
       return;
     }
     for (const st of library.danceStyles || []) {
-      const n = moves.filter((m) => m.style === st.key).length;
-      if (n) genreSel.append(new Option(`${st.name} (${n})`, st.key));
+      for (const tier of ['standing', 'floor']) {
+        const key = tier === 'standing' ? st.key : `${st.key}:${tier}`;
+        const n = moves.filter((m) => moveGroup(m) === key).length;
+        if (n) genreSel.append(new Option(`${st.name}${tier === 'standing' ? '' : ' ' + tier} (${n})`, key));
+      }
     }
     // Within a style: basic moves first, then routines; a style made of two genres (hip-hop: party and LA) keeps the
     // genre in the label ("party hip-hop basic 3 · dancer 23").
     const fill = () => {
-      const own = moves.filter((m) => m.style === genreSel.value);
+      const own = moves.filter((m) => moveGroup(m) === genreSel.value);
       const one = new Set(own.map((m) => m.label.split(/ (basic|routine) /)[0])).size === 1;
       own.sort((a, b) => Number(a.routine) - Number(b.routine));
       moveSel.replaceChildren(...own.map((m) => new Option(
@@ -2158,8 +2170,8 @@
     now.textContent = m ? 'trying: ' + m.label : '';
     if (m && $('#dnTryMove').value !== m.id) {
       const g = $('#dnTryGenre');
-      if (g.value !== m.style) {
-        g.value = m.style;
+      if (g.value !== moveGroup(m)) {
+        g.value = moveGroup(m);
         if (g.fillMoves) g.fillMoves();
       }
       $('#dnTryMove').value = m.id;
@@ -2205,7 +2217,6 @@
     updatePastGuests(r);
     const list = $('#dnList');
     if (!list) return;
-    if (r.danceMode !== undefined) setText($('#dnMode'), r.danceMode ? ` · ${r.danceMode}` : '');
     if (r.dancing) {
       // One row per dancer: what they are doing, Send off, and Block for stream guests. Rows are rebuilt only when
       // who is on stage changes (the text updates in place, so a click is never lost to a re-render).
@@ -2221,7 +2232,10 @@
             const off = Object.assign(document.createElement('button'), { className: 'mini', textContent: 'Send off',
               title: 'Wave goodbye and leave the stage now' });
             off.addEventListener('click', () => bset('dancerleave', String(d.id)));
-            li.append(off);
+            const brk = Object.assign(document.createElement('button'), { className: 'mini dn-bust', textContent: 'Bust a move',
+              title: 'Bust a move: from their next 8-bar point, two whole break routines with floor work in them (32 bars), whatever their style; then their own moves again (beatset dancebust)' });
+            brk.addEventListener('click', () => bset('dancebust', String(d.id)));
+            li.append(brk, off);
             if (d.guest) {
               const block = Object.assign(document.createElement('button'), { className: 'mini', textContent: 'Block',
                 title: `Send ${d.name} off and never put this guest on stage again (Unblock below). Saved to settings.json (reforce.Guests.Blocked).` });
@@ -2236,7 +2250,11 @@
           return li;
         }));
       }
-      [...list.children].forEach((li, i) => setText($('.dn-what', li), r.dancing[i] || ''));
+      [...list.children].forEach((li, i) => {
+        setText($('.dn-what', li), r.dancing[i] || '');
+        const brk = $('.dn-bust', li);
+        if (brk) brk.setAttribute('aria-pressed', String(!!(runs[i] && runs[i].bustMove)));
+      });
     }
     if (r.guestsBlocked) {
       const box = $('#dnBlocked');
@@ -2261,7 +2279,7 @@
       : r.guestStatus === 'ok' ? `Stream guests: ${r.guestArrivals || 0} check-in${r.guestArrivals === 1 ? '' : 's'} this session`
       : `Stream guests: ⚠ ${r.guestStatus}`);
     for (const [id, v] of [['dnLight', r.danceLighting], ['dnReflect', r.danceReflection], ['dnHeight', r.danceHeight],
-                           ['dnOutline', r.danceOutline], ['dnHuman', r.danceHuman], ['dnMax', r.danceMax], ['dnGuestMin', r.guestMinutes]])
+                           ['dnOutline', r.danceOutline], ['dnHuman', r.danceHuman], ['dnHair', r.danceHair], ['dnMax', r.danceMax], ['dnGuestMin', r.guestMinutes]])
       beatSliderShow(id, v);
   }
   function updateRhythm(r, full) {

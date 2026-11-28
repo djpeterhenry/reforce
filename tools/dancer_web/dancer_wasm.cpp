@@ -6,7 +6,9 @@
 //                                routine per style); returns how many, or -1. Call dancer_set again afterwards.
 //   dancer_set(keys, seed, t)    a character from dancer file keys ("HairStyle=bob\nTop=#ff0000\n...")
 //   dancer_frame(t, bpm)         step to time t (seconds) at bpm; returns the part count (0: no dancer)
-//   dancer_parts()               the parts: kDancerInstFloats floats each (engine/DancerInstances.hpp)
+//   dancer_parts()               the parts: kDancerInstFloats floats each (engine/DancerInstances.hpp); the bent ones
+//                                (long hair that bends: drawn with the tube mesh) last
+//   dancer_bent()                how many of the parts, at the end, are bent
 //   dancer_head_top()            world height of the top of the head, hair or hat (framing)
 //
 // Build: tools/dancer_web/build.sh (Emscripten).
@@ -33,6 +35,7 @@ std::vector<float> parts;
 dance::BodyOut body;
 double lastT = -1;
 float headTop = 1;
+int bent = 0;
 
 // The preview cycles through its style's mocap moves (Peter, 2026-11-21: "just cycle through what's there"): each
 // basic move for its 4 bars, then the routine, then again. Each move starts on a bar line from its own bar 1.
@@ -131,12 +134,20 @@ EMSCRIPTEN_KEEPALIVE int dancer_frame(double t, double bpm) {
     run->build(body);
     headTop = body.headTop;
     parts.resize(body.parts.size() * kDancerInstFloats);
-    for (std::size_t i = 0; i < body.parts.size(); ++i) packDancerPart(body.parts[i], body, parts.data() + i * kDancerInstFloats);
+    std::size_t n = 0;
+    bent = 0;
+    for (int pass = 0; pass < 2; ++pass)  // the bent parts last (drawn with the tube mesh)
+        for (const dance::BodyPart& p : body.parts)
+            if (p.bent == (pass == 1)) {
+                packDancerPart(p, body, parts.data() + n++ * kDancerInstFloats);
+                bent += pass;
+            }
     return int(body.parts.size());
 }
 
 EMSCRIPTEN_KEEPALIVE const float* dancer_parts() { return parts.data(); }
 EMSCRIPTEN_KEEPALIVE float dancer_head_top() { return headTop; }
+EMSCRIPTEN_KEEPALIVE int dancer_bent() { return bent; }
 EMSCRIPTEN_KEEPALIVE int dancer_floats() { return kDancerInstFloats; }
 
 }  // extern "C"

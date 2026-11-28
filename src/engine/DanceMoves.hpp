@@ -13,7 +13,7 @@
 // looser. The styles are the dance genres of the mocap moves (docs/dancers-design.md "Styles are the dance genres"):
 // a dancer's style is what they dance, and their look is generated to go with it.
 //
-// The choreographer (one per dancer, or one shared by the crew in together / canon / mirror mode) picks a new
+// The choreographer (one per dancer; a partner may dance its leader's mirrored, engine::Mingle) picks a new
 // routine on bar lines every 1-4 bars (always on phrase lines), blends half a beat between routines, follows the
 // music (a breakdown -> chill, a build -> hype, a drop -> a jump and then hype), and avoids repeats. Deterministic:
 // seeded, and driven only by the beat / bar / music inputs.
@@ -99,6 +99,10 @@ struct Routine {
     // 4-bar line in the phrase grid (it may join mid-cycle). Otherwise phase 0 is `start`.
     bool aligned = false;
     double origin = 0;
+    // The crossfade into this routine: its heading's difference from the one before, followed continuously from the
+    // fade's start (the short way then; never flipping a whole turn mid-fade when it passes half a turn).
+    mutable float fadeYaw = 0;
+    mutable bool fadeYawSet = false;
 };
 
 // Music inputs for one step.
@@ -129,7 +133,7 @@ public:
     explicit Choreographer(const ChoreoOptions& o);
 
     // Advances to `g` (call once per step, beats non-decreasing apart from small jitter) and returns the pose at
-    // beat g.beat - delay (canon: a lagged copy of the same routines). `mirror` mirrors the result.
+    // beat g.beat - delay (a lagged copy of the same routines: the humanising's arm and head lags). `mirror` mirrors it.
     DancePose pose(const MusicState& g, const Skeleton& sk, double delay = 0, bool mirror = false);
 
     // The routine playing at `beat` (after pose() has advanced past it).
@@ -141,6 +145,39 @@ public:
     // Full move), looped; -1 goes back to the choreography. Drops and the hello / goodbye waves still play.
     void tryMove(int move);
     int triedMove() const { return tryMove_; }
+    // Bust a move (Peter, 2026-11-27; a stream guest's "Bust a move"): from the next 8-bar point of the phrase, whole
+    // 16-bar break routines with floor work in them (ClipInfo::floorWork), two different ones back to back for the
+    // default 32 bars, whatever the dancer's style (none loaded: nothing changes; no drop cuts in); then the dancer's
+    // own moves again. Asked while on (or already asked): ignored. Not while waving goodbye. bustMoveAt: whether
+    // `beat` is in it (`pending`: asked and not yet started counts too).
+    void bustMove(int bars = 32);
+    bool bustMoveAt(double beat, bool pending = true) const;
+    double bustMoveStart() const { return bustFrom_; }
+    double bustMoveEnd() const { return bustTo_; }
+    // Where a bust stands at `beat` (2026-11-27, for the guest page: docs/guests.md "bust"): None; Waiting (asked,
+    // for its 8-bar point); Room (its 8-bar point came without room to go down: put off to the next one, the stage
+    // clearing room); On (playing). `beats`: until it starts (Waiting / Room; -1 while asked and not yet planned) or
+    // until it ends (On); 0 for None.
+    enum class BustPhase { None, Waiting, Room, On };
+    BustPhase bustPhase(double beat, double* beats = nullptr) const;
+    // Room to go down (2026-11-27, docs/dancers-design.md "Floor moves held still, room to go down"): the stage's say,
+    // each step, on moves with floor work (ClipInfo::floorWork). `room`: how wide a reach fits round the dancer now
+    // (standard-body units, ClipInfo::reach max; < 0: not now, e.g. walking; infinite, the default: no
+    // stage, as before). A floor move the choreographer chose that doesn't fit waits: the dancer dances standing and
+    // the same move (as chosen, mirrored or not) starts on the following 4-bar (a basic) or 8-bar (a routine) point of
+    // the phrase once it fits, however long that takes (Peter, 2026-11-27: never give up; the stage clears the room
+    // ever more firmly meanwhile). Only after kFloorLastResort such points does it start anyway. A bust waits the same
+    // way, its 8-bar points. floorPending: the move waiting (-1 none).
+    static constexpr int kFloorLastResort = 6;
+    void setFloorRoom(float room) { floorRoom_ = room; }
+    int floorPending() const { return pendMove_; }
+    // Counts (tests, the report): floor moves started at once, after waiting, anyway (kFloorLastResort); busts
+    // delayed; how many grid points each start waited (delays[k]: k points, the last one k or more).
+    struct FloorCounts {
+        int now = 0, waited = 0, forced = 0, bustDelays = 0;
+        int delays[8] = {};
+    };
+    const FloorCounts& floorCounts() const { return floorCounts_; }
     // Forces the next routine to be a goodbye wave (exit).
     void farewell(double beat);
     void hello(double beat);
@@ -154,6 +191,9 @@ private:
     // Beats from the phrase line at or before `beat` (0 .. 64), from the music's running phrase count.
     static double phrasePos(double beat, const MusicState& g);
     Routine pick(double start, double end, const MusicState& g, bool dropHit);
+    Routine pickOne(double start, double end, const MusicState& g, bool dropHit);
+    // Standing moves only, ending by `until` (a floor move or a bust waiting for room).
+    Routine filler(double start, double end, const MusicState& g, bool dropHit, double until);
     DancePose evaluate(const Routine& r, double beat, const Skeleton& sk) const;
 
     ChoreoOptions opts_;
@@ -167,11 +207,19 @@ private:
     double lastPhrase_ = -1;
     int tryMove_ = -1;
     bool tryChanged_ = false;
+    float floorRoom_ = 1e30f;        // setFloorRoom
+    int pendMove_ = -1, pendTries_ = 0, forceMove_ = -1;
+    bool pendMirror_ = false, noFloor_ = false;
+    int bustWaits_ = 0;
+    void countDelay(int points) { ++floorCounts_.delays[std::min(points, 7)]; }
+    FloorCounts floorCounts_;
+    int bustAsk_ = 0;               // bustMove asked (bars), planned on the next advance
+    double bustFrom_ = 1e18, bustTo_ = -1e18;
 };
 
-// Social mode (PLAN 5P.6): what a dancer does while watching someone else dance (a partner's call, the soloist in a
-// cypher): claps, points at them, raises the roof, nods with arms crossed, hands on hips... over light footwork. The
-// reaction changes every 2 bars (seeded per dancer) and keeps the style's feel.
+// Watching (PLAN 5P.6, engine::Mingle): what a dancer does while watching someone else dance (a partner's call, a
+// group's soloist): claps, points at them, raises the roof, nods with arms crossed, hands on hips... over light
+// footwork. The reaction changes every 2 bars (seeded per dancer) and keeps the style's feel.
 DancePose reactionPose(double beat, std::uint32_t seed, Style style, const Skeleton& sk);
 std::string reactionName(double beat, std::uint32_t seed);
 // Watching someone with the mocap moves (Peter, 2026-11-21: 100 % AIST): a calm basic move of the style (chill

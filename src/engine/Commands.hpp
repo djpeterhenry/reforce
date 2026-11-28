@@ -274,6 +274,7 @@ struct VideoState {
     bool beatConfident = false;
     double beatBpm = 0, beatLock = 0;
     double beatOffsetMs = 0;           // reforce.BeatClock.OffsetMs (videoset beatoffset): beats this much earlier
+    bool beatFlash = false;            // sync test flash (videoset beatflash; not saved)
     std::vector<std::string> beatSprites;  // per synced movie: "name: rate 1.10x, phase +0.01 beat"
     std::string lastError;
 };
@@ -315,7 +316,6 @@ struct RhythmState {
     bool dropSwitch = false;            // reforce.Drop.Switch
     // Dancers (PLAN 5P): the Dancers card's settings and who is dancing what (live).
     bool danceFloor = true;
-    std::string danceMode = "mingle";
     std::string danceRandom = "all";  // reforce.Dancer.RandomStyles (beatset dancerandom)
     bool guests = false;              // reforce.Guests.Enabled (beatset guests)
     double guestMinutes = 30;         // reforce.Guests.Minutes (beatset guestminutes)
@@ -325,6 +325,7 @@ struct RhythmState {
         std::uint32_t id = 0;
         std::string name, guest;
         bool leaving = false;
+        bool bustMove = false;  // busting a move (beatset dancebust), asked or on
     };
     std::vector<DanceRun> danceRuns;
     // Past stream guests (web/GuestBook) for the Dancers card, newest first, blocked ones left out.
@@ -339,6 +340,8 @@ struct RhythmState {
     int guestArrivals = 0;            // check-ins picked up since reforce started
     double danceLighting = 0.75, danceOutline = 2, danceHeight = 0.24, danceHuman = 1;
     double danceMocap = 1.0;   // reforce.Dancer.Mocap (beatset dancemocap)
+    double danceHair = 1.0;    // reforce.Dancer.Hair (beatset dancehair)
+    bool danceLongHair = true;  // reforce.Dancer.LongHair (beatset dancelonghair): long hair bends
     std::string danceTry;      // the mocap move being tried (beatset dancetry), its id; "" = none
     double danceReflection = 0.35;  // reforce.Dancer.Reflection (beatset dancereflect)
     int danceMax = 5;  // reforce.Dancer.MaxLive

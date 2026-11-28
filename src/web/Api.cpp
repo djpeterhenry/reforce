@@ -539,7 +539,7 @@ std::string libraryToJson(const Library& lib) {
         const auto st = engine::dance::clipGenreStyle(c.genre);
         w.beginObject().field("id", c.id).field("label", c.label)
             .field("style", std::string(st ? engine::dance::styleName(*st) : "")).field("routine", c.routine)
-            .field("bpm", c.bpm).endObject();
+            .field("bpm", c.bpm).field("tier", std::string(engine::dance::clipTierName(c.tier))).endObject();
     }
     w.endArray();
     w.key("layers").beginArray();
@@ -600,7 +600,7 @@ void writeRhythmLive(json::Writer& w, const engine::RhythmState& r) {
     w.key("danceRuns").beginArray();
     for (const auto& d : r.danceRuns)
         w.beginObject().field("id", static_cast<unsigned long long>(d.id)).field("name", d.name).field("guest", d.guest)
-            .field("leaving", d.leaving).endObject();
+            .field("leaving", d.leaving).field("bustMove", d.bustMove).endObject();
     w.endArray();
     w.key("guestBook").beginArray();
     for (const auto& g : r.guestBook)
@@ -609,7 +609,6 @@ void writeRhythmLive(json::Writer& w, const engine::RhythmState& r) {
     w.key("guestsBlocked").beginArray();
     for (const auto& [id, name] : r.guestsBlocked) w.beginObject().field("id", id).field("name", name).endObject();
     w.endArray();
-    w.field("danceMode", r.danceMode);
 }
 }  // namespace
 
@@ -688,7 +687,7 @@ std::string stateToJson(const engine::EngineState& s, bool stable) {
         w.field("guests", r.guests).field("guestMinutes", r.guestMinutes).field("guestStatus", r.guestStatus)
             .field("guestArrivals", r.guestArrivals);
         w.field("danceOutline", r.danceOutline).field("danceHeight", r.danceHeight).field("danceHuman", r.danceHuman);
-        w.field("danceMax", r.danceMax).field("danceMocap", r.danceMocap).field("danceTry", r.danceTry);
+        w.field("danceMax", r.danceMax).field("danceMocap", r.danceMocap).field("danceHair", r.danceHair).field("danceLongHair", r.danceLongHair).field("danceTry", r.danceTry);
         w.endObject();
     }
     w.field("simRate", s.simRate);
@@ -723,7 +722,7 @@ std::string stateToJson(const engine::EngineState& s, bool stable) {
         w.key("sprites").stringArray(v.sprites);
         w.field("spritesHeld", v.spritesHeld);
         w.field("beatSync", v.beatSync).field("beatSource", v.beatSource).field("beatConfident", v.beatConfident);
-        w.field("beatOffsetMs", v.beatOffsetMs);
+        w.field("beatOffsetMs", v.beatOffsetMs).field("beatFlash", v.beatFlash);
         w.field("spriteColor", v.spriteColor);
         w.field("syphonAlpha", v.syphonAlpha).field("windowVisuals", v.windowVisuals).field("keySimilarity", v.keySimilarity);
         w.field("keySmoothness", v.keySmoothness);
@@ -912,6 +911,10 @@ std::string validateCommand(const Command& c, const Library* lib, int* status) {
             }
             if (key == "syphonalpha") {
                 if (!on && !off) return bad("video: syphonalpha: on | off");
+                break;
+            }
+            if (key == "beatflash") {
+                if (!on && !off) return bad("video: beatflash: on | off");
                 break;
             }
             if (key == "windowvisuals") {

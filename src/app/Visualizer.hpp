@@ -98,8 +98,14 @@ struct VisualizerOptions {
     std::vector<render::SolidTestSpec> solidTests;
     // TEST HOOK (PLAN 5P, --dancer-test STYLE[,STYLE...]): built-in characters dancing from the first step on.
     std::vector<std::string> dancerTests;
+    // TEST HOOK (--name-tags; Peter 2026-11-27, for trying dancer changes): a name tag over every dancer, generated
+    // ones too (normally guests only).
+    bool nameTagsAll = false;
     // Stream guests (web/Guests.hpp) may poll the guest service. Off for offline renders and --background instances.
     bool network = false;
+    // A test guest service (--guests-url, e.g. a local `wrangler dev`): polled even by a --background instance, with
+    // guests on and nothing remembered or saved (no guests-seen.txt, no past guests written). Key: --guests-key.
+    std::string guestsTestUrl, guestsTestKey;
     // Room lights (docs/lights.md): the paired Nanoleaf (nanoleaf.json next to settings.json). Empty: no lights (offline
     // renders, and --background instances unless --lights).
     std::filesystem::path lightsConfig;
@@ -344,6 +350,11 @@ public:
     // The Syphon output with transparency (reforce.Syphon.Alpha, docs/syphon-alpha.md): `frame` colorized with
     // trackAlpha, into `output` (same size, BGRA8) with the color unchanged and the alpha keyed.
     bool syphonAlpha() const { return syphonAlpha_; }
+    // Sync test flash (videoset beatflash, this session only, never saved; docs/usage.md "Sync test flash"): the
+    // whole frame, window and Syphon, opaque white for the first quarter of each beat and black otherwise (dark gray
+    // while the beat clock is not locked), with the Beat offset applied, for measuring A/V sync in an OBS recording.
+    bool beatFlashOn() const { return beatFlash_; }
+    float beatFlashLevel() const;  // 0..1 gray for this frame
     void encodeSyphonAlpha(MTL::CommandBuffer* cmd, MTL::Texture* frame, MTL::Texture* output);
     // Camera backdrop (docs/backdrop.md): `spec` under everything (nullopt = off; fades in / out over 0.4 s).
     void setBackdrop(const std::optional<video::SourceSpec>& spec);
@@ -517,10 +528,11 @@ private:
     bool danceFloor_ = true;
     std::string danceRandom_ = "all";  // reforce.Dancer.RandomStyles
     std::map<std::string, int> dancerFileStyle_;  // scene file -> its generated style, or -1 (a named character)
-    engine::SocialMode socialMode_ = engine::SocialMode::Show;
     engine::Mingle mingle_;
     double danceLighting_ = 0.75, danceOutline_ = 2, danceHeight_ = 0.24, danceHuman_ = 1;
     double danceMocap_ = 1.0;  // reforce.Dancer.Mocap: share of routines that are mocap moves
+    double danceHair_ = 1.0;   // reforce.Dancer.Hair: 0 classic swing .. 1 hair physics .. 2 loose
+    bool danceLongHair_ = true;  // reforce.Dancer.LongHair: long hair bends (false: the rigid tube, as before)
     int danceTry_ = -1;        // beatset dancetry: the mocap move every dancer loops (a moveLibrary index), -1 none
     double danceReflection_ = 0.35;  // reforce.Dancer.Reflection
     int danceMaxLive_ = 5;
@@ -535,6 +547,7 @@ private:
         bool placed = false;
         float x = 0, y = 0, z = 0;   // stage point the tag's bottom center sits on
         float headY = 0;             // low-passed head-top height
+        float standTop = 0;          // the highest head top seen (standing): floor work keeps the tag above half of it
         float scale = 0;             // the dancer's pop
         bool seen = false;
         std::string bubble;          // a guest's message showing over them ("" = none)
@@ -573,6 +586,11 @@ private:
     void startGuests(double t);
     std::vector<std::string> guestsBlocked_;        // reforce.Guests.Blocked
     std::map<std::string, std::string> guestNames_; // guest id -> name, as seen this session (the panel)
+    // Social settings from the guest page (web::GuestSocial: Solo / Mingle / Crew, who to dance with), by guest id.
+    std::map<std::string, web::GuestSocial> guestSocial_;
+    std::vector<std::string> guestFloorSent_;       // the guests on stage as last told to the feed
+    std::string guestBustSent_;                     // their busts as last told (web::bustParam)
+    bool guestsTest_ = false;                       // --guests-url: nothing saved
     void setGuestsBlocked(const std::string& list);
     void encodeNameTags(MTL::CommandBuffer* cmd, MTL::Texture* output);
     engine::dance::MusicState danceMusic(double t, const audio::AudioFrame* audio);
@@ -767,6 +785,7 @@ private:
     bool movieColorOver_ = false;
     // Syphon alpha (reforce.Syphon.Alpha; videoset syphonalpha / keysimilarity / keysmoothness, OBS's units).
     bool syphonAlpha_ = true, syphonPremultiplied_ = false;
+    bool beatFlash_ = false;  // videoset beatflash (beatFlashOn)
     bool windowVisualsOnly_ = false;
     // Room lights: settings, the connection (its own thread) and the GPU readback (made at the first capture).
     engine::LightsSettings lights_;

@@ -18,7 +18,7 @@
 namespace reforce::render {
 namespace {
 
-constexpr int kMaxShadows = 104;  // 3 a dancer: 32 on stage plus a few waving goodbye (= StageU.shadows in the MSL)
+constexpr int kMaxShadows = 136;  // 4 a dancer: 32 on stage plus a few waving goodbye (= StageU.shadows in the MSL)
 
 constexpr const char* kDancerShaders = R"MSL(
 #include <metal_stdlib>
@@ -40,6 +40,7 @@ struct Inst {
     float4 faceB;            // lashes, freckles, blush, lipstick
     float4 lips;             // hair: the second clip plane
     float4 beard;
+    float4 bend[6];          // long hair that bends: the columns' p2, p3; w y0 (> 0: bent), anchors (bendHair)
 };
 struct StageU {
     float4x4 viewProj;
@@ -48,7 +49,7 @@ struct StageU {
     float4 floorP;           // floor alpha, shadow strength, beat, pattern
     float4 misc;             // pulse, shadow count, horizon v, half width
     float4 floor2;           // -, wall z, reflection strength
-    float4 shadows[104];     // x, z, radius, strength (kMaxShadows)
+    float4 shadows[136];     // x, z, radius, strength (kMaxShadows)
 };
 
 struct BodyOut {
@@ -67,15 +68,51 @@ static float3 capsuleLocal(CapV v, Inst I, thread float3& nl) {
     return float3(d.x * r, v.end * I.geo.x + d.y * r, d.z * r);
 }
 
+// Long hair that bends (engine/DancerRig HairBend and bendHairPoint: keep in step; drawn with the tube mesh): below
+// y0 along its axis the part follows its columns' curves (the back, left, right), blended across the tube by its
+// local x / radius; each point its column's anchor moved along the curve, its offset from the anchor turned as the
+// curve turns. In the part's frame with x and z scaled (world units). w, n: the world point and normal.
+static void bendHair(const Inst I, float3 local, float3 nl, float r, thread float3& w, thread float3& n) {
+    const float sx = length(I.m0.xyz), sz = length(I.m2.xyz);
+    const float3 fx = I.m0.xyz / sx, fy = I.m1.xyz, fz = I.m2.xyz / sz;
+    const float3 q = float3(local.x * sx, local.y, local.z * sz);
+    const float y0 = I.bend[0].w, span = I.geo.x - y0;
+    if (q.y <= y0 || span < 1e-6f) return;
+    const float t = min((q.y - y0) / span, 1.0f), extra = q.y - y0 - t * span, u = 1.0f - t;
+    const float s = clamp(local.x / max(r, 1e-6f), -1.0f, 1.0f);
+    const float3 p0 = float3(0.0f, y0, 0.0f), p1 = float3(0.0f, y0 + span / 3.0f, 0.0f);
+    const float3 n0 = float3(nl.x / sx, nl.y, nl.z / sz);
+    float3 P = float3(0.0f), N = float3(0.0f);
+    for (int c = 0; c < 3; ++c) {
+        const float wc = c == 0 ? 1.0f - abs(s) : c == 1 ? max(s, 0.0f) : max(-s, 0.0f);
+        const float3 anchor = c == 0 ? float3(0.0f, 0.0f, I.bend[1].w)
+                                     : float3(c == 1 ? I.bend[2].w : -I.bend[2].w, 0.0f, I.bend[3].w);
+        const float3 p2 = I.bend[c * 2].xyz, p3 = I.bend[c * 2 + 1].xyz;
+        const float3 B = p0 * (u * u * u) + p1 * (3.0f * u * u * t) + p2 * (3.0f * u * t * t) + p3 * (t * t * t);
+        const float3 dB = (p1 - p0) * (3.0f * u * u) + (p2 - p1) * (6.0f * u * t) + (p3 - p2) * (3.0f * t * t);
+        const float3 T = normalize(dB + float3(0.0f, 1e-7f, 0.0f));
+        // The turn taking +y to T: v c + k x v + k (k . v) / (1 + c), k = y x T.
+        const float3 k = float3(T.z, 0.0f, -T.x);
+        const float c1 = max(1.0f + T.y, 1e-4f);
+        const float3 off = float3(q.x, 0.0f, q.z) - anchor;
+        P += wc * (B + anchor + off * T.y + cross(k, off) + k * (dot(k, off) / c1) + T * extra);
+        N += wc * (n0 * T.y + cross(k, n0) + k * (dot(k, n0) / c1));
+    }
+    w = fx * P.x + fy * P.y + fz * P.z + I.m3.xyz;
+    n = fx * N.x + fy * N.y + fz * N.z;
+}
+
 static BodyOut bodyVertex(uint vid, uint iid, const device CapV* mesh, const device Inst* inst, constant StageU& U) {
     const Inst I = inst[iid];
     float3 nl;
     const float3 local = capsuleLocal(mesh[vid], I, nl);
-    const float3 w = I.m0.xyz * local.x + I.m1.xyz * local.y + I.m2.xyz * local.z + I.m3.xyz;
+    float3 w = I.m0.xyz * local.x + I.m1.xyz * local.y + I.m2.xyz * local.z + I.m3.xyz;
+    float3 n = I.n0.xyz * nl.x + I.n1.xyz * nl.y + I.n2.xyz * nl.z;
+    if (I.bend[0].w > 0.0f) bendHair(I, local, nl, mix(I.geo.y, I.geo.z, mesh[vid].end), w, n);
     BodyOut o;
     o.position = U.viewProj * float4(w, 1.0f);
     o.world = w;
-    o.n = I.n0.xyz * nl.x + I.n1.xyz * nl.y + I.n2.xyz * nl.z;
+    o.n = n;
     o.local = local;
     o.iid = iid;
     return o;
@@ -92,7 +129,9 @@ vertex BodyOut outline_vs(uint vid [[vertex_id]], uint iid [[instance_id]], cons
     float3 nl;
     const float3 local = capsuleLocal(mesh[vid], I, nl);
     float3 w = I.m0.xyz * local.x + I.m1.xyz * local.y + I.m2.xyz * local.z + I.m3.xyz;
-    const float3 n = normalize(I.n0.xyz * nl.x + I.n1.xyz * nl.y + I.n2.xyz * nl.z);
+    float3 n = I.n0.xyz * nl.x + I.n1.xyz * nl.y + I.n2.xyz * nl.z;
+    if (I.bend[0].w > 0.0f) bendHair(I, local, nl, mix(I.geo.y, I.geo.z, mesh[vid].end), w, n);
+    n = normalize(n);
     const float4 c = U.viewProj * float4(w, 1.0f);
     w += n * (U.viewport.z * c.w * 2.0f / (U.viewport.y * U.eye.w));
     BodyOut o;
@@ -505,8 +544,16 @@ static StageOut shadeBody(BodyOut in, bool front, const device Inst* inst, const
     return StageOut{float4(col, 1.0f), 1.0f};
 }
 
+// Hair (and a skirt: the two-sided materials) never shows under the floor (y 0): in floor work hanging hair lies on it
+// and big hair lags the head a little (2026-11-27). Standing, none reaches it.
+static bool hairUnderFloor(const device Inst* inst, BodyOut in) {
+    const int material = int(inst[in.iid].c0.w + 0.5f);
+    return (material == 2 || material == 4) && in.world.y < 0.0f;
+}
+
 fragment StageOut body_fs(BodyOut in [[stage_in]], bool front [[front_facing]], const device Inst* inst [[buffer(0)]],
                         constant StageU& U [[buffer(1)]], texture2d<float> light [[texture(0)]]) {
+    if (hairUnderFloor(inst, in)) discard_fragment();
     return shadeBody(in, front, inst, U, light);
 }
 
@@ -532,6 +579,7 @@ fragment float4 body_reflect_fs(BodyOut in [[stage_in]], bool front [[front_faci
 }
 
 fragment StageOut outline_fs(BodyOut in [[stage_in]], const device Inst* inst [[buffer(0)]]) {
+    if (hairUnderFloor(inst, in)) discard_fragment();
     const Inst I = inst[in.iid];
     if (dot(in.local, I.clip.xyz) > I.clip.w) discard_fragment();
     if (int(I.c0.w + 0.5f) == 4 && dot(in.local, I.lips.xyz) > I.lips.w) discard_fragment();
@@ -674,8 +722,9 @@ struct Inst {
     float faceB[4];   // lashes, freckles, blush, lipstick
     float lips[4];
     float beard[4];
+    float bend[6][4];  // long hair that bends (engine::packDancerPart)
 };
-static_assert(sizeof(Inst) == 304, "Inst must match the MSL struct");
+static_assert(sizeof(Inst) == 400, "Inst must match the MSL struct");
 static_assert(sizeof(Inst) == sizeof(float) * engine::kDancerInstFloats, "Inst is packed by engine::packDancerPart");
 
 struct StageU {
@@ -695,14 +744,15 @@ struct CapV {
 static_assert(sizeof(CapV) == 16);
 
 // The capsule mesh: a unit sphere split at the equator, the lower half at end 0 and the upper half at end 1, joined
-// by a band (the two equator rings). Counter-clockwise from outside.
+// by a band (the two equator rings; `bandRings` more rings between them for the tube mesh, which bends: long hair).
+// Counter-clockwise from outside.
 // Indexed: each ring's vertices once (the seam column s = segments is kept separate from s = 0, exactly as the
 // triangles used it before indexing), triangles as 16-bit indices in the same order and winding.
 struct CapMesh {
     std::vector<CapV> verts;
     std::vector<std::uint16_t> indices;
 };
-CapMesh capsuleMesh(int segments = 32, int rings = 12) {
+CapMesh capsuleMesh(int segments = 32, int rings = 12, int bandRings = 0) {
     struct Ring {
         float y, r, end;
     };
@@ -712,6 +762,7 @@ CapMesh capsuleMesh(int segments = 32, int rings = 12) {
         const float a = -pi / 2 + pi / 2 * float(i) / float(rings);
         rs.push_back({std::sin(a), std::cos(a), 0});
     }
+    for (int i = 1; i <= bandRings; ++i) rs.push_back({0, 1, float(i) / float(bandRings + 1)});
     for (int i = 0; i <= rings; ++i) {  // equator -> top pole
         const float a = pi / 2 * float(i) / float(rings);
         rs.push_back({std::sin(a), std::cos(a), 1});
@@ -803,7 +854,13 @@ DancerPipeline::DancerPipeline(MTL::Device* device, uint32_t width, uint32_t hei
                                MTL::ResourceStorageModeShared);
     meshIdx_ = device_->newBuffer(mesh.indices.data(), NS::UInteger(mesh.indices.size() * sizeof(std::uint16_t)),
                                   MTL::ResourceStorageModeShared);
-    if (!mesh_ || !meshIdx_) throw std::runtime_error("dancer mesh allocation failed");
+    const CapMesh tube = capsuleMesh(32, 12, 24);
+    tubeIndices_ = uint32_t(tube.indices.size());
+    tube_ = device_->newBuffer(tube.verts.data(), NS::UInteger(tube.verts.size() * sizeof(CapV)),
+                               MTL::ResourceStorageModeShared);
+    tubeIdx_ = device_->newBuffer(tube.indices.data(), NS::UInteger(tube.indices.size() * sizeof(std::uint16_t)),
+                                  MTL::ResourceStorageModeShared);
+    if (!mesh_ || !meshIdx_ || !tube_ || !tubeIdx_) throw std::runtime_error("dancer mesh allocation failed");
     for (int i = 0; i < 8; ++i) {
         MTL::Buffer* b = makeBuffer(device_, NS::UInteger(maxParts_) * sizeof(Inst), MTL::ResourceStorageModeShared);
         if (!b) throw std::runtime_error("dancer instance buffer allocation failed");
@@ -881,6 +938,8 @@ DancerPipeline::~DancerPipeline() {
     if (depthFloor_) depthFloor_->release();
     if (mesh_) mesh_->release();
     if (meshIdx_) meshIdx_->release();
+    if (tube_) tube_->release();
+    if (tubeIdx_) tubeIdx_->release();
     device_->release();
 }
 
@@ -903,17 +962,53 @@ bool DancerPipeline::encode(MTL::CommandBuffer* cmd, MTL::Texture* output, const
         U.shadows[shadows][3] = s;
         ++shadows;
     };
+    bool anyBent = false;
     for (int b = 0; b < st.bodyCount && b < int(st.bodies.size()); ++b) {
         const auto& body = st.bodies[std::size_t(b)];
         for (const auto& p : body.parts) {
             if (n >= maxParts_) break;
+            if (p.bent) {
+                anyBent = true;
+                continue;
+            }
             engine::packDancerPart(p, body, reinterpret_cast<float*>(&inst[n++]));
         }
-        const float scale = std::max(0.0f, body.headCenter.y) / 0.82f;
+        // The body's blob: smaller while the dancer pops in (its head lower); in floor work as big as the body (a
+        // body lying down has its head low too), and one more under the head while it is near the floor.
+        const float scale = std::max(std::max(0.0f, body.headCenter.y) / 0.82f, body.ground * body.size);
         addShadow(body.rootFloor, 0.24f * std::min(1.0f, scale), 0.75f);
         for (const auto& ft : body.feet) addShadow(ft, 0.1f, 0.7f * std::clamp(1.0f - (ft.y - 0.05f) / 0.3f, 0.0f, 1.0f));
+        if (body.ground > 0.01f)
+            addShadow(body.headCenter, 0.16f * std::min(1.0f, body.size),
+                      0.7f * body.ground * std::clamp(1.0f - body.headCenter.y / (0.5f * std::max(body.size, 0.05f)), 0.0f, 1.0f));
     }
+    // Long hair that bends: after the rest, drawn with the tube mesh (bentFirst .. n).
+    const int bentFirst = n;
+    if (anyBent)
+        for (int b = 0; b < st.bodyCount && b < int(st.bodies.size()); ++b) {
+            const auto& body = st.bodies[std::size_t(b)];
+            for (const auto& p : body.parts)
+                if (p.bent && n < maxParts_) engine::packDancerPart(p, body, reinterpret_cast<float*>(&inst[n++]));
+        }
     lastParts_ = n;
+    // Draws the bodies' parts (the encoder's buffers set: the mesh at vertex 0, the instances at vertex 1 and
+    // fragment 0): capsules, then bent tubes.
+    auto drawParts = [&](MTL::RenderCommandEncoder* enc) {
+        if (bentFirst > 0)
+            enc->drawIndexedPrimitives(MTL::PrimitiveTypeTriangle, NS::UInteger(meshIndices_), MTL::IndexTypeUInt16,
+                                       meshIdx_, NS::UInteger(0), NS::UInteger(bentFirst));
+        if (n > bentFirst) {
+            const NS::UInteger off = NS::UInteger(bentFirst) * sizeof(Inst);
+            enc->setVertexBuffer(tube_, 0, 0);
+            enc->setVertexBufferOffset(off, 1);
+            enc->setFragmentBufferOffset(off, 0);
+            enc->drawIndexedPrimitives(MTL::PrimitiveTypeTriangle, NS::UInteger(tubeIndices_), MTL::IndexTypeUInt16,
+                                       tubeIdx_, NS::UInteger(0), NS::UInteger(n - bentFirst));
+            enc->setVertexBuffer(mesh_, 0, 0);
+            enc->setVertexBufferOffset(0, 1);
+            enc->setFragmentBufferOffset(0, 0);
+        }
+    };
 
     std::memcpy(U.viewProj, st.cam.viewProj.m, sizeof(U.viewProj));
     put3(U.eye, st.cam.eye, st.cam.proj11);
@@ -978,8 +1073,7 @@ bool DancerPipeline::encode(MTL::CommandBuffer* cmd, MTL::Texture* output, const
         enc->setFragmentBuffer(buf, 0, 0);
         enc->setFragmentBytes(&U, sizeof(U), 1);
         enc->setFragmentTexture(light_, 0);
-        enc->drawIndexedPrimitives(MTL::PrimitiveTypeTriangle, NS::UInteger(meshIndices_), MTL::IndexTypeUInt16,
-                                   meshIdx_, NS::UInteger(0), NS::UInteger(n));
+        drawParts(enc);
         enc->endEncoding();
     } else {
         U.floor2[2] = 0;  // floor_fs: no reflection to blend
@@ -1041,13 +1135,11 @@ bool DancerPipeline::encode(MTL::CommandBuffer* cmd, MTL::Texture* output, const
             // Bodies: hair shells and the skirt are two-sided (their cut-open insides show), the rest culled.
             enc->setRenderPipelineState(bodyPso_);
             enc->setCullMode(MTL::CullModeNone);
-            enc->drawIndexedPrimitives(MTL::PrimitiveTypeTriangle, NS::UInteger(meshIndices_), MTL::IndexTypeUInt16, meshIdx_,
-                                       NS::UInteger(0), NS::UInteger(n));
+            drawParts(enc);
             if (U.viewport[2] > 0.01f) {
                 enc->setRenderPipelineState(outlinePso_);
                 enc->setCullMode(MTL::CullModeFront);
-                enc->drawIndexedPrimitives(MTL::PrimitiveTypeTriangle, NS::UInteger(meshIndices_),
-                                           MTL::IndexTypeUInt16, meshIdx_, NS::UInteger(0), NS::UInteger(n));
+                drawParts(enc);
             }
         }
         enc->endEncoding();

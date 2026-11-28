@@ -356,6 +356,7 @@ details.library[open] > * + * { margin-top: 8px; }
 .beatoff { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; white-space: nowrap; }
 .beatoff .lbl { color: var(--muted); }
 .beatoff button { padding: 2px 8px; min-width: 0; }
+.beatoff #boFlash[aria-pressed="true"] { background: #fff; color: #000; }
 .beatoff #boVal { min-width: 52px; text-align: center; font-variant-numeric: tabular-nums; cursor: default; user-select: none; }
 .row.movierow { flex-wrap: wrap; row-gap: 6px; column-gap: 14px; }
 .row.movierow button { flex: 1 1 100%; }

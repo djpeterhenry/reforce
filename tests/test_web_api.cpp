@@ -462,6 +462,8 @@ TEST_CASE("video commands (Phase 5F): text form, JSON, validation, state and sou
     CHECK(web::parseCommandJson(R"({"action":"videoset","key":"keysimilarity","value":80})").ok());
     CHECK(web::parseCommandJson(R"({"action":"videoset","key":"keysmoothness","value":1000})").ok());
     CHECK_FALSE(web::parseCommandJson(R"({"action":"videoset","key":"syphonalpha","value":"maybe"})").ok());
+    CHECK(web::parseCommandJson(R"({"action":"videoset","key":"beatflash","value":"on"})").ok());
+    CHECK_FALSE(web::parseCommandJson(R"({"action":"videoset","key":"beatflash","value":"maybe"})").ok());
     CHECK(web::parseCommandJson(R"({"action":"videoset","key":"windowvisuals","value":true})").ok());
     CHECK_FALSE(web::parseCommandJson(R"({"action":"videoset","key":"windowvisuals","value":"maybe"})").ok());
     CHECK_FALSE(web::parseCommandJson(R"({"action":"videoset","key":"keysimilarity","value":0})").ok());

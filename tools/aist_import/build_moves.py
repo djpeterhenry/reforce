@@ -29,7 +29,7 @@ from pathlib import Path
 import numpy as np
 from scipy.ndimage import gaussian_filter1d
 from aistlib import *
-from retarget import CHANNELS, CH, ANGLES, retarget, calibrate_head
+from retarget import CHANNELS, FLOOR_CHANNELS, CH, ANGLES, retarget, calibrate_head
 
 SPB = 16          # samples per beat
 KEEP_BASIC = 2    # performances kept per basic choreography
@@ -48,15 +48,18 @@ def sample(chan, frames):
 
 
 # How much each channel counts in the loop-closure score (rough scale of a noticeable difference).
-SCALE = np.ones(len(CHANNELS))
-for n in CHANNELS:
+SCALE = np.ones(len(FLOOR_CHANNELS))
+for n in FLOOR_CHANNELS:
     if n in ANGLES: SCALE[CH[n]] = 0.15
     if n.startswith(('hand', 'foot')) and n[-1] in 'uvwyz': SCALE[CH[n]] = 0.1
     if n.startswith(('elbow', 'knee')): SCALE[CH[n]] = 0.5
-    if n in ('bodyX', 'bodyZ', 'hipX', 'hipY', 'hipZ'): SCALE[CH[n]] = 0.05
+    if n in ('bodyX', 'bodyZ', 'hipX', 'hipY', 'hipZ', 'clear'): SCALE[CH[n]] = 0.05
+    if n.startswith('hipQ'): SCALE[CH[n]] = 0.1
+QUAT = slice(CH['hipQx'], CH['hipQw'] + 1)  # floor work's pelvis quaternion (retarget FLOOR_CHANNELS)
+SCORED = CH['clear'] + 1  # channels the loop closure and the motion are scored on
 
 
-def make_loop(chan, P, b0, beats):
+def make_loop(chan, P, b0, beats, seam_beats=SEAM):
     """`beats` beats from beat b0 as a loop: (samples (beats*SPB, C), body turns, closure error, motion)."""
     n = beats * SPB
     fr = (b0 + np.arange(n + 1) / SPB) * P
@@ -75,17 +78,22 @@ def make_loop(chan, P, b0, beats):
     # the whole loop; everything else is left as recorded and only the last SEAM beats blend into the start.
     res = s[-1] - s[0]
     res[CH['bodyYaw']] -= 2 * np.pi * turns
+    floor = s.shape[1] > len(CHANNELS)
+    if floor and np.dot(s[-1, QUAT], s[0, QUAT]) < 0:  # q and -q are the same turn: close to the nearer
+        res[QUAT] = s[-1, QUAT] + s[0, QUAT]
     for name in ANGLES:  # joint angles close the short way round; a head ending turned the other way: no loop
         if name != 'bodyYaw':
             res[CH[name]] = wrap_angle(res[CH[name]])
             if abs(res[CH[name]]) > np.pi / 2: return None
     t = np.arange(n + 1) / n
-    seam = min(SEAM, beats / 8) / beats  # as a share of the loop
+    seam = min(seam_beats, beats / 8) / beats  # as a share of the loop
     x = np.clip((t - (1 - seam)) / seam, 0, 1)
     blend = x * x * (3 - 2 * x)
-    drift = np.zeros(len(CHANNELS), bool)
+    drift = np.zeros(s.shape[1], bool)
     drift[[CH['bodyX'], CH['bodyZ'], CH['bodyYaw']]] = True
     s = s - np.where(drift[None, :], t[:, None], blend[:, None]) * res[None, :]
+    if floor:
+        s[:, QUAT] /= np.linalg.norm(s[:, QUAT], axis=1, keepdims=True)
     # Travel kept near the dancer's spot (TRAVEL_RADIUS leg lengths, about a body width): dancers on a crowded stage
     # only avoid each other's spots. What goes further is eased away over a beat or two (the feet glide a little),
     # then held to 1.3 x the radius at most.
@@ -103,14 +111,19 @@ def make_loop(chan, P, b0, beats):
         idx = [CH['hand' + side + c] for c in 'uvw']
         ln = np.linalg.norm(s[:, idx], axis=1, keepdims=True)
         s[:, idx] *= np.minimum(1, 1.15 / np.maximum(ln, 1e-9))
-    err = float(np.sqrt(np.mean((res / SCALE) ** 2)))
-    motion = float(np.mean(np.abs(np.diff(s[:-1], axis=0)) / SCALE) * SPB)
+    m = min(s.shape[1], SCORED)  # (floor work's contact channels: not scored, so adding them changed no choice)
+    sc = SCALE[:m]
+    err = float(np.sqrt(np.mean((res[:m] / sc) ** 2)))
+    motion = float(np.mean(np.abs(np.diff(s[:-1, :m], axis=0)) / sc) * SPB)
     return s[:-1], turns, err, motion
 
 
 POS = [CH[n] for n in CHANNELS if n.startswith(('hand', 'foot')) and n[-1] in 'uvwyz'] + \
       [CH[n] for n in ('hipX', 'hipY', 'hipZ')]
 ANG = [CH[n] for n in ANGLES if n != 'bodyYaw']
+# Floor work: the head and the toes aren't checked for jumps (upside down the face tracking flips; the rig holds the
+# head to small turns anyway, and the toes' turn is a guess from the knee). retarget smooths them instead.
+FLOOR_LOOSE = {CH[n] for n in ('headYaw', 'headRoll', 'headPitch', 'footYawL', 'footYawR')}
 
 
 def to_lengths(s):
@@ -127,8 +140,14 @@ def jumps(s):
     glitch: faster than anyone moves in a 16th of a beat)."""
     r = to_lengths(s)
     d = np.abs(np.diff(r, axis=0))
-    a = np.abs(wrap_angle(np.diff(s[:, ANG], axis=0)))
-    return (d[:, POS].max(1) > 0.6) | (a.max(1) > 0.8)
+    floor = s.shape[1] > len(CHANNELS)
+    ang = [i for i in ANG if not floor or i not in FLOOR_LOOSE]
+    a = np.abs(wrap_angle(np.diff(s[:, ang], axis=0)))
+    out = (d[:, POS].max(1) > 0.6) | (a.max(1) > 0.8)
+    if floor:  # floor work: the pelvis turning 0.8 rad in a 16th of a beat
+        q = s[:, QUAT] / np.linalg.norm(s[:, QUAT], axis=1, keepdims=True)
+        out |= 2 * np.arccos(np.clip(np.abs((q[1:] * q[:-1]).sum(1)), 0, 1)) > 0.8
+    return out
 
 
 def wrap_angle(a):
@@ -146,9 +165,12 @@ def repair(s, max_share=0.04):
     out = s.copy()
     good = np.nonzero(~bad)[0]
     for c in range(s.shape[1]):
-        v = s[:, c] if CHANNELS[c] not in ANGLES or CHANNELS[c] == 'bodyYaw' else np.unwrap(s[:, c])
+        name = FLOOR_CHANNELS[c]
+        v = s[:, c] if name not in ANGLES or name == 'bodyYaw' else np.unwrap(s[:, c])
         out[:, c] = np.interp(np.arange(len(s)), good, v[good])
-        if CHANNELS[c] in ANGLES and CHANNELS[c] != 'bodyYaw': out[:, c] = wrap_angle(out[:, c])
+        if name in ANGLES and name != 'bodyYaw': out[:, c] = wrap_angle(out[:, c])
+    if s.shape[1] > len(CHANNELS):
+        out[:, QUAT] /= np.linalg.norm(out[:, QUAT], axis=1, keepdims=True)
     return out
 
 
@@ -228,19 +250,19 @@ def main():
           f'{out.stat().st_size / 1e6:.1f} MB')
 
 
-def write(path, moves):
+def write(path, moves, names=CHANNELS, prefix='aist'):
     def s8(x):
         b = x.encode('utf-8')[:255]
         return struct.pack('<B', len(b)) + b
     buf = bytearray(b'RFMOVES2')
-    buf += struct.pack('<I', len(CHANNELS))
-    for n in CHANNELS: buf += s8(n)
-    bits = [16 if n == 'bodyYaw' else 8 for n in CHANNELS]
+    buf += struct.pack('<I', len(names))
+    for n in names: buf += s8(n)
+    bits = [16 if n == 'bodyYaw' else 8 for n in names]
     buf += bytes(bits)
     buf += struct.pack('<I', len(moves))
     for m in moves:
         i, s = m['info'], m['samples'].astype(np.float64)
-        buf += s8(f"aist:{m['stem']}@{m['b0']}") + s8(m['label']) + i['genre'].encode()
+        buf += s8(f"{prefix}:{m['stem']}@{m['b0']}") + s8(m['label']) + i['genre'].encode()
         buf += struct.pack('<BHHHh', m['kind'], i['bpm'], m['beats'], SPB, m['turns'])
         lo, hi = s.min(0), s.max(0)
         hi = np.where(hi - lo < 1e-6, lo + 1e-6, hi)

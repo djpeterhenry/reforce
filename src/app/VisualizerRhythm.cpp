@@ -225,7 +225,7 @@ std::string Visualizer::setBeatParam(const std::string& key, const std::string& 
         danceFloor_ = value == "on" || value == "1";
     } else if (key == "guests") {
         guestsOn_ = value == "on" || value == "1";
-        if (guestFeed_) guestFeed_->configure(guestsOn_, guestsUrl_, 5.0, guestsKey_);
+        if (guestFeed_) guestFeed_->configure(guestsOn_, guestsUrl_, 1.0, guestsKey_);
         rlog("[reforce] stream guests %s\n", guestsOn_ ? (guestFeed_ ? "on" : "on (but not polling: offline / test instance)") : "off");
     } else if (key == "dancerleave") {
         for (auto& d : liveDancers_)
@@ -233,6 +233,20 @@ std::string Visualizer::setBeatParam(const std::string& key, const std::string& 
                 rlog("[reforce] Dancer \"%s\" sent off\n", d->name().c_str());
                 d->leave(std::max(0.0, lastDanceT_), stage_.beat, 2.0);
             }
+    } else if (key == "dancebust") {  // ID (the panel), NAME or #N: that dancer busts a move
+        engine::DancerRun* who = nullptr;
+        int n = 0;
+        for (auto& d : liveDancers_) {
+            if (d->leaving()) continue;
+            ++n;
+            if (std::to_string(d->seed()) == value || d->name() == value || "#" + std::to_string(n) == value) {
+                who = d.get();
+                break;
+            }
+        }
+        if (!who) return "dancebust: no dancer \"" + value + "\" on stage";
+        rlog("[reforce] Dancer \"%s\": bust a move\n", who->name().c_str());
+        who->bustMove();
     } else if (key == "guestsblocked") {
         setGuestsBlocked(value == "none" ? std::string() : value);
     } else if (key == "dancesay") {  // NAME=TEXT: a speech bubble over that dancer, like a guest's message
@@ -268,6 +282,10 @@ std::string Visualizer::setBeatParam(const std::string& key, const std::string& 
         danceHuman_ = num;
     } else if (key == "dancemocap") {
         danceMocap_ = num;
+    } else if (key == "dancehair") {
+        danceHair_ = num;
+    } else if (key == "dancelonghair") {
+        danceLongHair_ = value == "on" || value == "1";
     } else if (key == "dancetry") {
         const int clip = value == "off" ? -1 : engine::dance::findClip(value);
         if (value != "off" && clip < 0) return "dancetry: no mocap move \"" + value + "\"";
@@ -310,13 +328,14 @@ void Visualizer::rhythmState(engine::RhythmState& r) const {
                     : guestFeed_          ? guestFeed_->status()
                                           : "not here (offline / test copy)";
     r.guestArrivals = guestFeed_ ? guestFeed_->arrivals() : 0;
-    r.danceMode = liveDancers_.empty() ? "" : engine::socialModeName(socialMode_);
     r.danceLighting = danceLighting_;
     r.danceReflection = danceReflection_;
     r.danceOutline = danceOutline_;
     r.danceHeight = danceHeight_;
     r.danceHuman = danceHuman_;
     r.danceMocap = danceMocap_;
+    r.danceHair = danceHair_;
+    r.danceLongHair = danceLongHair_;
     r.danceTry.clear();
     if (danceTry_ >= 0)
         for (int i = 0; i < engine::dance::clipCount(); ++i)
@@ -324,7 +343,7 @@ void Visualizer::rhythmState(engine::RhythmState& r) const {
     r.danceMax = danceMaxLive_;
     r.danceRuns.clear();
     for (const auto& d : liveDancers_)
-        r.danceRuns.push_back({d->seed(), d->name(), d->spec().guestId, d->leaving()});
+        r.danceRuns.push_back({d->seed(), d->name(), d->spec().guestId, d->leaving(), d->inBustMove(stage_.beat)});
     r.guestBook.clear();
     if (guestBook_)
         for (const auto& g : guestBook_->guests())
@@ -410,6 +429,12 @@ scene::SyncInput Visualizer::syncInput() const {
     in.build = drop_.state().build;
     in.drop = drop_.state().drop;
     return in;
+}
+
+float Visualizer::beatFlashLevel() const {
+    const scene::SyncInput s = syncInput();
+    if (!(s.on > 0) || !std::isfinite(s.beat)) return 0.15f;
+    return s.beat - std::floor(s.beat) < 0.25 ? 1.0f : 0.0f;
 }
 
 void Visualizer::encodeNowPlaying(MTL::CommandBuffer* cmd, MTL::Texture* output) {
