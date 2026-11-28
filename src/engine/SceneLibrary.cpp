@@ -139,6 +139,12 @@ std::vector<SceneEntry> listMediaFolder(const fs::path& dir, const std::string& 
          it != fs::recursive_directory_iterator(); it.increment(ec)) {
         if (ec) break;
         const fs::path& p = it->path();
+        // A folder holding a file named .reforce-ignore is left out with everything in it: work folders kept next
+        // to the sprites (frames, source clips) that aren't sprites (Peter 2026-11-27).
+        if (it->is_directory(ec)) {
+            if (fs::exists(p / kMediaIgnoreFile, ec)) it.disable_recursion_pending();
+            continue;
+        }
         if (!it->is_regular_file(ec) || !(videosOnly ? isSpriteVideoFile(p) : isSpriteFile(p))) continue;
         std::string rel = fs::relative(p, dir, ec).generic_string();
         rel = rel.substr(0, rel.size() - p.extension().string().size());

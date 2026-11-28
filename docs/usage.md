@@ -75,7 +75,8 @@ the git-ignored `scenes/`; only needed for the G-Force comparison tools) wins: t
 `reforce.ScenesDir` = this repo's `scenes/` into the settings file. `--scenes` overrides both.
 
 Your own images and movies: if `~/reforce` exists, the installer points `reforce.ExternalSpritesDir` at it (images and
-movies in any subfolder become sprites) and `reforce.VideoDir` at `~/reforce/movies` (the video picker).
+movies in any subfolder become sprites; a folder holding a file named `.reforce-ignore` is skipped with everything in
+it) and `reforce.VideoDir` at `~/reforce/movies` (the video picker).
 
 **First launch: microphone prompt.** macOS asks whether reforce may use the microphone; any audio
 input, including a Loopback device, needs this. The window comes up right away and stays silent

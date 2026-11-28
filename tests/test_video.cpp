@@ -404,6 +404,12 @@ TEST_CASE("video: settings keys and media folders") {
     CHECK(all[2].id == "External/sub/b");
     auto vids = engine::listMediaFolder(dir, "Videos/", true);
     CHECK(vids.size() == 2);
+    // A folder holding .reforce-ignore is left out, everything under it too.
+    fs::create_directories(dir / "work" / "deep");
+    for (const char* f : {"work/g.mp4", "work/deep/h.png", "work/.reforce-ignore"}) std::ofstream(dir / f) << "x";
+    CHECK(engine::listMediaFolder(dir, "External/", false).size() == 3);
+    fs::remove(dir / "work" / ".reforce-ignore");
+    CHECK(engine::listMediaFolder(dir, "External/", false).size() == 5);
     CHECK(engine::isSpriteFile("x.jpg"));
     CHECK(engine::isSpriteFile("x.mov"));
 }

@@ -199,8 +199,89 @@ bool Visualizer::callGuest(const std::string& idOrLabel, double t) {
     return startDancerSpec(std::move(spec), t, 0.0);
 }
 
+namespace {
+std::int64_t wallMs() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
+        .count();
+}
+}  // namespace
+
+void Visualizer::saveFloor(double t) {
+    // Who is on the floor and when each one's stay ends (guests-floor.txt): a restart brings them back (restoreFloor).
+    // Written when that changes, and once a minute while someone is on (keeps "saved" fresh for those brought on by
+    // hand).
+    if (floorPath_.empty() || !floorRestored_) return;
+    std::string key;
+    std::vector<std::pair<std::string, double>> on;  // id, leavesAt (scene time; < 0: until cleared)
+    for (const auto& d : liveDancers_) {
+        if (d->leaving() || d->spec().guestId.empty()) continue;
+        on.push_back({d->spec().guestId, d->leavesAt()});
+        key += d->spec().guestId + ":" + std::to_string(std::lround(d->leavesAt() * 10)) + ",";
+    }
+    const std::int64_t now = wallMs();
+    if (key == floorSaved_ && (on.empty() || now - floorSavedAt_ < 60000)) return;
+    std::vector<web::FloorGuest> guests;
+    for (const auto& [id, at] : on)
+        guests.push_back({id, at < 0 ? 0 : now + std::int64_t(std::llround((at - t) * 1000.0))});
+    const std::string tmp = floorPath_ + ".tmp";
+    if (FILE* f = std::fopen(tmp.c_str(), "wb")) {
+        const std::string text = web::floorText(now, guests);
+        const bool ok = std::fwrite(text.data(), 1, text.size(), f) == text.size();
+        if (std::fclose(f) == 0 && ok && std::rename(tmp.c_str(), floorPath_.c_str()) == 0) {
+            floorSaved_ = std::move(key);
+            floorSavedAt_ = now;
+            return;
+        }
+    }
+    std::remove(tmp.c_str());
+    floorSaved_ = std::move(key);  // (not again every step: the next change or minute tries again)
+    floorSavedAt_ = now;
+    rlog("[reforce] guests: could not write %s\n", floorPath_.c_str());
+}
+
+void Visualizer::restoreFloor(double t) {
+    // Once, on the first poll step: the guests who were on the floor when reforce last ran, back with the time they
+    // had left (those brought on by hand: still until cleared, if reforce was gone only a few minutes).
+    floorRestored_ = true;
+    if (floorPath_.empty() || !guestsOn_ || !guestBook_) return;
+    std::string text;
+    if (FILE* f = std::fopen(floorPath_.c_str(), "rb")) {
+        char buf[4096];
+        for (std::size_t n; (n = std::fread(buf, 1, sizeof buf, f)) > 0;) text.append(buf, n);
+        std::fclose(f);
+    } else {
+        return;
+    }
+    const auto file = web::parseFloorText(text);
+    if (!file) {
+        rlog("[reforce] guests: %s unreadable, nobody brought back\n", floorPath_.c_str());
+        return;
+    }
+    for (const web::FloorReturn& r : web::floorReturns(*file, wallMs())) {
+        if (std::find(guestsBlocked_.begin(), guestsBlocked_.end(), r.id) != guestsBlocked_.end()) continue;
+        const web::SavedGuest* g = guestBook_->find(r.id);
+        const auto scene = g ? guestBook_->sceneText(g->id) : std::nullopt;
+        if (!g || !scene) continue;
+        const scene::CompiledConfig cfg = scene::compileConfig(scene::parseSceneText(*scene), scene::SceneType::Dancer);
+        engine::DancerSpec spec = engine::dancerSpec(cfg, g->name);
+        spec.guestId = g->id;
+        spec.random = false;
+        guestNames_[g->id] = g->name;
+        if (r.seconds > 0)
+            rlog("[reforce] guest \"%s\" back after the restart (%.1f min left)\n", g->name.c_str(), r.seconds / 60.0);
+        else
+            rlog("[reforce] guest \"%s\" back after the restart (stays until cleared)\n", g->name.c_str());
+        startDancerSpec(std::move(spec), t, r.seconds);
+    }
+}
+
 void Visualizer::startGuests(double t) {
     if (!guestFeed_) return;
+    if (!floorRestored_) restoreFloor(t);
+    if (guestsMinutes_ != guestsMinutesSent_) {
+        guestFeed_->setDefaultMinutes(guestsMinutes_);
+        guestsMinutesSent_ = guestsMinutes_;
+    }
     web::GuestFeed::Batch batch = guestFeed_->take();
     for (const web::GuestArrival& a : batch.arrivals) {
         if (!guestsOn_) continue;
@@ -224,15 +305,25 @@ void Visualizer::startGuests(double t) {
         auto here = std::find_if(liveDancers_.begin(), liveDancers_.end(), [&](const auto& d) {
             return !d->leaving() && d->spec().guestId == a.id;
         });
+        // Their stay: what they picked on the page (Peter 2026-11-27: 30 min, 1 hour or until the end of the stream),
+        // else reforce.Guests.Minutes. 0: until reforce quits or Clear.
+        const bool picked = a.session || a.minutes > 0;
+        const double stay = a.session ? 0.0 : (a.minutes > 0 ? std::clamp(a.minutes, 1.0, 240.0) : guestsMinutes_) * 60.0;
+        char how[48];
+        if (stay > 0) std::snprintf(how, sizeof how, "%.0f min", stay / 60.0);
+        else std::snprintf(how, sizeof how, "until the end of the stream");
         if (here != liveDancers_.end()) {
-            // Checked in again (or changed their dancer on the page): the new look in place, and the full stay again.
-            rlog("[reforce] guest \"%s\" checked in again (already dancing: look updated)\n", a.name.c_str());
+            // Checked in again (or changed their dancer or stay on the page): the new look in place, and their stay
+            // again from now (a picked one even for a guest brought on by hand).
+            rlog("[reforce] guest \"%s\" checked in again (already dancing: look updated, %s%s)\n", a.name.c_str(), how,
+                 stay > 0 ? " from now" : "");
             (*here)->restyle(std::move(spec));
-            (*here)->stayFor(t, guestsMinutes_ * 60.0);
+            if (picked) (*here)->pickStay(t, stay);
+            else (*here)->setStay(t, stay);
             continue;
         }
-        rlog("[reforce] guest \"%s\" is here\n", a.name.c_str());
-        startDancerSpec(std::move(spec), t, guestsMinutes_ * 60.0);
+        rlog("[reforce] guest \"%s\" is here (%s)\n", a.name.c_str(), how);
+        startDancerSpec(std::move(spec), t, stay);
     }
     // Social settings: the latest for everyone on the floor (the service sends them all with every poll).
     if (batch.hasSocial) {
@@ -381,6 +472,7 @@ void Visualizer::stepDancers(double t, const audio::AudioFrame* audio) {
             guestFeed_->setBusts(busts);
             guestBustSent_ = std::move(param);
         }
+        saveFloor(t);
     }
     const double aspect = double(opts_.width) / double(opts_.height);
     {
@@ -527,12 +619,17 @@ void Visualizer::stepNameTags(double dt) {
             g.bubbleAge = bub != guestBubbles_.end() ? now - bub->start : 0.0;
             g.scale = d.scale();
             const engine::dance::BodyOut& body = stage_.bodies[k];
+            // Not built this step (size 0: the first step of the entrance, the last of the exit): the slot still holds
+            // whoever used it before, so its head says nothing about this dancer (Peter 2026-11-27: a guest's tag
+            // stuck at the top of the screen, from another dancer's head divided by the 0.05 size floor below).
+            if (body.parts.empty()) continue;
             // Just above the top of the head, hair or hat, at the dancer's full size (the pop scales the tag).
             const float k1 = std::max(d.scale(), 0.05f);
             float top = (body.headTop - body.rootFloor.y) / k1 + 0.07f;
+            if (!std::isfinite(top)) continue;
             // In floor work the head goes down to the floor: the tag stays at least at about half the guest's
-            // standing height (the highest it has been).
-            g.standTop = std::max(g.standTop, top);
+            // standing height (the highest it has been at full size: the pop in and out only scale the tag).
+            if (d.scale() >= 0.9f && !d.leaving()) g.standTop = std::max(g.standTop, top);
             top = std::max(top, 0.55f * g.standTop);
             if (!g.placed) g.headY = top;
             g.headY += (top - g.headY) * float(1.0 - std::exp(-dt / 0.6));

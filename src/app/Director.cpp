@@ -949,17 +949,26 @@ void Director::runSlideshow(double t) {
         // A movie sprite looping until stopped keeps the screen: no new sprites meanwhile.
         if (d.layer == Layer::Sprite && vis_->videoSpritesHeld()) continue;
         // reforce.Quantize.Spawn: a due spawn waits for the next beat / bar / phrase line.
-        const bool waits = d.slideshow.armed() && d.slideshow.due(t) && !linkAllows(prefs_.spawnQuantize);
+        bool waits = d.slideshow.armed() && d.slideshow.due(t) && !linkAllows(prefs_.spawnQuantize);
         // Solids / organics: a due start also waits while MaxLive are at full strength (until one starts fading out).
         const bool feature = d.layer == Layer::Object;
         // An object with SBar starts from the slideshow only on its line (every SBar bars of the phrase clock); the
-        // next one in the shuffle is peeked (copies), so the shuffle itself is unchanged.
+        // next one in the shuffle is peeked (copies), so the shuffle itself is unchanged. The peek first re-arms a
+        // copy of the timer, as pollSpawn does before nextId: at the end of a round the reshuffle then draws from
+        // the same RNG state, and the peeked object is the one that starts (Peter 2026-11-27).
+        // Its line replaces Quantize.Spawn: both had to cross in the same step, and the object (and, with
+        // OneFeature, the movies behind it) could wait forever (Peter 2026-11-27).
         bool offLine = false;
         if (feature && phraseOn_ && d.slideshow.armed() && d.slideshow.due(t) && !d.playlist.empty()) {
             engine::Playlist copy = d.playlist;
             engine::SchedRng r = spawnRng_;
+            engine::LayerSlideshow timer = d.slideshow;
+            timer.arm(t, r);
             if (const engine::SceneEntry* e = resolve(d, copy.peek(r)))
-                if (const double sb = startBars(d, *e); sb > 0) offLine = !sync::crossedBoundary(barPrev_, barCur_, sb);
+                if (const double sb = startBars(d, *e); sb > 0) {
+                    offLine = !sync::crossedBoundary(barPrev_, barCur_, sb);
+                    waits = false;
+                }
         }
         if (!d.playlist.empty() && !waits && !offLine && vis_->spawnRoom(d.layer, t) && (!feature || featureMay(d.slideshow)) &&
             engine::pollSpawn(d.slideshow, t, spawnRng_)) {
@@ -1043,8 +1052,9 @@ void Director::route(const engine::Command& c, double t) {
 void Director::step(MTL::CommandBuffer* cmd, double t, const audio::AudioFrame* audio) {
     lastT_ = t;
     updateLink(audio);
+    vis_->stepClocks(t, audio);  // the beat and phrase clocks of this step, like the Link beat above
     {
-        // The phrase clock as of the last step (PLAN 5O.1).
+        // The phrase clock as of this step (PLAN 5O.1).
         const sync::PhraseState& ps = vis_->phraseState();
         phrasePrev_ = phraseOn_ && ps.on ? phraseCur_ : ps.phrase;
         phraseCur_ = ps.phrase;

@@ -330,6 +330,9 @@ public:
 
     // One simulation step at time t.
     void step(MTL::CommandBuffer* cmd, double t, const audio::AudioFrame* audio);
+    // Steps the beat and phrase clocks for this step ahead of step() (which then skips them), so the Director's
+    // slideshow sees the phrase clock of the same step as the Link beat, not the step before (Peter 2026-11-27).
+    void stepClocks(double t, const audio::AudioFrame* audio);
     // Colorizes the latest simulation frame into `output` (display rate), with
     // the color video layer composited unless `withVideo` is false. `trackAlpha`: the output's alpha holds how
     // much must stay opaque in the Syphon alpha (encodeSyphonAlpha), else it is 1.
@@ -591,6 +594,15 @@ private:
     std::vector<std::string> guestFloorSent_;       // the guests on stage as last told to the feed
     std::string guestBustSent_;                     // their busts as last told (web::bustParam)
     bool guestsTest_ = false;                       // --guests-url: nothing saved
+    double guestsMinutesSent_ = -1;                 // reforce.Guests.Minutes as last told to the feed (&minutes=)
+    // Who was on the floor (guests-floor.txt next to settings.json; web::floorText): a restart brings them back with
+    // the time they had left (Peter 2026-11-27). "" in a test copy (--guests-url) and without the network.
+    std::string floorPath_;
+    bool floorRestored_ = false;    // restoreFloor ran (the file is written only after)
+    std::string floorSaved_;        // what was last written (ids and stays)
+    std::int64_t floorSavedAt_ = 0; // when (ms since 1970)
+    void saveFloor(double t);
+    void restoreFloor(double t);
     void setGuestsBlocked(const std::string& list);
     void encodeNameTags(MTL::CommandBuffer* cmd, MTL::Texture* output);
     engine::dance::MusicState danceMusic(double t, const audio::AudioFrame* audio);
@@ -664,6 +676,7 @@ private:
     // Beat-synced movies (PLAN 5J.4): one clock per sim step, Link or the audio PLL.
     sync::BeatClock beatClock_;
     double beatClockT_ = -1, beatClockDt_ = 0;
+    bool clocksStepped_ = false;  // stepClocks() ran for the coming step()
     sync::PhraseClock phrase_;  // PLAN 5O.1, configured from settings in the constructor
     double kickZoom_ = 0, kickRotateDeg_ = 0, kickDecayMs_ = 120;  // PLAN 5O.3 (settings, panel)
     double kick_ = 0;           // kick pulse this step, 0..1

@@ -965,6 +965,7 @@ bool DancerPipeline::encode(MTL::CommandBuffer* cmd, MTL::Texture* output, const
     bool anyBent = false;
     for (int b = 0; b < st.bodyCount && b < int(st.bodies.size()); ++b) {
         const auto& body = st.bodies[std::size_t(b)];
+        if (body.parts.empty()) continue;  // not built this step (size 0): the rest is whoever had the slot before
         for (const auto& p : body.parts) {
             if (n >= maxParts_) break;
             if (p.bent) {

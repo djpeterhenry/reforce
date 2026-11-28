@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <tuple>
 
 #include "web/Json.hpp"
@@ -91,6 +92,9 @@ std::optional<GuestPoll> parseGuestPoll(std::string_view text, std::string* erro
         a.id = clean(id->str);
         a.name = clean(name->str, 48);
         a.sceneText = sceneText(*dancer, a.name);
+        if (const json::Value* mins = c.get("minutes"); mins && mins->isNumber() && mins->num > 0)
+            a.minutes = std::min(mins->num, 24.0 * 60.0);
+        if (const json::Value* ses = c.get("session"); ses && ses->isBool()) a.session = ses->b;
         out.push_back(std::move(a));
     }
     if (const json::Value* msgs = root->get("messages"); msgs && msgs->isArray()) {
@@ -218,6 +222,12 @@ void GuestFeed::setBusts(const std::vector<GuestBust>& busts) {
     busts_ = std::move(f);
 }
 
+void GuestFeed::setDefaultMinutes(double minutes) {
+    std::string m = std::to_string(std::lround(std::clamp(minutes, 1.0, 24.0 * 60.0)));
+    std::lock_guard<std::mutex> lock(mu_);
+    minutes_ = std::move(m);
+}
+
 GuestFeed::Batch GuestFeed::take() {
     std::lock_guard<std::mutex> lock(mu_);
     Batch out;
@@ -249,7 +259,7 @@ void GuestFeed::run() {
             std::tie(after, msgAfter, reqAfter) = recall(memoryPath_, url_);
         }
         const std::string url = url_ + "/api/checkins?after=" + std::to_string(after) + "&msgAfter=" + std::to_string(msgAfter) +
-                                "&reqAfter=" + std::to_string(reqAfter) + "&floor=" + floor_ + "&bust=" + busts_;
+                                "&reqAfter=" + std::to_string(reqAfter) + "&floor=" + floor_ + "&bust=" + busts_ + "&minutes=" + minutes_;
         const double interval = interval_;
         const std::string key = key_;
         lock.unlock();
@@ -330,6 +340,59 @@ int importGuests(std::string_view text, GuestBook& book, std::string* error) {
         ++n;
     }
     return n;
+}
+
+std::string floorText(std::int64_t savedMs, const std::vector<FloorGuest>& guests) {
+    std::string out = "saved " + std::to_string(savedMs) + "\n";
+    for (const auto& g : guests) {
+        if (g.id.empty() || g.id.find_first_of(" \n\r\t") != std::string::npos) continue;
+        out += g.id + " " + std::to_string(g.endsMs) + "\n";
+    }
+    return out;
+}
+
+std::optional<FloorFile> parseFloorText(std::string_view text) {
+    FloorFile f;
+    bool head = false;
+    std::size_t at = 0;
+    while (at < text.size()) {
+        std::size_t nl = text.find('\n', at);
+        if (nl == std::string_view::npos) nl = text.size();
+        std::string line(text.substr(at, nl - at));
+        at = nl + 1;
+        if (!line.empty() && line.back() == '\r') line.pop_back();
+        if (line.empty()) continue;
+        const std::size_t sp = line.find(' ');
+        if (sp == std::string::npos || sp == 0) return std::nullopt;
+        const std::string key = line.substr(0, sp), val = line.substr(sp + 1);
+        char* end = nullptr;
+        const long long v = std::strtoll(val.c_str(), &end, 10);
+        if (end == val.c_str() || *end != '\0' || v < 0) return std::nullopt;
+        if (!head) {
+            if (key != "saved") return std::nullopt;
+            f.savedMs = v;
+            head = true;
+        } else {
+            f.guests.push_back({key, v});
+        }
+    }
+    if (!head) return std::nullopt;
+    return f;
+}
+
+std::vector<FloorReturn> floorReturns(const FloorFile& f, std::int64_t nowMs, std::int64_t minLeftMs,
+                                      std::int64_t handRecentMs) {
+    std::vector<FloorReturn> out;
+    const bool recent = nowMs >= f.savedMs && nowMs - f.savedMs <= handRecentMs;
+    for (const auto& g : f.guests) {
+        if (std::any_of(out.begin(), out.end(), [&](const FloorReturn& r) { return r.id == g.id; })) continue;
+        if (g.endsMs == 0) {
+            if (recent) out.push_back({g.id, 0.0});
+        } else if (g.endsMs - nowMs >= minLeftMs) {
+            out.push_back({g.id, double(g.endsMs - nowMs) / 1000.0});
+        }
+    }
+    return out;
 }
 
 }  // namespace reforce::web

@@ -204,6 +204,7 @@ Visualizer::Visualizer(MTL::Device* device, const VisualizerOptions& opts)
             const std::string settings = engine::defaultSettingsPath();
             guestFeed_ = std::make_unique<web::GuestFeed>(settings.substr(0, settings.find_last_of('/') + 1) +
                                                           "guests-seen.txt");
+            floorPath_ = settings.substr(0, settings.find_last_of('/') + 1) + "guests-floor.txt";
             guestFeed_->configure(guestsOn_, guestsUrl_, 1.0, guestsKey_);
         }
         danceRandom_ = opts.prefs.dancerRandomStyles;
@@ -539,9 +540,15 @@ LayerStatus Visualizer::status(Layer layer, double t) const {
 
 void Visualizer::seedNoise(MTL::CommandBuffer* cmd) { pipeline_->encodeNoise(cmd, uint32_t(opts_.seed)); }
 
+void Visualizer::stepClocks(double t, const audio::AudioFrame* audio) {
+    stepBeatClock(t, audio);
+    clocksStepped_ = true;
+}
+
 void Visualizer::step(MTL::CommandBuffer* cmd, double t, const audio::AudioFrame* audio) {
     timings_ = {};
-    stepBeatClock(t, audio);  // first: SYNC_* for every config this step, movie beat sync
+    if (!clocksStepped_) stepBeatClock(t, audio);  // first: SYNC_* for every config this step, movie beat sync
+    clocksStepped_ = false;
     stepFlowField(t);
     stepWaveShape(t, audio);
     stepParticles(t, audio);

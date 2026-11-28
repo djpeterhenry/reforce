@@ -689,7 +689,7 @@ colorized frame (`reforce.MovieSprite.Color = over`); see usage.md, "Sprite visi
 ### 5.7 Solid (reforce extension, PLAN 5L)
 
 *Since 2026-11-22 solids and organics are one layer, Objects (`switch:object:NAME`, `Object.*` settings and theme
-keys, `reforce.Object.MaxLive`; docs/usage.md "Objects"); the scene types and their keys below are unchanged. Any object may set `SBar=N`: from the slideshow it starts only on a line every N bars of the phrase clock.*
+keys, `reforce.Object.MaxLive`; docs/usage.md "Objects"); the scene types and their keys below are unchanged. Any object may set `SBar=N`: from the slideshow it starts only on a line every N bars of the phrase clock (that line replaces `reforce.Quantize.Spawn` for it).*
 3D solids: a polyhedron, sphere, torus or prism wearing the current WaveShape (or the frame), drawn into the
 intensity buffer through the sprite pass so it trails and takes the ColorMap (design: docs/3d-design.md). Scene
 files live in `reforce.Solid.package` (reforce's committed `content/Packages/`, a scene root's `Packages/`, or the
@@ -1033,7 +1033,7 @@ ZBar="2"  Puls=".5"  Over="1"  Glow=".7"
 ### 5.8 Organic (reforce extension, PLAN 5N)
 
 *Since 2026-11-22 solids and organics are one layer, Objects (`switch:object:NAME`, `Object.*` settings and theme
-keys, `reforce.Object.MaxLive`; docs/usage.md "Objects"); the scene types and their keys below are unchanged. Any object may set `SBar=N`: from the slideshow it starts only on a line every N bars of the phrase clock.*
+keys, `reforce.Object.MaxLive`; docs/usage.md "Objects"); the scene types and their keys below are unchanged. Any object may set `SBar=N`: from the slideshow it starts only on a line every N bars of the phrase clock (that line replaces `reforce.Quantize.Spawn` for it).*
 
 Procedural growth, drawn as tapered lines into the intensity buffer through the WaveShape line pass, so it trails and
 takes the ColorMap (design: docs/organics-design.md). Scene files live in `reforce.Organic.package` (reforce's

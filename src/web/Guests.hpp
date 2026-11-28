@@ -26,6 +26,8 @@ struct GuestArrival {
     std::string id;         // stable per guest
     std::string name;       // the name tag
     std::string sceneText;  // a reforce.Dancer.package scene file (Vers=100, Style=..., Name=...)
+    double minutes = 0;     // how long they want to dance, picked on the guest page (0: reforce.Guests.Minutes)
+    bool session = false;   // picked "until the end of the stream": stays until reforce quits or Clear
 };
 
 // A message for a speech bubble over the guest's dancer (sent from the page; the service drops ones over 2 minutes old).
@@ -108,6 +110,8 @@ public:
     // Their busts (bustParam), sent with every poll as &bust= (an empty one too: the service learns this reforce
     // reports them). Any thread.
     void setBusts(const std::vector<GuestBust>& busts);
+    // reforce.Guests.Minutes, sent with every poll as &minutes= (the page shows it as the usual stay). Any thread.
+    void setDefaultMinutes(double minutes);
     // New arrivals and messages since the last call, together (a message's guest arrives in the same batch or
     // earlier). Any thread.
     struct Batch {
@@ -133,6 +137,7 @@ private:
     double interval_ = 1.0;
     std::string floor_;  // "ID,ID" (URL-safe)
     std::string busts_;  // bustParam (URL-safe)
+    std::string minutes_ = "30";  // &minutes=
     std::uint64_t generation_ = 0;  // bumped when the URL changes: the next poll starts from what is remembered
     std::string memoryPath_;
     std::vector<GuestArrival> pending_;
@@ -144,5 +149,28 @@ private:
     std::atomic<int> total_{0};
     std::thread thread_;
 };
+
+// Who was on the floor (Peter 2026-11-27): written next to settings.json while reforce runs, so a restart brings them
+// back with the time they had left. One guest per line, "ID ENDS" (ms since 1970; 0 = brought on by hand, stays until
+// cleared), after a first line "saved MS".
+struct FloorGuest {
+    std::string id;
+    std::int64_t endsMs = 0;
+};
+std::string floorText(std::int64_t savedMs, const std::vector<FloorGuest>& guests);
+struct FloorFile {
+    std::int64_t savedMs = 0;
+    std::vector<FloorGuest> guests;
+};
+std::optional<FloorFile> parseFloorText(std::string_view text);
+// Who comes back at `nowMs`, with the seconds they have left (0: until cleared). A timed guest comes back while their
+// time runs (at least `minLeftMs` of it left); one brought on by hand only when the file is at most `handRecentMs`
+// old (a restart, not the next night).
+struct FloorReturn {
+    std::string id;
+    double seconds = 0;
+};
+std::vector<FloorReturn> floorReturns(const FloorFile& f, std::int64_t nowMs, std::int64_t minLeftMs = 5000,
+                                      std::int64_t handRecentMs = 10 * 60 * 1000);
 
 }  // namespace reforce::web

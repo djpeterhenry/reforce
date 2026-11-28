@@ -332,6 +332,15 @@ public:
     void stayFor(double t, double hold) {
         if (hold > 0 && hold_ > 0) hold_ = std::max(hold_, t - start_ + hold);
     }
+    // Stay exactly `hold` more seconds from `t` (a guest who picked another stay on the page: shorter too); <= 0, or a
+    // dancer staying until cleared, as it is.
+    void setStay(double t, double hold) {
+        if (hold > 0 && hold_ > 0) hold_ = std::max(0.0, t - start_ + hold);
+    }
+    // A stay the guest picked: `hold` seconds from `t`, or <= 0 until cleared (also for one brought on by hand).
+    void pickStay(double t, double hold) { hold_ = hold > 0 ? std::max(1e-3, t - start_ + hold) : 0.0; }
+    // When the stay runs out (scene time), or < 0: staying until cleared (or leaving already).
+    double leavesAt() const { return hold_ > 0 && !leaving() ? start_ + hold_ : -1.0; }
     // Leave: a goodbye wave, then shrink away over `fade` seconds in all (at least 1.6 s).
     void leave(double t, double beat, double fade);
     bool leaving() const { return exitStart_ >= 0; }

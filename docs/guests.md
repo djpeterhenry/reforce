@@ -28,12 +28,17 @@ Only the live instance polls: never offline (`--deterministic`) or in a `--backg
 latest dancer is also kept on this Mac (`~/Library/Application Support/reforce/Guests/`), so past guests can be
 brought back from the Dancers card.
 
+**After a restart** (2026-11-27): the live instance keeps who is on the floor and when each one's stay ends in
+`guests-floor.txt` next to settings.json, and brings them back when it starts again with the time they had left
+(guests brought on by hand: until cleared, if reforce was gone at most 10 minutes). Blocked guests and those whose
+time ran out stay away.
+
 ## Protocol
 
 reforce polls every second:
 
 ```
-GET {reforce.Guests.Url}/api/checkins?after=SEQ&msgAfter=SEQ&reqAfter=SEQ&floor=ID,ID&bust=ID:STATE:S,...
+GET {reforce.Guests.Url}/api/checkins?after=SEQ&msgAfter=SEQ&reqAfter=SEQ&floor=ID,ID&bust=ID:STATE:S,...&minutes=M
 Authorization: Bearer {reforce.Guests.Key}        (only when the key is set)
 User-Agent: reforce
 ```
@@ -56,7 +61,7 @@ same check-in twice. The service answers `200` with JSON:
 {
   "seq": 42,
   "checkins": [
-    { "seq": 41, "id": "g7f3", "name": "Sam", "dancer": { "Style": "house", "HairStyle": "afro", "Skin": "#5a3825", "Top": "#e04a2f" } }
+    { "seq": 41, "id": "g7f3", "name": "Sam", "dancer": { "Style": "house", "HairStyle": "afro", "Skin": "#5a3825", "Top": "#e04a2f" }, "minutes": 60 }
   ],
   "msgSeq": 9,
   "messages": [
@@ -82,8 +87,12 @@ same check-in twice. The service answers `200` with JSON:
   `dancer` holds dancer scene file keys (docs/scene-format.md, "Dancer"): letters-only keys, string, number or boolean
   values, up to 64 characters each; `Name`, `Meta`, `Vers` and `Random` are ignored. An unknown value falls back to
   the default, so a service may offer only some of the keys. A check-in for a guest already on stage changes their
-  dancer in place to the look it carries (name, clothes, style) and renews their `reforce.Guests.Minutes`: a service
-  can send one when a guest edits their dancer while dancing.
+  dancer in place to the look it carries (name, clothes, style) and starts their stay over from now: a service
+  can send one when a guest edits their dancer while dancing. `minutes` (optional, 2026-11-27): how long the guest
+  wants to stay, picked on the guest page (1 to 240 used); without it, `reforce.Guests.Minutes`. reforce sends that
+  setting with every poll as `&minutes=M`, so a page can show it as the usual stay. `"session": true` (optional): the
+  guest stays until the end of the stream (until reforce quits or Clear; back after a restart like those brought on
+  by hand).
 - `messages` (optional): speech bubbles over a guest's dancer, `seq > msgAfter`, oldest first; keep them short-lived
   (the maintainer's: 2 minutes). Up to 1024 characters of `text` are shown.
 

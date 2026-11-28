@@ -403,3 +403,45 @@ TEST_CASE("guests: each guest's bust goes out with the polls (docs/guests.md \"b
     REQUIRE(!sent.empty());
     CHECK(sent[0] == "g1:on:30");
 }
+
+TEST_CASE("guests: a check-in carries the stay the guest picked (minutes)") {
+    const auto p = reforce::web::parseGuestPoll(R"({"seq":3,"checkins":[
+        {"seq":1,"at":1,"id":"a1","name":"A","dancer":{"Style":"pop"},"minutes":45},
+        {"seq":2,"at":1,"id":"b2","name":"B","dancer":{"Style":"pop"}},
+        {"seq":3,"at":1,"id":"c3","name":"C","dancer":{"Style":"pop"},"minutes":-5},
+        {"seq":4,"at":1,"id":"d4","name":"D","dancer":{"Style":"pop"},"session":true}]})");
+    REQUIRE(p);
+    REQUIRE(p->arrivals.size() == 4);
+    CHECK(!p->arrivals[0].session);
+    CHECK(p->arrivals[3].session);  // until the end of the stream
+    CHECK(p->arrivals[0].minutes == doctest::Approx(45));
+    CHECK(p->arrivals[1].minutes == 0);  // not picked: reforce.Guests.Minutes
+    CHECK(p->arrivals[2].minutes == 0);
+}
+
+TEST_CASE("guests: the floor file brings guests back after a restart with the time they had left") {
+    using namespace reforce::web;
+    const std::string text = floorText(1000000, {{"a1", 1000000 + 20 * 60000}, {"hand", 0}, {"bad id", 5}});
+    CHECK(text == "saved 1000000\na1 2200000\nhand 0\n");
+    const auto f = parseFloorText(text);
+    REQUIRE(f);
+    CHECK(f->savedMs == 1000000);
+    REQUIRE(f->guests.size() == 2);
+
+    // A minute later: a1 with 19 minutes, the hand-brought guest until cleared.
+    auto back = floorReturns(*f, 1000000 + 60000);
+    REQUIRE(back.size() == 2);
+    CHECK(back[0].id == "a1");
+    CHECK(back[0].seconds == doctest::Approx(19 * 60));
+    CHECK(back[1].id == "hand");
+    CHECK(back[1].seconds == 0);
+
+    // Half an hour later: a1's time ran out, and the hand-brought guest is from too long ago.
+    CHECK(floorReturns(*f, 1000000 + 30 * 60000).empty());
+    // Under 5 s left: not worth coming back for.
+    CHECK(floorReturns(*f, 2200000 - 4000).empty());
+
+    CHECK(!parseFloorText("a1 5\n"));           // no "saved" line
+    CHECK(!parseFloorText("saved x\n"));
+    CHECK(parseFloorText("saved 5\n")->guests.empty());
+}

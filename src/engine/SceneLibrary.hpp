@@ -43,6 +43,8 @@ std::vector<SceneEntry> listScenes(const std::filesystem::path& scenesDir, scene
 // Images and movies (videosOnly: movies) anywhere under `dir`, ids prefixed
 // with `idPrefix` ("External/Clip"): reforce.ExternalSpritesDir joins the
 // Sprite catalog this way, reforce.VideoDir feeds the video source picker.
+// A folder holding a file named kMediaIgnoreFile is skipped with all it holds.
+inline constexpr const char* kMediaIgnoreFile = ".reforce-ignore";
 std::vector<SceneEntry> listMediaFolder(const std::filesystem::path& dir, const std::string& idPrefix,
                                         bool videosOnly);
 
